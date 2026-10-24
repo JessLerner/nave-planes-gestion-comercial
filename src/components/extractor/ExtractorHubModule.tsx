@@ -82,7 +82,7 @@ export const ExtractorHubModule: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Web/CRM URL Source State
-  const [webUrl, setWebUrl] = useState<string>('https://crm.concesionaria-nave.com/leads');
+  const [webUrl, setWebUrl] = useState<string>('');
   const [webMonthFilter, setWebMonthFilter] = useState<'current' | 'all'>('current');
   const [webTeamFilter, setWebTeamFilter] = useState<string>('all');
 
@@ -123,7 +123,9 @@ export const ExtractorHubModule: React.FC = () => {
   const [copiedSql, setCopiedSql] = useState<boolean>(false);
   const [isDownloading, setIsDownloading] = useState<boolean>(false);
   const [isLiveConnected, setIsLiveConnected] = useState<boolean>(false);
-  const [apiKey, setApiKey] = useState<string>('sk_live_sheetstream_prod_99f2');
+  // The ingestion key is a server secret. It is never embedded in the UI or
+  // repository; the production extractor reads it from its runtime secrets.
+  const [apiKey, setApiKey] = useState<string>('');
   const [copiedApiKey, setCopiedApiKey] = useState<boolean>(false);
 
   const apiBaseUrl = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
@@ -167,13 +169,6 @@ export const ExtractorHubModule: React.FC = () => {
   useEffect(() => {
     saveSupabaseConfig(supabaseConfig);
   }, [supabaseConfig]);
-
-  // Load API config
-  useEffect(() => {
-    extractorApi.getConfig().then(cfg => {
-      if (cfg?.apiKey) setApiKey(cfg.apiKey);
-    }).catch(console.error);
-  }, []);
 
   // Load records and stats
   const refreshRecords = async () => {

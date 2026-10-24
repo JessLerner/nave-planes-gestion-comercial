@@ -462,7 +462,10 @@ let extractorDatabase: {
 } = {
   records: [],
   syncLogs: [],
-  apiKey: 'sk_live_sheetstream_prod_99f2'
+  // Never ship an ingestion credential in source code. Set it in the runtime
+  // environment for local compatibility only; production ingestion belongs in
+  // the Supabase Edge Function and uses INGEST_SHARED_SECRET.
+  apiKey: process.env.DATA_EXTRACTOR_API_KEY || ''
 };
 
 // Load saved extractor data if exists
@@ -507,12 +510,19 @@ app.post('/api/ingest', (req: Request, res: Response) => {
   const userAgent = (req.headers['user-agent'] as string) || 'Google-Sheets-Client';
   const authHeader = req.headers['authorization'] || req.headers['x-api-key'] || req.body.apiKey;
 
-  // Validate API key if configured
-  if (extractorDatabase.apiKey && authHeader) {
+  // Ingestion fails closed: accepting uploads without a configured secret would
+  // let anybody write commercial records into the platform.
+  if (!extractorDatabase.apiKey) {
+    return res.status(503).json({ error: 'Ingestion unavailable', message: 'No hay credencial de ingestión configurada.' });
+  }
+  if (!authHeader) {
+    return res.status(401).json({ error: 'Unauthorized', message: 'Falta credencial de ingestión.' });
+  }
+  {
     const token = typeof authHeader === 'string' && authHeader.startsWith('Bearer ')
       ? authHeader.slice(7)
       : authHeader;
-    if (token !== extractorDatabase.apiKey && token !== 'test_demo_key') {
+    if (token !== extractorDatabase.apiKey) {
       const durationMs = Date.now() - startTime;
       const logEntry: ExtractorSyncLog = {
         id: `log_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
@@ -785,13 +795,17 @@ app.get('/api/stats', (_req: Request, res: Response) => {
 // GET / POST: API Key configuration
 app.get('/api/config', (_req: Request, res: Response) => {
   res.json({
-    apiKey: extractorDatabase.apiKey,
+    apiKeyConfigured: Boolean(extractorDatabase.apiKey),
     ingestUrl: '/api/ingest',
     streamUrl: '/api/stream'
   });
 });
 
 app.post('/api/config', (req: Request, res: Response) => {
+  const adminSecret = process.env.EXTRACTOR_ADMIN_SECRET;
+  if (!adminSecret || req.headers['x-admin-secret'] !== adminSecret) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
   const { apiKey } = req.body;
   if (apiKey && typeof apiKey === 'string') {
     extractorDatabase.apiKey = apiKey.trim();

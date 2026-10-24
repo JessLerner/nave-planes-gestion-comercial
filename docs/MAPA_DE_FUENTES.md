@@ -8,7 +8,7 @@ Este documento describe qué sistema es dueño de cada dato. No se cargan datos 
 | App Control Operaciones | `Modelos_y_Precios` | Marca, modelo, plan, cuota 1 y cuenta de fábrica | marca + modelo + tipo de plan + vigencia |
 | App Control Operaciones | `Equipos_de_venta` | Supervisor y vendedores por equipo | nombre normalizado; luego identificador interno de vendedor |
 | App Control Operaciones | `Origen_datos` | Canales de origen de leads | nombre normalizado |
-| Scoring Peugeot | planilla de Scoring | Estado de auditoría, motivos y comentarios | marca `PEUGEOT` + `SX` + cliente normalizado |
+| Scoring Peugeot | planilla de Scoring | Estado de auditoría, motivos y comentarios | `SX` = `N° Suscripción` |
 | Fox CRM / Data Extractor | reporte o webhook aprobado | Entrada, reparto y gestión de leads | identificador externo del CRM |
 | Informe de mora | CSV/XLSX mensual pendiente | Agrupamiento, cuotas vencidas y deuda | N° Suscripción |
 
@@ -24,9 +24,7 @@ La importación hará *upsert* por `N° Suscripción`, que es la clave única qu
 
 Columnas recibidas: `FECHA`, `Nº`, `CISA`, `DOC`, `SX`, `DEBITO`, `PAGO`, `DEBE`, `MODELO`, `CLIENTE`, `VENDEDOR`, `SUPERVISOR`, `ADM`, `VIDEOLLAMADA`, `MOTIVO RECHAZO 1`, `MOTIVO RECHAZO 2`, `MOTIVO APROBADO`, `MOTIVO ANULADO`, `CATEGORIA`, `COMENTARIOS`.
 
-El registro de auditoría conserva la fila original y se identifica inicialmente por **marca + SX + cliente normalizado**. Esto permite tener más de un contrato para el mismo cliente cuando se reemplaza y se asigna una nueva SX.
-
-Para asociar automáticamente el scoring a la venta de `ID Ventas` falta confirmar una sola equivalencia: ¿la columna `Nº` del Scoring es el mismo valor que `N° Suscripción`? Si no lo es, el extractor almacenará ambas referencias y dejará el vínculo como "pendiente de conciliación" en vez de asociar contratos de forma insegura.
+El registro de auditoría conserva la fila original y se asocia a la operación mediante **SX**, que equivale exactamente a `N° Suscripción` en `ID Ventas`. Cliente funciona como control adicional: permite detectar un reemplazo de contrato, ya que el mismo cliente puede recibir una nueva SX.
 
 ## Flujo de sincronización
 

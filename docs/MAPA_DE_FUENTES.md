@@ -28,8 +28,8 @@ El registro de auditoría conserva la fila original y se asocia a la operación 
 
 ## Flujo de sincronización
 
-1. Apps Script expone la lectura de `ID Ventas`, `Modelos_y_Precios`, `Equipos_de_venta` y `Origen_datos` mediante un endpoint de sólo lectura.
-2. El extractor autenticado lee ese endpoint y envía el lote a una Edge Function de Supabase.
+1. Apps Script expone la lectura de `ID Ventas`, `Modelos_y_Precios`, `Equipos_de_venta` y `Origen_datos` mediante un endpoint de sólo lectura. Parte Diario no se modifica.
+2. La función `sync-app-control-roster` de Supabase lee ese endpoint y actualiza exclusivamente la nómina. Excluye siempre `Convencional`.
 3. La Edge Function normaliza las columnas y hace *upsert*.
 4. Para cada marca se registra una fuente de Scoring independiente; Peugeot es la primera.
 5. Nave Planes consulta exclusivamente Supabase y muestra, aun sin datos, el estado y la fecha de cada fuente.

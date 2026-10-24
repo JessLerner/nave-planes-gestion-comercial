@@ -1,0 +1,6 @@
+{
+  "name": "Nave Planes - Gestión Comercial y Operativa",
+  "description": "Plataforma integral de gestión operativa, comercial, scoring, RRHH y control de cartera para mandos medios y gerencia de concesionaria de autos.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -17,6 +17,7 @@ import { formatARS } from '../../utils/businessLogic';
 
 export const PriceListModule: React.FC = () => {
   const { priceLists, updatePriceListItem, addPriceListItem, currentUser } = useApp();
+  const canManagePriceLists = currentUser.role === 'admin';
 
   const [selectedBrand, setSelectedBrand] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
@@ -60,7 +61,7 @@ export const PriceListModule: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-3">
-          {(currentUser.role === 'admin' || currentUser.role === 'gerente') && (
+          {canManagePriceLists && (
             <button
               onClick={() => setShowAddModal(true)}
               className="flex items-center gap-2 px-3.5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-semibold shadow-lg shadow-blue-600/20 transition-all"
@@ -133,7 +134,7 @@ export const PriceListModule: React.FC = () => {
                 <th className="py-3 px-4 text-right">Valor Vehículo</th>
                 <th className="py-3 px-4 text-right">Bonificación</th>
                 <th className="py-3 px-4 text-center">Simulador</th>
-                {(currentUser.role === 'admin' || currentUser.role === 'gerente') && (
+                {canManagePriceLists && (
                   <th className="py-3 px-4 text-right">Acción</th>
                 )}
               </tr>
@@ -149,7 +150,7 @@ export const PriceListModule: React.FC = () => {
                     <p className="text-xs text-slate-500 max-w-md mx-auto mt-1 mb-4">
                       Sincronice la planilla oficial de Google Sheets / PDF o cargue las versiones oficiales de fábrica.
                     </p>
-                    {(currentUser.role === 'admin' || currentUser.role === 'gerente') && (
+                    {canManagePriceLists && (
                       <button
                         onClick={() => setShowAddModal(true)}
                         className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-semibold shadow-md shadow-blue-600/20"
@@ -195,7 +196,7 @@ export const PriceListModule: React.FC = () => {
                       <span>Simular</span>
                     </button>
                   </td>
-                  {(currentUser.role === 'admin' || currentUser.role === 'gerente') && (
+                  {canManagePriceLists && (
                     <td className="py-3 px-4 text-right">
                       <button
                         onClick={() => setEditingItem(item)}

@@ -9,6 +9,9 @@ import {
   Calendar,
   Layers,
   Settings,
+  ExternalLink,
+  Bell,
+  Clock3,
 } from 'lucide-react';
 
 interface HeaderProps {
@@ -33,9 +36,12 @@ export const Header: React.FC<HeaderProps> = ({
     syncDataExtractor,
     lastSyncTime,
     monthlyConfig,
+    wageAdvances,
+    sellers,
   } = useApp();
 
   const [showUserDropdown, setShowUserDropdown] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
 
   const getBreadcrumbTitle = () => {
     switch (activeTab) {
@@ -61,6 +67,9 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   const currentTeam = teams.find(t => t.id === selectedTeamId);
+  const pendingAdvances = currentUser.role === 'gerente'
+    ? wageAdvances.filter(advance => advance.status === 'pending')
+    : [];
 
   return (
     <header className="h-16 bg-slate-900/90 backdrop-blur border-b border-slate-800 px-4 sm:px-6 flex items-center justify-between gap-3 sm:gap-6 z-20 shrink-0">
@@ -110,8 +119,19 @@ export const Header: React.FC<HeaderProps> = ({
 
       {/* Zone 2: Actions & Pipeline Sync */}
       <div className="flex items-center gap-3">
-        {/* Calendar Settings shortcut (Admin/Gerente) */}
-        {(currentUser.role === 'admin' || currentUser.role === 'gerente') && (
+        <a
+          href="https://foxcrm.net/app/reporte_cartera_leads.php"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-orange-500/10 hover:bg-orange-500/20 text-xs font-semibold text-orange-300 border border-orange-500/30 transition-colors"
+          title="Abrir el reporte de cartera de leads en Fox CRM"
+        >
+          <ExternalLink className="w-3.5 h-3.5" />
+          <span className="hidden sm:inline">Ir a Fox CRM</span>
+        </a>
+
+        {/* Configuration is intentionally restricted to the platform administrator. */}
+        {currentUser.role === 'admin' && (
           <button
             onClick={onOpenCalendarConfig}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-slate-800/80 hover:bg-slate-700 text-xs font-medium text-slate-300 border border-slate-700/80 transition-colors"
@@ -123,8 +143,57 @@ export const Header: React.FC<HeaderProps> = ({
           </button>
         )}
 
+        {currentUser.role === 'gerente' && (
+          <div className="relative">
+            <button
+              onClick={() => setShowNotifications(value => !value)}
+              className="relative flex items-center justify-center w-9 h-9 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-colors"
+              aria-label={`Notificaciones: ${pendingAdvances.length} adelantos pendientes`}
+              aria-expanded={showNotifications}
+              title="Adelantos pendientes de autorización"
+            >
+              <Bell className="w-4 h-4 text-amber-300" />
+              {pendingAdvances.length > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 min-w-4 h-4 px-1 rounded-full bg-red-500 text-[10px] leading-4 text-white font-bold">
+                  {pendingAdvances.length}
+                </span>
+              )}
+            </button>
+
+            {showNotifications && (
+              <div className="absolute right-0 mt-2 w-80 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl z-50 overflow-hidden">
+                <div className="px-4 py-3 border-b border-slate-800 flex items-center justify-between">
+                  <span className="text-xs font-bold text-white">Pendientes de Gerencia</span>
+                  <span className="text-[10px] text-amber-300 font-semibold">{pendingAdvances.length} adelantos</span>
+                </div>
+                {pendingAdvances.length === 0 ? (
+                  <div className="px-4 py-5 text-xs text-slate-400">No hay adelantos pendientes de autorización.</div>
+                ) : (
+                  <div className="max-h-72 overflow-y-auto divide-y divide-slate-800">
+                    {pendingAdvances.map(advance => {
+                      const seller = sellers.find(item => item.id === advance.seller_id);
+                      return (
+                        <div key={advance.id} className="px-4 py-3">
+                          <div className="text-xs font-semibold text-slate-100">Adelanto pendiente · {seller?.name || 'Vendedor'}</div>
+                          <div className="mt-1 flex items-center gap-1 text-[11px] text-slate-400">
+                            <Clock3 className="w-3 h-3" />
+                            <span>Solicitado el {advance.request_date}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+                <div className="px-4 py-2.5 bg-slate-950/60 text-[11px] text-slate-400">
+                  Autorizá o rechazá cada pedido desde RRHH & Adelantos.
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Data-Extractor Sync Button */}
-        <button
+        {currentUser.role === 'admin' && <button
           onClick={syncDataExtractor}
           disabled={isSyncingDataExtractor}
           className="flex items-center gap-2 px-3 py-1.5 rounded bg-slate-800 hover:bg-slate-700/80 text-xs font-medium text-slate-200 border border-slate-700 transition-colors"
@@ -137,7 +206,7 @@ export const Header: React.FC<HeaderProps> = ({
           <span className="hidden xl:inline text-[10px] text-slate-400 ml-1 border-l border-slate-700 pl-1.5">
             {lastSyncTime.split('(')[0]}
           </span>
-        </button>
+        </button>}
 
         {/* Role Switcher Simulator (Essential for executive evaluation) */}
         <div className="relative">

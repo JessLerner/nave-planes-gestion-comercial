@@ -30,6 +30,7 @@ import {
   CartesianGrid,
 } from 'recharts';
 import { formatARS } from '../../utils/businessLogic';
+import { Seller } from '../../types';
 
 export const PacingDashboard: React.FC<{ onOpenCalendarConfig: () => void }> = ({
   onOpenCalendarConfig,
@@ -48,6 +49,7 @@ export const PacingDashboard: React.FC<{ onOpenCalendarConfig: () => void }> = (
     sellersAtTwoPlus,
     salesBySeller,
     updateSellerTarget,
+    updateSeller,
     updateTeamTargetOverride,
     selectedTeamId,
     recommendations,
@@ -55,6 +57,7 @@ export const PacingDashboard: React.FC<{ onOpenCalendarConfig: () => void }> = (
 
   const [editingSellerId, setEditingSellerId] = useState<string | null>(null);
   const [editingTargetValue, setEditingTargetValue] = useState<number>(4);
+  const [editingSellerProfile, setEditingSellerProfile] = useState<Seller | null>(null);
   const [activeTabRecom, setActiveTabRecom] = useState<'all' | 'tactical' | 'executive'>('all');
 
   // Filter metrics based on selected team
@@ -465,7 +468,9 @@ export const PacingDashboard: React.FC<{ onOpenCalendarConfig: () => void }> = (
                     <td className="py-3 px-4">
                       <div className="font-semibold text-white">{seller.name}</div>
                       <div className="text-[11px] text-slate-400">
-                        DNI {seller.dni} · Alta {seller.hire_date}
+                        {seller.employment_type || 'Vínculo sin informar'}
+                        {seller.legajo ? ` · Legajo ${seller.legajo}` : ''}
+                        {seller.hire_date ? ` · Alta ${seller.hire_date}` : ''}
                       </div>
                     </td>
                     <td className="py-3 px-4 text-slate-300">
@@ -539,6 +544,14 @@ export const PacingDashboard: React.FC<{ onOpenCalendarConfig: () => void }> = (
                       )}
                     </td>
                     <td className="py-3 px-4 text-right">
+                      {currentUser.role === 'admin' && (
+                        <button
+                          onClick={() => setEditingSellerProfile({ ...seller })}
+                          className="mr-2 px-2.5 py-1 bg-indigo-600/20 hover:bg-indigo-600/35 text-indigo-200 border border-indigo-500/30 rounded text-xs transition-colors"
+                        >
+                          Ficha
+                        </button>
+                      )}
                       {editingSellerId !== seller.id && (
                         <button
                           onClick={() => {
@@ -559,6 +572,46 @@ export const PacingDashboard: React.FC<{ onOpenCalendarConfig: () => void }> = (
           </table>
         </div>
       </div>
+
+      {editingSellerProfile && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4">
+          <div className="w-full max-w-lg rounded-xl border border-slate-700 bg-slate-900 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-800 px-5 py-4">
+              <div>
+                <h3 className="font-semibold text-white">Ficha de recurso</h3>
+                <p className="text-xs text-slate-400">Datos laborales administrados desde Nave Planes.</p>
+              </div>
+              <button onClick={() => setEditingSellerProfile(null)} className="text-slate-400 hover:text-white">Cerrar</button>
+            </div>
+            <div className="grid gap-3 p-5 sm:grid-cols-2">
+              <label className="sm:col-span-2 text-xs text-slate-300">Nombre completo
+                <input value={editingSellerProfile.name} onChange={e => setEditingSellerProfile({ ...editingSellerProfile, name: e.target.value })} className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white" />
+              </label>
+              <label className="text-xs text-slate-300">Tipo de vínculo
+                <select value={editingSellerProfile.employment_type || ''} onChange={e => setEditingSellerProfile({ ...editingSellerProfile, employment_type: e.target.value })} className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white">
+                  <option value="">Sin informar</option><option value="Legajo">Legajo</option><option value="Coaching">Coaching</option><option value="Free lance">Free lance</option>
+                </select>
+              </label>
+              <label className="text-xs text-slate-300">N° de legajo
+                <input value={editingSellerProfile.legajo || ''} onChange={e => setEditingSellerProfile({ ...editingSellerProfile, legajo: e.target.value })} className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white" />
+              </label>
+              <label className="text-xs text-slate-300">DNI
+                <input inputMode="numeric" value={editingSellerProfile.dni || ''} onChange={e => setEditingSellerProfile({ ...editingSellerProfile, dni: e.target.value })} className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white" />
+              </label>
+              <label className="text-xs text-slate-300">Fecha de ingreso
+                <input type="date" value={editingSellerProfile.hire_date || ''} onChange={e => setEditingSellerProfile({ ...editingSellerProfile, hire_date: e.target.value || undefined })} className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white" />
+              </label>
+              <label className="flex items-center gap-2 text-xs text-slate-300 sm:col-span-2">
+                <input type="checkbox" checked={editingSellerProfile.active} onChange={e => setEditingSellerProfile({ ...editingSellerProfile, active: e.target.checked })} /> Recurso activo
+              </label>
+            </div>
+            <div className="flex justify-end gap-2 border-t border-slate-800 px-5 py-4">
+              <button onClick={() => setEditingSellerProfile(null)} className="rounded px-3 py-2 text-sm text-slate-300 hover:bg-slate-800">Cancelar</button>
+              <button onClick={() => { updateSeller(editingSellerProfile.id, editingSellerProfile); setEditingSellerProfile(null); }} className="rounded bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-500">Guardar cambios</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 6. Motor de Consejos y Recomendaciones Inteligentes (Solapa Adaptativa) */}
       <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">

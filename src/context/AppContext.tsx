@@ -86,6 +86,7 @@ interface AppContextType {
   updateCandidateDocs: (candidateId: string, docKey: keyof Candidate['docs'], value: boolean) => void;
   importCarteraBatch: (newRecords: CarteraMora[]) => void;
   updateSellerTarget: (sellerId: string, newTarget: number) => void;
+  updateSeller: (sellerId: string, changes: Partial<Omit<Seller, 'id'>>) => void;
   updateTeamTargetOverride: (teamId: string, override?: number) => void;
   addSeller: (seller: Omit<Seller, 'id'>) => void;
   addTeam: (team: Omit<Team, 'id'>) => void;
@@ -430,6 +431,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const requestAdvance = (sellerId: string, amount: number, reason: string) => {
     const seller = sellers.find(s => s.id === sellerId);
     if (!seller) return { success: false, message: 'Vendedor no encontrado.' };
+    if (currentUser.role !== 'supervisor') {
+      return { success: false, message: 'Las solicitudes de adelanto deben ser iniciadas por el supervisor responsable.' };
+    }
+    if (!currentUser.team_id || seller.team_id !== currentUser.team_id) {
+      return { success: false, message: 'Solo puede solicitar adelantos para vendedores de su propio equipo.' };
+    }
 
     const sellerSales = salesBySeller[sellerId] || 0;
     const currentDay = new Date().getDate();
@@ -470,6 +477,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const reviewAdvance = (advanceId: string, status: 'approved' | 'rejected', notes?: string) => {
+    if (currentUser.role !== 'gerente') return;
     setWageAdvances(prev => {
       const next = prev.map(wa => {
         if (wa.id !== advanceId) return wa;
@@ -524,6 +532,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const updatePriceListItem = (item: PriceListItem) => {
+    if (currentUser.role !== 'admin') return;
     setPriceLists(prev => {
       const next = prev.map(pl => (pl.id === item.id ? item : pl));
       syncToBackend({ priceLists: next });
@@ -532,6 +541,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const addPriceListItem = (item: Omit<PriceListItem, 'id' | 'updated_at'>) => {
+    if (currentUser.role !== 'admin') return;
     const newItem: PriceListItem = {
       ...item,
       id: `pl-${Date.now().toString().slice(-4)}`,
@@ -545,6 +555,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const updateCandidateStage = (candidateId: string, stage: Candidate['stage']) => {
+    const candidate = candidates.find(c => c.id === candidateId);
+    if (currentUser.role === 'supervisor' && candidate?.target_team_id !== currentUser.team_id) return;
     setCandidates(prev => {
       const next = prev.map(c => (c.id === candidateId ? { ...c, stage } : c));
       syncToBackend({ candidates: next });
@@ -553,6 +565,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const updateCandidateDocs = (candidateId: string, docKey: keyof Candidate['docs'], value: boolean) => {
+    const candidate = candidates.find(c => c.id === candidateId);
+    if (currentUser.role === 'supervisor' && candidate?.target_team_id !== currentUser.team_id) return;
     setCandidates(prev => {
       const next = prev.map(c => {
         if (c.id !== candidateId) return c;
@@ -574,6 +588,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const updateSellerTarget = (sellerId: string, newTarget: number) => {
     setSellers(prev => {
       const next = prev.map(s => (s.id === sellerId ? { ...s, individual_target: newTarget } : s));
+      syncToBackend({ sellers: next });
+      return next;
+    });
+  };
+
+  const updateSeller = (sellerId: string, changes: Partial<Omit<Seller, 'id'>>) => {
+    if (currentUser.role !== 'admin') return;
+    setSellers(prev => {
+      const next = prev.map(s => (s.id === sellerId ? { ...s, ...changes } : s));
       syncToBackend({ sellers: next });
       return next;
     });
@@ -670,6 +693,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         updateCandidateDocs,
         importCarteraBatch,
         updateSellerTarget,
+        updateSeller,
         updateTeamTargetOverride,
         addSeller,
         addTeam,

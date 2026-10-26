@@ -15,6 +15,10 @@ export interface Team {
   name: string;
   supervisor_id: string;
   supervisor_name: string;
+  supervisor_staff_id?: string;
+  manager_staff_id?: string;
+  manager_name?: string;
+  commercial_structure?: string;
   branch: string;
   target_override?: number;
   color: string;
@@ -24,9 +28,12 @@ export interface Seller {
   id: string;
   name: string;
   team_id: string;
+  staff_member_id?: string;
   active: boolean;
-  hire_date: string;
+  hire_date?: string;
   termination_date?: string;
+  legajo?: string;
+  employment_type?: string;
   phone: string;
   email: string;
   dni: string;

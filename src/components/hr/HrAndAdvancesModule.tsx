@@ -46,6 +46,17 @@ export const HrAndAdvancesModule: React.FC = () => {
   // Review modal state
   const [selectedAdvanceForReview, setSelectedAdvanceForReview] = useState<WageAdvance | null>(null);
   const [rejectionNotes, setRejectionNotes] = useState('');
+  const isSupervisor = currentUser.role === 'supervisor';
+  const canApproveAdvances = currentUser.role === 'gerente';
+  const visibleSellers = isSupervisor
+    ? sellers.filter(s => s.team_id === currentUser.team_id)
+    : sellers;
+  const visibleAdvances = isSupervisor
+    ? wageAdvances.filter(wa => sellers.find(s => s.id === wa.seller_id)?.team_id === currentUser.team_id)
+    : wageAdvances;
+  const visibleCandidates = isSupervisor
+    ? candidates.filter(candidate => candidate.target_team_id === currentUser.team_id)
+    : candidates;
 
   // Selected seller details for live validation check
   const selectedSeller = sellers.find(s => s.id === targetSellerId);
@@ -112,13 +123,13 @@ export const HrAndAdvancesModule: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-3">
-          <button
+          {isSupervisor && <button
             onClick={() => setShowRequestModal(true)}
             className="flex items-center gap-2 px-3.5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-semibold shadow-lg shadow-blue-600/20 transition-all"
           >
             <DollarSign className="w-3.5 h-3.5" />
             <span>Gestionar Solicitud de Adelanto</span>
-          </button>
+          </button>}
         </div>
       </div>
 
@@ -132,7 +143,7 @@ export const HrAndAdvancesModule: React.FC = () => {
               : 'text-slate-400 hover:text-white'
           }`}
         >
-          Adelantos de Sueldo ({wageAdvances.length})
+          Adelantos de Sueldo ({visibleAdvances.length})
         </button>
         <button
           onClick={() => setActiveSubTab('recruitment')}
@@ -142,7 +153,7 @@ export const HrAndAdvancesModule: React.FC = () => {
               : 'text-slate-400 hover:text-white'
           }`}
         >
-          Reclutamiento & Legajos ({candidates.length})
+          Reclutamiento & Legajos ({visibleCandidates.length})
         </button>
         <button
           onClick={() => setActiveSubTab('turnover')}
@@ -164,10 +175,10 @@ export const HrAndAdvancesModule: React.FC = () => {
             <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
               <div className="text-xs text-slate-400">Total Solicitudes del Mes</div>
               <div className="text-2xl font-bold text-white font-mono mt-1">
-                {wageAdvances.length}
+                {visibleAdvances.length}
               </div>
               <div className="text-[11px] text-slate-500 mt-1">
-                Aprobados: {wageAdvances.filter(w => w.status === 'approved').length} · Pendientes: {wageAdvances.filter(w => w.status === 'pending').length}
+                Aprobados: {visibleAdvances.filter(w => w.status === 'approved').length} · Pendientes: {visibleAdvances.filter(w => w.status === 'pending').length}
               </div>
             </div>
 
@@ -175,7 +186,7 @@ export const HrAndAdvancesModule: React.FC = () => {
               <div className="text-xs text-slate-400">Monto Total Liquidado</div>
               <div className="text-2xl font-bold text-emerald-400 font-mono mt-1">
                 {formatARS(
-                  wageAdvances
+                  visibleAdvances
                     .filter(w => w.status === 'approved')
                     .reduce((sum, w) => sum + w.amount, 0)
                 )}
@@ -188,10 +199,10 @@ export const HrAndAdvancesModule: React.FC = () => {
             <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
               <div className="text-xs text-slate-400">Vendedores Aptos (≥ 2 ventas)</div>
               <div className="text-2xl font-bold text-blue-400 font-mono mt-1">
-                {sellers.filter(s => s.active && (salesBySeller[s.id] || 0) >= monthlyConfig.min_sales_for_advance).length}
+                {visibleSellers.filter(s => s.active && (salesBySeller[s.id] || 0) >= monthlyConfig.min_sales_for_advance).length}
               </div>
               <div className="text-[11px] text-slate-500 mt-1">
-                {sellers.filter(s => s.active && (salesBySeller[s.id] || 0) < monthlyConfig.min_sales_for_advance).length} vendedores en 0 o 1 venta (bloqueados)
+                {visibleSellers.filter(s => s.active && (salesBySeller[s.id] || 0) < monthlyConfig.min_sales_for_advance).length} vendedores en 0 o 1 venta (bloqueados)
               </div>
             </div>
           </div>
@@ -219,11 +230,11 @@ export const HrAndAdvancesModule: React.FC = () => {
                     <th className="py-3 px-4 text-right">Monto Solicitado</th>
                     <th className="py-3 px-4">Motivo Declarado</th>
                     <th className="py-3 px-4 text-center">Estado Auditoría</th>
-                    <th className="py-3 px-4 text-right">Acción RRHH</th>
+                    <th className="py-3 px-4 text-right">Acción Gerencia</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/80">
-                  {wageAdvances.map(wa => {
+                  {visibleAdvances.map(wa => {
                     const seller = sellers.find(s => s.id === wa.seller_id);
                     const team = teams.find(t => t.id === seller?.team_id);
                     const isApproved = wa.status === 'approved';
@@ -281,7 +292,7 @@ export const HrAndAdvancesModule: React.FC = () => {
                           )}
                         </td>
                         <td className="py-3 px-4 text-right">
-                          {isPending && (currentUser.role === 'rrhh' || currentUser.role === 'admin' || currentUser.role === 'gerente') ? (
+                          {isPending && canApproveAdvances ? (
                             <div className="inline-flex items-center gap-1.5">
                               <button
                                 onClick={() => reviewAdvance(wa.id, 'approved')}
@@ -316,7 +327,7 @@ export const HrAndAdvancesModule: React.FC = () => {
       {activeSubTab === 'recruitment' && (
         <div className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {candidates.map(candidate => {
+            {visibleCandidates.map(candidate => {
               const team = teams.find(t => t.id === candidate.target_team_id);
               const docsComplete = Object.values(candidate.docs).every(Boolean);
 
@@ -486,7 +497,7 @@ export const HrAndAdvancesModule: React.FC = () => {
                   onChange={e => setTargetSellerId(e.target.value)}
                   className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-200"
                 >
-                  {sellers.filter(s => s.active).map(s => {
+                  {visibleSellers.filter(s => s.active).map(s => {
                     const salesCount = salesBySeller[s.id] || 0;
                     return (
                       <option key={s.id} value={s.id}>
@@ -573,7 +584,7 @@ export const HrAndAdvancesModule: React.FC = () => {
                       : 'bg-slate-800 text-slate-500 cursor-not-allowed'
                   }`}
                 >
-                  Enviar a RRHH
+                  Enviar a Gerencia
                 </button>
               </div>
             </form>

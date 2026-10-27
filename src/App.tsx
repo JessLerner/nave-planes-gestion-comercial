@@ -15,6 +15,7 @@ import { HrAndAdvancesModule } from './components/hr/HrAndAdvancesModule';
 import { CarteraMoraModule } from './components/cartera/CarteraMoraModule';
 import { DatabaseConnectorsModule } from './components/database/DatabaseConnectorsModule';
 import { ExtractorHubModule } from './components/extractor/ExtractorHubModule';
+import { RosterManagementModule } from './components/admin/RosterManagementModule';
 import { CalendarConfigModal } from './components/calendar/CalendarConfigModal';
 import { AuthProvider, useAuth } from './auth/AuthProvider';
 import { LoginScreen } from './auth/LoginScreen';
@@ -28,7 +29,7 @@ function MainLayout() {
 
   // If user switches away from admin while on extractor, gracefully return to pacing
   React.useEffect(() => {
-    if (activeTab === 'extractor' && currentUser.role !== 'admin') {
+    if ((activeTab === 'extractor' || activeTab === 'structure') && currentUser.role !== 'admin') {
       setActiveTab('pacing');
     }
   }, [currentUser.role, activeTab]);
@@ -65,6 +66,7 @@ function MainLayout() {
             {activeTab === 'cartera' && <CarteraMoraModule />}
             {activeTab === 'database' && <DatabaseConnectorsModule />}
             {activeTab === 'extractor' && <ExtractorHubModule />}
+            {activeTab === 'structure' && <RosterManagementModule />}
           </div>
         </main>
       </div>

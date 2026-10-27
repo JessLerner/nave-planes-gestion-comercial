@@ -12,6 +12,16 @@ const text = (value: unknown, max = 180) => typeof value === 'string' && value.t
 const optionalText = (value: unknown, max = 180) => value == null || value === '' ? null : text(value, max);
 const date = (value: unknown) => { const result = optionalText(value, 10); return result && /^\d{4}-\d{2}-\d{2}$/.test(result) ? result : null; };
 const normalize = (value: string | null) => value ? value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^\p{L}\p{N}]+/gu, ' ').trim().replace(/\s+/g, ' ').toLowerCase() : null;
+const nameTokens = (value: string | null) => (normalize(value) || '').split(' ').filter(Boolean);
+// The HR sheet often omits a middle name or flips apellido/nombre.  Treat it
+// as the same resource only when every token of the shorter name is present
+// in the longer one; ambiguous candidates stay unresolved instead of guessed.
+const namesCompatible = (left: string, right: string) => {
+  const a = nameTokens(left); const b = nameTokens(right);
+  if (a.length < 2 || b.length < 2) return false;
+  const [shorter, longer] = a.length <= b.length ? [a, b] : [b, a];
+  return shorter.every(token => longer.includes(token));
+};
 
 async function userIdFromRequest(req: VercelRequest) {
   const header = req.headers?.authorization;
@@ -63,6 +73,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         db.query(`select id, name from public.teams`),
       ]);
       const staffByName = new Map<string, string>();
+      const staffCandidates = currentStaff.rows.map(row => ({ id: row.id as string, fullName: row.full_name as string }));
       currentStaff.rows.forEach(row => { const key = normalize(row.full_name); if (key) staffByName.set(key, row.id); });
       const teamByName = new Map<string, string>();
       currentTeams.rows.forEach(row => { const key = normalize(row.name); if (key) teamByName.set(key, row.id); });
@@ -76,12 +87,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const legajo = optionalText(row.legajo, 80); const employmentType = optionalText(row.employmentType, 80);
         const commercialStructure = optionalText(row.commercialStructure, 180); const location = optionalText(row.location, 180);
         const hireDate = date(row.hireDate); const teamName = optionalText(row.teamName, 180); const teamId = teamName ? teamByName.get(normalize(teamName) || '') : null;
-        let staffId = staffByName.get(key);
+        let staffId: string | null = staffByName.get(key) ?? null;
+        if (!staffId) {
+          const compatible = staffCandidates.filter(candidate => namesCompatible(fullName, candidate.fullName));
+          if (compatible.length === 1) staffId = compatible[0].id;
+        }
         if (staffId) {
           await db.query(`update public.staff_members set active=true, role=$2::public.staff_role, dni=coalesce($3,dni), legajo=coalesce($4,legajo), employment_type=coalesce($5,employment_type), commercial_structure=coalesce($6,commercial_structure), location=coalesce($7,location), hire_date=coalesce($8::date,hire_date), termination_date=null, source_label='ESTRUCTURA RRHH ACTIVA OK', updated_at=now() where id=$1`, [staffId, role, dni, legajo, employmentType, commercialStructure, location, hireDate]);
         } else {
           const created = await db.query(`insert into public.staff_members (full_name, role, active, dni, legajo, employment_type, commercial_structure, location, hire_date, source_label) values ($1,$2::public.staff_role,true,$3,$4,$5,$6,$7,$8::date,'ESTRUCTURA RRHH ACTIVA OK') returning id`, [fullName, role, dni, legajo, employmentType, commercialStructure, location, hireDate]);
-          staffId = created.rows[0].id; staffByName.set(key, staffId); createdStaff++;
+          staffId = created.rows[0].id as string; staffByName.set(key, staffId); staffCandidates.push({ id: staffId, fullName }); createdStaff++;
         }
         if (role === 'vendedor') {
           if (!teamId) { unresolvedRows++; continue; }

@@ -16,6 +16,15 @@ type AuthState = {
 };
 
 const AuthContext = createContext<AuthState | null>(null);
+const CANONICAL_PRODUCTION_URL = 'https://nave-planes-gestion-comercial.vercel.app';
+
+function getRecoveryRedirectUrl() {
+  // Vercel also exposes a project-specific alias. Authentication emails must
+  // always return to the public production URL, not to whichever alias the
+  // requester happened to open.
+  const baseUrl = import.meta.env.PROD ? CANONICAL_PRODUCTION_URL : window.location.origin;
+  return `${baseUrl}/?password-reset=1`;
+}
 
 function isPasswordSetupLink() {
   const fragment = window.location.hash;
@@ -114,7 +123,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (!supabase) return { error: 'La conexión de acceso no está configurada.' };
       const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
         // The explicit marker survives both hash and PKCE recovery redirects.
-        redirectTo: `${window.location.origin}/?password-reset=1`,
+        redirectTo: getRecoveryRedirectUrl(),
       });
       return error ? { error: error.message } : {};
     },

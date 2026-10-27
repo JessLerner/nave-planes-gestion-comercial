@@ -131,6 +131,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const created = await db.query(`insert into public.staff_members (full_name, role, active, dni, legajo, employment_type, commercial_structure, location, hire_date, termination_date, source_label) values ($1,$2::public.staff_role,$3,$4,$5,$6,$7,$8,$9::date,$10::date,'Administración Nave.Plan') returning id`, [fullName, role, active, dni, legajo, employmentType, commercialStructure, location, hireDate, terminationDate]);
         staffId = created.rows[0].id;
       }
+      // The resource record is the source of truth for the organizational
+      // chart. A manager/supervisor assignment made from a ficha is reflected
+      // immediately in teams; changing away from a leadership function clears
+      // stale reporting links without deleting any historical information.
+      if (role === 'gerente' || role === 'supervisor') {
+        const leadershipColumn = role === 'gerente' ? 'manager_staff_id' : 'supervisor_staff_id';
+        const oppositeColumn = role === 'gerente' ? 'supervisor_staff_id' : 'manager_staff_id';
+        await db.query(`update public.teams set ${oppositeColumn}=null where ${oppositeColumn}=$1`, [staffId]);
+        if (teamId) await db.query(`update public.teams set ${leadershipColumn}=$2 where id=$1`, [teamId, staffId]);
+      } else {
+        await db.query(`update public.teams set manager_staff_id=null where manager_staff_id=$1`, [staffId]);
+        await db.query(`update public.teams set supervisor_staff_id=null where supervisor_staff_id=$1`, [staffId]);
+      }
       if (role === 'vendedor') {
         const existingSeller = await db.query(`select * from public.sellers where staff_member_id = $1 limit 1`, [staffId]);
         if (existingSeller.rows[0]) {
@@ -140,6 +153,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           const seller = await db.query(`insert into public.sellers (full_name, team_id, staff_member_id, active, hire_date, termination_date, dni, legajo, employment_type) values ($1,$2,$3,$4,$5::date,$6::date,$7,$8,$9) returning id`, [fullName, teamId, staffId, active, hireDate, terminationDate, dni, legajo, employmentType]);
           await logChange(db, 'seller', seller.rows[0].id, 'created', null, { fullName, teamId, active }, userId);
         }
+      } else if (staffId) {
+        await db.query(`update public.sellers set active=false, termination_date=coalesce(termination_date, current_date) where staff_member_id=$1 and active=true`, [staffId]);
       }
       await logChange(db, 'staff_member', staffId!, id ? (active ? 'updated' : 'deactivated') : 'created', previous.rows[0] || null, { fullName, role, active, teamId }, userId);
     } else if (action === 'bulk_assign_team') {

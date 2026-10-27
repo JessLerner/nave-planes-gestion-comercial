@@ -44,6 +44,12 @@ const normalizeUser = (value: string | null) => value
   ? value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().replace(/\s+/g, ' ').toLowerCase()
   : null;
 
+const nameSignature = (value: string | null) => normalizeUser(value)
+  ?.split(' ')
+  .filter(Boolean)
+  .sort((left, right) => left.localeCompare(right, 'es-AR'))
+  .join(' ') || null;
+
 async function verifySupabaseAccessToken(req: VercelRequest) {
   const header = req.headers?.authorization;
   const authorization = Array.isArray(header) ? header[0] : header;
@@ -123,15 +129,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     `);
     const sellerResult = await db.query(`select id, team_id, full_name from public.sellers`);
     const mappings = new Map<string, { sellerId: string | null; teamId: string | null }>();
+    const sellersBySignature = new Map<string, { sellerId: string | null; teamId: string | null }>();
+    const ambiguousSignatures = new Set<string>();
     for (const row of mappingResult.rows) mappings.set(row.fox_user_key, { sellerId: row.seller_id, teamId: row.team_id });
     for (const seller of sellerResult.rows) {
       const key = normalizeUser(seller.full_name);
       if (key && !mappings.has(key)) mappings.set(key, { sellerId: seller.id, teamId: seller.team_id });
+      const signature = nameSignature(seller.full_name);
+      if (signature) {
+        if (sellersBySignature.has(signature)) ambiguousSignatures.add(signature);
+        else sellersBySignature.set(signature, { sellerId: seller.id, teamId: seller.team_id });
+      }
     }
+    for (const signature of ambiguousSignatures) sellersBySignature.delete(signature);
 
     const unmappedNames = new Set<string>();
     const enriched = leads.map(lead => {
-      const assignment = lead.fox_user_key ? mappings.get(lead.fox_user_key) : undefined;
+      const assignment = lead.fox_user_key
+        ? mappings.get(lead.fox_user_key) || sellersBySignature.get(nameSignature(lead.fox_user_name) || '')
+        : undefined;
       if (lead.fox_user_name && !assignment) unmappedNames.add(lead.fox_user_name);
       return { ...lead, seller_id: assignment?.sellerId ?? null, team_id: assignment?.teamId ?? null };
     });

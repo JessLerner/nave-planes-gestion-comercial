@@ -41,7 +41,7 @@ const timestamp = (value: unknown) => {
 };
 
 const normalizeUser = (value: string | null) => value
-  ? value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().replace(/\s+/g, ' ').toLowerCase()
+  ? value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^\p{L}\p{N}]+/gu, ' ').trim().replace(/\s+/g, ' ').toLowerCase()
   : null;
 
 const nameSignature = (value: string | null) => normalizeUser(value)

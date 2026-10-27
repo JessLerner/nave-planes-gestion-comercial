@@ -100,6 +100,24 @@ export interface ScoringRecord {
   verified_quota_value: boolean;
 }
 
+// Read-only mirror of the quality-control spreadsheets.  It intentionally
+// preserves the category reported by Administración instead of guessing a
+// normalized approval state from it.
+export interface ScoringSourceRow {
+  id: string;
+  brand: string;
+  subscription_number: string;
+  scoring_date?: string;
+  seller_name?: string;
+  supervisor_name?: string;
+  observed_category?: string;
+  rejection_reason_1?: string;
+  rejection_reason_2?: string;
+  approval_reason?: string;
+  cancellation_reason?: string;
+  last_seen_at?: string;
+}
+
 export interface LeadDistribution {
   id: string;
   date: string;

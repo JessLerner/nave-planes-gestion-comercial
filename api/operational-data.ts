@@ -34,7 +34,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const [teamsResult, sellersResult, operationsResult] = await Promise.all([
+    const [teamsResult, sellersResult, operationsResult, scoringRowsResult] = await Promise.all([
       pool.query(`
         select
           t.id,
@@ -66,6 +66,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         from public.sales_operations
         order by operation_date desc
       `),
+      pool.query(`
+        select id, brand, subscription_number, scoring_date, seller_name,
+               supervisor_name, observed_category, rejection_reason_1,
+               rejection_reason_2, approval_reason, cancellation_reason,
+               last_seen_at
+        from public.scoring_source_rows
+        order by scoring_date desc nulls last, last_seen_at desc
+        limit 500
+      `),
     ]);
 
     return res.status(200).json({
@@ -75,6 +84,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         teams: teamsResult.rows,
         sellers: sellersResult.rows,
         operations: operationsResult.rows,
+        scoring_rows: scoringRowsResult.rows,
       },
     });
   } catch (error) {

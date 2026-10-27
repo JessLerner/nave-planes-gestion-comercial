@@ -13,6 +13,7 @@ import {
   Recommendation,
   ScoringStatus,
   OperationStatus,
+  ScoringSourceRow,
 } from '../types';
 import {
   DEFAULT_USERS,
@@ -54,6 +55,7 @@ interface AppContextType {
   teams: Team[];
   sellers: Seller[];
   operations: SalesOperation[];
+  scoringSourceRows: ScoringSourceRow[];
   priceLists: PriceListItem[];
   wageAdvances: WageAdvance[];
   monthlyConfig: MonthlyConfig;
@@ -127,6 +129,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [teams, setTeams] = useState<Team[]>(EMPTY_TEAMS);
   const [sellers, setSellers] = useState<Seller[]>(EMPTY_SELLERS);
   const [operations, setOperations] = useState<SalesOperation[]>(EMPTY_OPERATIONS);
+  const [scoringSourceRows, setScoringSourceRows] = useState<ScoringSourceRow[]>([]);
   const [priceLists, setPriceLists] = useState<PriceListItem[]>(EMPTY_PRICE_LIST);
   const [wageAdvances, setWageAdvances] = useState<WageAdvance[]>(EMPTY_ADVANCES);
   const [monthlyConfig, setMonthlyConfig] = useState<MonthlyConfig>(DEFAULT_MONTHLY_CONFIG);
@@ -172,6 +175,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               client_dni: '',
               client_phone: '',
             })));
+          }
+          if (d.scoring_rows) {
+            setScoringSourceRows(d.scoring_rows);
           }
           setLastSyncTime(new Date().toLocaleString('es-AR'));
         }
@@ -685,6 +691,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         teams,
         sellers,
         operations,
+        scoringSourceRows,
         priceLists,
         wageAdvances,
         monthlyConfig,

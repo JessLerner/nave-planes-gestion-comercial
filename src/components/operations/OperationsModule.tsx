@@ -29,6 +29,7 @@ import { formatARS, canPresentToFactory } from '../../utils/businessLogic';
 export const OperationsModule: React.FC = () => {
   const {
     operations,
+    scoringSourceRows,
     sellers,
     teams,
     priceLists,
@@ -41,6 +42,15 @@ export const OperationsModule: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterBrand, setFilterBrand] = useState<string>('all');
   const [filterScoring, setFilterScoring] = useState<string>('all');
+
+  const visibleScoringRows = scoringSourceRows.filter(row => {
+    if (filterBrand !== 'all' && row.brand !== filterBrand) return false;
+    if (!searchTerm) return true;
+    const query = searchTerm.toLowerCase();
+    return [row.subscription_number, row.seller_name, row.supervisor_name, row.observed_category]
+      .filter(Boolean)
+      .some(value => value!.toLowerCase().includes(query));
+  });
 
   // Modal states
   const [showNewOpModal, setShowNewOpModal] = useState(false);
@@ -224,6 +234,66 @@ export const OperationsModule: React.FC = () => {
       </div>
 
       {/* 3. Operations Table */}
+      <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
+        <div className="px-4 py-3 border-b border-slate-800 flex items-center justify-between gap-4">
+          <div>
+            <h3 className="text-sm font-semibold text-white">Scoring sincronizado</h3>
+            <p className="text-[11px] text-slate-400 mt-0.5">
+              Lectura directa de la planilla de Administración. La categoría y los motivos se muestran tal como fueron informados.
+            </p>
+          </div>
+          <span className="text-xs font-mono text-blue-300 bg-blue-950/40 border border-blue-900/60 rounded px-2 py-1">
+            {visibleScoringRows.length} registros
+          </span>
+        </div>
+        <div className="overflow-x-auto max-h-80 overflow-y-auto">
+          <table className="w-full text-left text-xs">
+            <thead className="sticky top-0 bg-slate-950/95 text-slate-400 font-semibold border-b border-slate-800 uppercase tracking-wider text-[10px]">
+              <tr>
+                <th className="py-3 px-4">Fecha / Suscripción</th>
+                <th className="py-3 px-4">Marca</th>
+                <th className="py-3 px-4">Vendedor / Supervisor</th>
+                <th className="py-3 px-4">Categoría informada</th>
+                <th className="py-3 px-4">Motivos / observación</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-800/80">
+              {visibleScoringRows.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="py-8 px-4 text-center text-slate-500">
+                    Todavía no hay registros de Scoring que coincidan con los filtros.
+                  </td>
+                </tr>
+              ) : visibleScoringRows.map(row => {
+                const reasons = [row.rejection_reason_1, row.rejection_reason_2, row.approval_reason, row.cancellation_reason]
+                  .filter(Boolean)
+                  .join(' · ');
+                return (
+                  <tr key={row.id} className="hover:bg-slate-800/40 transition-colors">
+                    <td className="py-3 px-4">
+                      <div className="font-mono font-semibold text-white">{row.subscription_number}</div>
+                      <div className="text-[11px] text-slate-400">{row.scoring_date || 'Sin fecha'}</div>
+                    </td>
+                    <td className="py-3 px-4 text-slate-200">{row.brand}</td>
+                    <td className="py-3 px-4">
+                      <div className="text-slate-200 font-medium">{row.seller_name || 'Sin vendedor informado'}</div>
+                      <div className="text-[11px] text-slate-400">{row.supervisor_name || 'Sin supervisor informado'}</div>
+                    </td>
+                    <td className="py-3 px-4">
+                      <span className="inline-flex rounded border border-slate-700 bg-slate-800 px-2 py-0.5 text-[11px] text-slate-200">
+                        {row.observed_category || 'Sin categoría'}
+                      </span>
+                    </td>
+                    <td className="py-3 px-4 text-slate-300 max-w-sm">{reasons || '—'}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* 4. Operations Table */}
       <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">

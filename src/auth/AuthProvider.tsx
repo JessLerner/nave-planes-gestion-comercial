@@ -23,7 +23,7 @@ function getRecoveryRedirectUrl() {
   // always return to the public production URL, not to whichever alias the
   // requester happened to open.
   const baseUrl = import.meta.env.PROD ? CANONICAL_PRODUCTION_URL : window.location.origin;
-  return `${baseUrl}/?password-reset=1`;
+  return `${baseUrl}/restablecer-contrasena`;
 }
 
 function isPasswordSetupLink() {
@@ -31,7 +31,8 @@ function isPasswordSetupLink() {
   const query = new URLSearchParams(window.location.search);
   return fragment.includes('type=invite')
     || fragment.includes('type=recovery')
-    || query.get('password-reset') === '1';
+    || query.get('password-reset') === '1'
+    || window.location.pathname === '/restablecer-contrasena';
 }
 
 function toUser(profile: Record<string, unknown>, email: string): User {

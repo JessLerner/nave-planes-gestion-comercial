@@ -1,5 +1,4 @@
 import { Pool } from 'pg';
-import { verifySupabaseAccessToken } from '../lib/server/auth';
 
 type VercelRequest = { method?: string; headers?: Record<string, string | string[] | undefined> };
 type VercelResponse = { status: (code: number) => VercelResponse; json: (body: unknown) => VercelResponse };
@@ -7,6 +6,19 @@ type VercelResponse = { status: (code: number) => VercelResponse; json: (body: u
 const rawConnectionString = process.env.POSTGRES_URL || process.env.DATABASE_URL || '';
 const connectionString = rawConnectionString.replace(/([?&])sslmode=[^&]*/i, '$1').replace(/[?&]$/, '');
 const pool = new Pool({ connectionString, ssl: { rejectUnauthorized: false } });
+
+async function verifySupabaseAccessToken(req: VercelRequest) {
+  const header = req.headers?.authorization;
+  const authorization = Array.isArray(header) ? header[0] : header;
+  if (!authorization?.startsWith('Bearer ')) return null;
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_ANON_KEY;
+  if (!url || !key) return null;
+  const response = await fetch(`${url}/auth/v1/user`, { headers: { Authorization: authorization, apikey: key } });
+  if (!response.ok) return null;
+  const user = await response.json() as { id?: string };
+  return user.id ? { id: user.id } : null;
+}
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') return res.status(405).json({ success: false, message: 'Método no permitido.' });

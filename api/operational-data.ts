@@ -1,5 +1,5 @@
 import { Pool } from 'pg';
-import { verifySupabaseAccessToken } from './_auth';
+import { verifySupabaseAccessToken } from '../lib/server/auth';
 
 type VercelRequest = { method?: string; headers?: Record<string, string | string[] | undefined> };
 type VercelResponse = {

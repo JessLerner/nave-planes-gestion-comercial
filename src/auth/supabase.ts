@@ -13,6 +13,10 @@ export async function getSupabaseClient(): Promise<SupabaseClient | null> {
       if (!config.url || !config.key) return null;
       client = createClient(config.url, config.key, {
       auth: {
+        // Keep the session only for the lifetime of this browser tab. This
+        // prevents a previously authenticated browser from bypassing the
+        // password-recovery flow after the tab has been closed.
+        storage: window.sessionStorage,
         persistSession: true,
         autoRefreshToken: true,
         detectSessionInUrl: true,

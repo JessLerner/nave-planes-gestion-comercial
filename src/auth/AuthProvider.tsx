@@ -112,6 +112,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     user,
     loading,
     configurationError,
+    mustSetPassword,
     signIn: async (email, password) => {
       const supabase = await getSupabaseClient();
       if (!supabase) return { error: 'La conexión de acceso no está configurada.' };

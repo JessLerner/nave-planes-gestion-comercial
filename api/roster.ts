@@ -142,6 +142,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
       }
       await logChange(db, 'staff_member', staffId!, id ? (active ? 'updated' : 'deactivated') : 'created', previous.rows[0] || null, { fullName, role, active, teamId }, userId);
+    } else if (action === 'bulk_assign_team') {
+      const teamId = optionalText(body?.teamId, 80);
+      const staffIds = Array.isArray(body?.staffIds) ? [...new Set((body?.staffIds as unknown[]).map(value => optionalText(value, 80)).filter((id): id is string => Boolean(id)))] : [];
+      if (!teamId || !staffIds.length || staffIds.length > 300) return res.status(400).json({ success: false, message: 'Seleccioná un equipo y entre uno y 300 vendedores.' });
+      const team = await db.query(`select id, name from public.teams where id=$1`, [teamId]);
+      if (!team.rows[0]) return res.status(404).json({ success: false, message: 'El equipo seleccionado no existe.' });
+      const sellers = await db.query(`select id, staff_member_id, team_id from public.sellers where staff_member_id = any($1::uuid[]) and active=true`, [staffIds]);
+      if (sellers.rows.length !== staffIds.length) return res.status(400).json({ success: false, message: 'Sólo se pueden reasignar recursos activos que tengan función de vendedor.' });
+      await db.query(`update public.sellers set team_id=$2 where staff_member_id = any($1::uuid[])`, [staffIds, teamId]);
+      await logChange(db, 'seller_batch', null, 'reassigned_team', sellers.rows, { staffIds, teamId, teamName: team.rows[0].name }, userId);
+      await db.query('commit');
+      return res.status(200).json({ success: true, moved: sellers.rows.length, data: await roster(db) });
     } else if (action === 'save_team') {
       const teamId = optionalText(body?.teamId, 80); const managerId = optionalText(body?.managerStaffId, 80); const supervisorId = optionalText(body?.supervisorStaffId, 80);
       if (!teamId) return res.status(400).json({ success: false, message: 'Equipo inválido.' });

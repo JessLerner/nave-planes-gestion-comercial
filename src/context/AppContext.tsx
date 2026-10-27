@@ -141,24 +141,42 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Load from backend on start
   useEffect(() => {
-    fetch('/api/data')
+    fetch('/api/operational-data')
       .then(res => res.json())
       .then(res => {
         if (res.success && res.data) {
           const d = res.data;
-          if (d.connectors && d.connectors.length > 0) setConnectors(d.connectors);
-          if (d.teams && d.teams.length > 0) setTeams(d.teams);
-          if (d.sellers && d.sellers.length > 0) setSellers(d.sellers);
-          if (d.operations && d.operations.length > 0) setOperations(d.operations);
-          if (d.priceLists && d.priceLists.length > 0) setPriceLists(d.priceLists);
-          if (d.wageAdvances && d.wageAdvances.length > 0) setWageAdvances(d.wageAdvances);
-          if (d.carteraMora && d.carteraMora.length > 0) setCarteraMora(d.carteraMora);
-          if (d.candidates && d.candidates.length > 0) setCandidates(d.candidates);
-          if (d.leadDistributions && d.leadDistributions.length > 0) setLeadDistributions(d.leadDistributions);
-          if (d.monthlyConfig) setMonthlyConfig(d.monthlyConfig);
+          if (d.teams) {
+            setTeams(d.teams.map((team: any) => ({
+              ...team,
+              supervisor_id: team.supervisor_staff_id || '',
+              supervisor_name: team.supervisor_name || 'Sin asignar',
+              manager_name: team.manager_name || 'Sin asignar',
+              color: '#2563eb',
+            })));
+          }
+          if (d.sellers) {
+            setSellers(d.sellers.map((seller: any) => ({
+              ...seller,
+              name: seller.full_name,
+              phone: '',
+              email: '',
+              dni: '',
+            })));
+          }
+          if (d.operations) {
+            setOperations(d.operations.map((operation: any) => ({
+              ...operation,
+              date: operation.operation_date,
+              client_name: 'Cliente protegido',
+              client_dni: '',
+              client_phone: '',
+            })));
+          }
+          setLastSyncTime(new Date().toLocaleString('es-AR'));
         }
       })
-      .catch(err => console.log('Backend not available yet, using local state'));
+      .catch(() => console.log('La conexión operativa todavía no está disponible.'));
   }, []);
 
   // Save to backend helper

@@ -24,6 +24,9 @@ import { PasswordSetupScreen } from './auth/PasswordSetupScreen';
 function MainLayout() {
   const { currentUser } = useApp();
   const [activeTab, setActiveTab] = useState<string>('pacing');
+  // Keep every visited workspace mounted. Switching sections must never erase
+  // an unfinished form, filters, preview or import selection.
+  const [visitedTabs, setVisitedTabs] = useState<Set<string>>(() => new Set(['pacing']));
   const [isCalendarConfigOpen, setIsCalendarConfigOpen] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
@@ -34,12 +37,17 @@ function MainLayout() {
     }
   }, [currentUser.role, activeTab]);
 
+  const openTab = (tab: string) => {
+    setVisitedTabs(current => new Set([...current, tab]));
+    setActiveTab(tab);
+  };
+
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-slate-950 text-slate-100">
       {/* Sidebar navigation */}
       <Sidebar
         activeTab={activeTab}
-        setActiveTab={setActiveTab}
+        setActiveTab={openTab}
         isOpenMobile={isMobileSidebarOpen}
         onCloseMobile={() => setIsMobileSidebarOpen(false)}
       />
@@ -56,17 +64,15 @@ function MainLayout() {
         {/* Viewport content */}
         <main className="flex-1 overflow-y-auto p-6 bg-slate-950">
           <div className="max-w-7xl mx-auto pb-12">
-            {activeTab === 'pacing' && (
-              <PacingDashboard onOpenCalendarConfig={() => setIsCalendarConfigOpen(true)} />
-            )}
-            {activeTab === 'crm' && <CrmLeadsModule />}
-            {activeTab === 'operations' && <OperationsModule />}
-            {activeTab === 'prices' && <PriceListModule />}
-            {activeTab === 'hr' && <HrAndAdvancesModule />}
-            {activeTab === 'cartera' && <CarteraMoraModule />}
-            {activeTab === 'database' && <DatabaseConnectorsModule />}
-            {activeTab === 'extractor' && <ExtractorHubModule />}
-            {activeTab === 'structure' && <RosterManagementModule />}
+            {visitedTabs.has('pacing') && <div className={activeTab === 'pacing' ? '' : 'hidden'}><PacingDashboard onOpenCalendarConfig={() => setIsCalendarConfigOpen(true)} /></div>}
+            {visitedTabs.has('crm') && <div className={activeTab === 'crm' ? '' : 'hidden'}><CrmLeadsModule /></div>}
+            {visitedTabs.has('operations') && <div className={activeTab === 'operations' ? '' : 'hidden'}><OperationsModule /></div>}
+            {visitedTabs.has('prices') && <div className={activeTab === 'prices' ? '' : 'hidden'}><PriceListModule /></div>}
+            {visitedTabs.has('hr') && <div className={activeTab === 'hr' ? '' : 'hidden'}><HrAndAdvancesModule /></div>}
+            {visitedTabs.has('cartera') && <div className={activeTab === 'cartera' ? '' : 'hidden'}><CarteraMoraModule /></div>}
+            {visitedTabs.has('database') && <div className={activeTab === 'database' ? '' : 'hidden'}><DatabaseConnectorsModule /></div>}
+            {visitedTabs.has('extractor') && <div className={activeTab === 'extractor' ? '' : 'hidden'}><ExtractorHubModule /></div>}
+            {visitedTabs.has('structure') && <div className={activeTab === 'structure' ? '' : 'hidden'}><RosterManagementModule /></div>}
           </div>
         </main>
       </div>

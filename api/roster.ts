@@ -7,7 +7,7 @@ const rawConnectionString = process.env.POSTGRES_URL || process.env.DATABASE_URL
 const connectionString = rawConnectionString.replace(/([?&])sslmode=[^&]*/i, '$1').replace(/[?&]$/, '');
 const pool = new Pool({ connectionString, ssl: { rejectUnauthorized: false } });
 
-const validRoles = new Set(['administrador_general', 'gerente', 'supervisor', 'vendedor', 'administracion', 'rrhh', 'otro']);
+const validRoles = new Set(['administrador_general', 'director', 'gerente', 'supervisor', 'vendedor', 'administracion', 'rrhh', 'mora', 'contable', 'otro']);
 const text = (value: unknown, max = 180) => typeof value === 'string' && value.trim() && value.trim().length <= max ? value.trim() : null;
 const optionalText = (value: unknown, max = 180) => value == null || value === '' ? null : text(value, max);
 const date = (value: unknown) => { const result = optionalText(value, 10); return result && /^\d{4}-\d{2}-\d{2}$/.test(result) ? result : null; };

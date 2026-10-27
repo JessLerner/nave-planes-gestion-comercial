@@ -43,8 +43,42 @@ export const OperationsModule: React.FC = () => {
   const [filterBrand, setFilterBrand] = useState<string>('all');
   const [filterScoring, setFilterScoring] = useState<string>('all');
 
+  const normalize = (value?: string) => (value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toUpperCase();
+
+  const accessibleTeamIds = new Set(
+    currentUser.role === 'admin' || currentUser.role === 'rrhh'
+      ? teams.map(team => team.id)
+      : currentUser.role === 'supervisor'
+        ? (currentUser.team_id ? [currentUser.team_id] : [])
+        : currentUser.role === 'gerente' && currentUser.staff_member_id
+          ? teams
+              .filter(team => team.manager_staff_id === currentUser.staff_member_id)
+              .map(team => team.id)
+          : []
+  );
+
+  const scoringRowTeamId = (supervisorName?: string) => {
+    const normalizedSupervisor = normalize(supervisorName);
+    return teams.find(team => normalize(team.supervisor_name) === normalizedSupervisor)?.id;
+  };
+
+  const scoringCategoryClass = (category?: string) => {
+    const normalized = normalize(category);
+    if (normalized.includes('RECHAZ')) return 'border-red-700 bg-red-950/80 text-red-200';
+    if (normalized.includes('APROB')) return 'border-emerald-700 bg-emerald-950/80 text-emerald-200';
+    if (normalized.includes('ANUL')) return 'border-black bg-black text-white';
+    return 'border-slate-700 bg-slate-800 text-slate-200';
+  };
+
   const visibleScoringRows = scoringSourceRows.filter(row => {
-    if (filterBrand !== 'all' && row.brand !== filterBrand) return false;
+    const teamId = scoringRowTeamId(row.supervisor_name);
+    const hasGlobalScoringAccess = currentUser.role === 'admin' || currentUser.role === 'rrhh';
+    if (!hasGlobalScoringAccess && (!teamId || !accessibleTeamIds.has(teamId))) return false;
+    if (filterBrand !== 'all' && normalize(row.brand) !== normalize(filterBrand)) return false;
     if (!searchTerm) return true;
     const query = searchTerm.toLowerCase();
     return [row.subscription_number, row.seller_name, row.supervisor_name, row.observed_category]
@@ -280,7 +314,7 @@ export const OperationsModule: React.FC = () => {
                       <div className="text-[11px] text-slate-400">{row.supervisor_name || 'Sin supervisor informado'}</div>
                     </td>
                     <td className="py-3 px-4">
-                      <span className="inline-flex rounded border border-slate-700 bg-slate-800 px-2 py-0.5 text-[11px] text-slate-200">
+                      <span className={`inline-flex rounded border px-2 py-0.5 text-[11px] font-medium ${scoringCategoryClass(row.observed_category)}`}>
                         {row.observed_category || 'Sin categoría'}
                       </span>
                     </td>

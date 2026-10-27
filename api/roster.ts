@@ -145,8 +145,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     } else if (action === 'save_team') {
       const teamId = optionalText(body?.teamId, 80); const managerId = optionalText(body?.managerStaffId, 80); const supervisorId = optionalText(body?.supervisorStaffId, 80);
       if (!teamId) return res.status(400).json({ success: false, message: 'Equipo inválido.' });
+      if (managerId && supervisorId && managerId === supervisorId) return res.status(400).json({ success: false, message: 'Una misma persona no puede ocupar Gerencia y Supervisión del mismo equipo.' });
       const before = await db.query(`select * from public.teams where id = $1`, [teamId]);
       if (!before.rows[0]) return res.status(404).json({ success: false, message: 'Equipo no encontrado.' });
+      const selectedIds = [managerId, supervisorId].filter((id): id is string => Boolean(id));
+      if (selectedIds.length) {
+        const selected = await db.query(`select id, role, active from public.staff_members where id = any($1::uuid[])`, [selectedIds]);
+        if (selected.rows.length !== selectedIds.length || selected.rows.some(row => !row.active)) return res.status(400).json({ success: false, message: 'El responsable seleccionado no existe o está dado de baja.' });
+        // The initial HR import predated organizational roles.  Preserve
+        // specialized roles, but promote legacy seller/other rows when they
+        // are formally appointed to lead a team.
+        if (managerId) await db.query(`update public.staff_members set role='gerente'::public.staff_role, updated_at=now() where id=$1 and role in ('vendedor'::public.staff_role, 'otro'::public.staff_role)`, [managerId]);
+        if (supervisorId) await db.query(`update public.staff_members set role='supervisor'::public.staff_role, updated_at=now() where id=$1 and role in ('vendedor'::public.staff_role, 'otro'::public.staff_role)`, [supervisorId]);
+      }
       await db.query(`update public.teams set manager_staff_id=$2::uuid, supervisor_staff_id=$3::uuid where id=$1`, [teamId, managerId, supervisorId]);
       await logChange(db, 'team', teamId, 'updated', before.rows[0], { managerStaffId: managerId, supervisorStaffId: supervisorId }, userId);
     } else return res.status(400).json({ success: false, message: 'Acción no reconocida.' });

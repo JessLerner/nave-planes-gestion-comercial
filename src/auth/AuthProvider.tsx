@@ -17,6 +17,14 @@ type AuthState = {
 
 const AuthContext = createContext<AuthState | null>(null);
 
+function isPasswordSetupLink() {
+  const fragment = window.location.hash;
+  const query = new URLSearchParams(window.location.search);
+  return fragment.includes('type=invite')
+    || fragment.includes('type=recovery')
+    || query.get('password-reset') === '1';
+}
+
 function toUser(profile: Record<string, unknown>, email: string): User {
   return {
     id: String(profile.id),
@@ -34,10 +42,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [configurationError, setConfigurationError] = useState<string | null>(null);
-  const [mustSetPassword, setMustSetPassword] = useState(() => {
-    const fragment = window.location.hash;
-    return fragment.includes('type=invite') || fragment.includes('type=recovery');
-  });
+  const [mustSetPassword, setMustSetPassword] = useState(isPasswordSetupLink);
 
   const hydrateProfile = async (activeSession: Session | null) => {
     if (!activeSession) {
@@ -77,6 +82,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       supabase.auth.getSession().then(({ data }) => {
       setSession(data.session);
+        if (data.session && isPasswordSetupLink()) setMustSetPassword(true);
       void hydrateProfile(data.session);
       });
 
@@ -107,7 +113,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const supabase = await getSupabaseClient();
       if (!supabase) return { error: 'La conexión de acceso no está configurada.' };
       const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-        redirectTo: `${window.location.origin}/`,
+        // The explicit marker survives both hash and PKCE recovery redirects.
+        redirectTo: `${window.location.origin}/?password-reset=1`,
       });
       return error ? { error: error.message } : {};
     },

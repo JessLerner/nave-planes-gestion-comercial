@@ -83,8 +83,10 @@ function AuthenticatedApp() {
   if (loading) {
     return <div className="min-h-screen bg-[#18191b] text-white flex items-center justify-center text-sm">Validando acceso seguro…</div>;
   }
+  // A valid recovery/invitation session must choose a password before it can
+  // enter the application, even while the operational profile is hydrating.
+  if (session && mustSetPassword) return <PasswordSetupScreen mode={window.location.hash.includes('type=invite') ? 'invite' : 'recovery'} />;
   if (!user || !session) return <LoginScreen />;
-  if (mustSetPassword) return <PasswordSetupScreen mode={window.location.hash.includes('type=invite') ? 'invite' : 'recovery'} />;
   return (
     <AppProvider initialUser={user} accessToken={session.access_token}>
       <MainLayout />

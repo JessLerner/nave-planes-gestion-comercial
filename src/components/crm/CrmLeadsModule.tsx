@@ -15,6 +15,7 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import { LeadSource } from '../../types';
+import { FoxReportImportPanel } from './FoxReportImportPanel';
 
 export const CrmLeadsModule: React.FC = () => {
   const {
@@ -26,6 +27,7 @@ export const CrmLeadsModule: React.FC = () => {
     isSyncingDataExtractor,
     syncDataExtractor,
     lastSyncTime,
+    distributeLeads,
   } = useApp();
 
   const [showDistributeModal, setShowDistributeModal] = useState(false);
@@ -132,6 +134,8 @@ export const CrmLeadsModule: React.FC = () => {
           </a>
         </div>
       </div>
+
+      {currentUser.role === 'admin' && <FoxReportImportPanel />}
 
       {/* 2. Conversion Metrics KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

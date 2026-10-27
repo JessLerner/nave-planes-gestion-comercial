@@ -169,6 +169,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       await logChange(db, 'seller_batch', null, 'reassigned_team', sellers.rows, { staffIds, teamId, teamName: team.rows[0].name }, userId);
       await db.query('commit');
       return res.status(200).json({ success: true, moved: sellers.rows.length, data: await roster(db) });
+    } else if (action === 'deactivate_resources') {
+      const staffIds = Array.isArray(body?.staffIds) ? [...new Set((body?.staffIds as unknown[]).map(value => optionalText(value, 80)).filter((id): id is string => Boolean(id)))] : [];
+      if (!staffIds.length || staffIds.length > 300) return res.status(400).json({ success: false, message: 'Seleccioná entre uno y 300 recursos para dar de baja.' });
+      const current = await db.query(`select id, full_name, role, active from public.staff_members where id = any($1::uuid[])`, [staffIds]);
+      if (current.rows.length !== staffIds.length) return res.status(404).json({ success: false, message: 'Uno o más recursos ya no existen.' });
+      const activeIds = current.rows.filter(row => row.active).map(row => row.id as string);
+      if (activeIds.length) {
+        await db.query(`update public.staff_members set active=false, termination_date=coalesce(termination_date, current_date), updated_at=now() where id = any($1::uuid[])`, [activeIds]);
+        await db.query(`update public.sellers set active=false, termination_date=coalesce(termination_date, current_date) where staff_member_id = any($1::uuid[]) and active=true`, [activeIds]);
+        await db.query(`update public.teams set manager_staff_id=null where manager_staff_id = any($1::uuid[])`, [activeIds]);
+        await db.query(`update public.teams set supervisor_staff_id=null where supervisor_staff_id = any($1::uuid[])`, [activeIds]);
+        await logChange(db, 'staff_member_batch', null, 'deactivated', current.rows, { staffIds: activeIds }, userId);
+      }
+      await db.query('commit');
+      return res.status(200).json({ success: true, deactivated: activeIds.length, data: await roster(db) });
     } else if (action === 'save_team') {
       const teamId = optionalText(body?.teamId, 80); const managerId = optionalText(body?.managerStaffId, 80); const supervisorId = optionalText(body?.supervisorStaffId, 80);
       if (!teamId) return res.status(400).json({ success: false, message: 'Equipo inválido.' });

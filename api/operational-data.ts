@@ -8,8 +8,16 @@ type VercelResponse = {
 
 // This endpoint runs only on Vercel. It keeps the database connection string
 // on the server and deliberately omits DNI, legajo and other HR-only fields.
+const rawConnectionString = process.env.POSTGRES_URL || process.env.DATABASE_URL || '';
+// The managed URL includes sslmode=require. With recent pg versions that URL
+// setting supersedes the ssl object, so remove it and keep verification policy
+// explicit here for the managed Supabase certificate chain.
+const connectionString = rawConnectionString
+  .replace(/([?&])sslmode=[^&]*/i, '$1')
+  .replace(/[?&]$/, '');
+
 const pool = new Pool({
-  connectionString: process.env.POSTGRES_URL || process.env.DATABASE_URL,
+  connectionString,
   ssl: { rejectUnauthorized: false },
 });
 

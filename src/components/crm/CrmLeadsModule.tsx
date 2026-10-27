@@ -16,8 +16,9 @@ import {
 } from 'lucide-react';
 import { LeadSource } from '../../types';
 import { FoxReportImportPanel } from './FoxReportImportPanel';
+import { FoxMetricsPanel } from './FoxMetricsPanel';
 
-export const CrmLeadsModule: React.FC = () => {
+const LegacyCrmLeadsModule: React.FC = () => {
   const {
     sellers,
     teams,
@@ -377,3 +378,5 @@ export const CrmLeadsModule: React.FC = () => {
     </div>
   );
 };
+
+export const CrmLeadsModule: React.FC = () => <FoxMetricsPanel />;

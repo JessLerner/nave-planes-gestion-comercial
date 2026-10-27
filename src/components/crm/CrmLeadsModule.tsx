@@ -12,6 +12,7 @@ import {
   RefreshCw,
   PlusCircle,
   BarChart2,
+  ExternalLink,
 } from 'lucide-react';
 import { LeadSource } from '../../types';
 
@@ -20,7 +21,6 @@ export const CrmLeadsModule: React.FC = () => {
     sellers,
     teams,
     leadDistributions,
-    distributeLeads,
     selectedTeamId,
     currentUser,
     isSyncingDataExtractor,
@@ -126,27 +126,10 @@ export const CrmLeadsModule: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-3">
-          <button
-            onClick={() => {
-              if (eligibleSellers.length > 0) {
-                setSelectedSellerId(eligibleSellers[0].id);
-              }
-              setShowDistributeModal(true);
-            }}
-            className="flex items-center gap-2 px-3.5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-semibold shadow-lg shadow-blue-600/20 transition-all"
-          >
-            <Send className="w-3.5 h-3.5" />
-            <span>Repartir Lote de Leads</span>
-          </button>
-
-          <button
-            onClick={syncDataExtractor}
-            disabled={isSyncingDataExtractor}
-            className="flex items-center gap-2 px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-medium border border-slate-700 transition-colors"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 text-emerald-400 ${isSyncingDataExtractor ? 'animate-spin' : ''}`} />
-            <span>{isSyncingDataExtractor ? 'Ingiriendo...' : 'Sincronizar'}</span>
-          </button>
+          <a href="https://foxcrm.net/app/reporte_cartera_leads.php" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-3 py-2 bg-orange-500/10 hover:bg-orange-500/20 text-orange-200 border border-orange-500/30 rounded-lg text-xs font-semibold transition-colors">
+            <ExternalLink className="w-3.5 h-3.5" />
+            <span>Gestionar en Fox CRM</span>
+          </a>
         </div>
       </div>
 
@@ -216,18 +199,9 @@ export const CrmLeadsModule: React.FC = () => {
                     <div className="text-slate-300 font-semibold text-sm">
                       Sin datos asignados en este período
                     </div>
-                    <p className="text-xs text-slate-500 max-w-md mx-auto mt-1 mb-4">
-                      Sincronice con la API de Data-Extractor (Fox CRM) para importar lotes entrantes o reparta manualmente un lote a sus vendedores.
+                    <p className="text-xs text-slate-500 max-w-md mx-auto mt-1">
+                      Los indicadores aparecerán al sincronizar el reporte de Fox CRM. La plataforma no inventa ni carga leads manuales.
                     </p>
-                    <button
-                      onClick={() => {
-                        if (eligibleSellers.length > 0) setSelectedSellerId(eligibleSellers[0].id);
-                        setShowDistributeModal(true);
-                      }}
-                      className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-semibold shadow-md shadow-blue-600/20"
-                    >
-                      Repartir Primer Lote
-                    </button>
                   </td>
                 </tr>
               ) : (

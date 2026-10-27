@@ -16,7 +16,6 @@ import {
   ScoringSourceRow,
 } from '../types';
 import {
-  DEFAULT_USERS,
   DEFAULT_CONNECTORS,
   DEFAULT_MONTHLY_CONFIG,
   EMPTY_TEAMS,
@@ -116,9 +115,9 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | null>(null);
 
-export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [users] = useState<User[]>(DEFAULT_USERS);
-  const [currentUser, setCurrentUser] = useState<User>(DEFAULT_USERS[0]);
+export const AppProvider: React.FC<{ children: React.ReactNode; initialUser: User; accessToken: string }> = ({ children, initialUser, accessToken }) => {
+  const [users] = useState<User[]>([initialUser]);
+  const [currentUser, setCurrentUser] = useState<User>(initialUser);
 
   // Database Connectors
   const [connectors, setConnectors] = useState<DatabaseConnectorConfig[]>(DEFAULT_CONNECTORS);
@@ -144,7 +143,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Load from backend on start
   useEffect(() => {
-    fetch('/api/operational-data')
+    fetch('/api/operational-data', { headers: { Authorization: `Bearer ${accessToken}` } })
       .then(res => res.json())
       .then(res => {
         if (res.success && res.data) {
@@ -179,11 +178,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           if (d.scoring_rows) {
             setScoringSourceRows(d.scoring_rows);
           }
+          if (d.lead_distributions) {
+            setLeadDistributions(d.lead_distributions.map((lead: any) => ({
+              ...lead,
+              date: lead.entry_date,
+              loss_reasons: lead.loss_reasons || {},
+            })));
+          }
           setLastSyncTime(new Date().toLocaleString('es-AR'));
         }
       })
       .catch(() => console.log('La conexión operativa todavía no está disponible.'));
-  }, []);
+  }, [accessToken]);
 
   // Save to backend helper
   const syncToBackend = (partialData: any) => {

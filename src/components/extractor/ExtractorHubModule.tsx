@@ -43,13 +43,13 @@ import {
 } from '../../services/extractor/googleAuth';
 import { User as FirebaseUser } from 'firebase/auth';
 import {
-  SupabaseConfig,
   loadSupabaseConfig,
   saveSupabaseConfig,
   testSupabaseConnection,
   sendRowsToSupabase,
   getSupabaseSqlScript
 } from '../../services/extractor/supabaseClient';
+import type { SupabaseConfig } from '../../types/extractor';
 import { extractorApi, realtimeStream } from '../../services/extractor/extractorApi';
 import { SheetRecord, SyncLog, SystemStats } from '../../types/extractor';
 import { parseSpreadsheetFile, filterColumns, ParsedFileResult } from '../../services/extractor/fileParser';

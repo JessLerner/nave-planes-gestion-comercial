@@ -12,7 +12,9 @@ import {
   ExternalLink,
   Bell,
   Clock3,
+  LogOut,
 } from 'lucide-react';
+import { useAuth } from '../../auth/AuthProvider';
 
 interface HeaderProps {
   activeTab: string;
@@ -27,8 +29,6 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
   const {
     currentUser,
-    setCurrentUser,
-    users,
     teams,
     selectedTeamId,
     setSelectedTeamId,
@@ -39,8 +39,8 @@ export const Header: React.FC<HeaderProps> = ({
     wageAdvances,
     sellers,
   } = useApp();
+  const { signOut } = useAuth();
 
-  const [showUserDropdown, setShowUserDropdown] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
 
   const getBreadcrumbTitle = () => {
@@ -208,13 +208,13 @@ export const Header: React.FC<HeaderProps> = ({
           </span>
         </button>}
 
-        {/* Role Switcher Simulator (Essential for executive evaluation) */}
+        {/* Authenticated user menu */}
         <div className="relative">
           <button
-            onClick={() => setShowUserDropdown(!showUserDropdown)}
+            onClick={() => void signOut()}
             className="flex items-center gap-2.5 px-3 py-1.5 rounded bg-slate-800/90 hover:bg-slate-700 border border-slate-700 text-left transition-colors"
-            aria-expanded={showUserDropdown}
-            aria-label="Cambiar perfil de usuario"
+            aria-label="Cerrar sesión"
+            title="Cerrar sesión"
           >
             <div className="w-7 h-7 rounded-full bg-blue-600/30 border border-blue-500/40 flex items-center justify-center text-xs font-bold text-blue-300 shrink-0">
               {currentUser.name.charAt(0)}
@@ -231,47 +231,8 @@ export const Header: React.FC<HeaderProps> = ({
                   : 'RRHH & Calidad'}
               </div>
             </div>
-            <ChevronDown className="w-3.5 h-3.5 text-slate-400 ml-1" />
+            <LogOut className="w-3.5 h-3.5 text-slate-400 ml-1" />
           </button>
-
-          {/* User selector modal dropdown */}
-          {showUserDropdown && (
-            <div className="absolute right-0 mt-2 w-72 bg-slate-900 border border-slate-700 rounded-lg shadow-2xl py-2 z-50">
-              <div className="px-3 py-2 border-b border-slate-800 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
-                Simulador de Perfiles (Mandos Medios / Altos)
-              </div>
-              <div className="px-3 py-1.5 text-[11px] text-slate-400 leading-snug">
-                Los vendedores no tienen acceso al sistema. Seleccione un usuario ejecutivo:
-              </div>
-              <div className="py-1">
-                {users.map(u => (
-                  <button
-                    key={u.id}
-                    onClick={() => {
-                      setCurrentUser(u);
-                      setShowUserDropdown(false);
-                    }}
-                    className={`w-full px-3 py-2 text-left flex items-start gap-2.5 hover:bg-slate-800 transition-colors ${
-                      currentUser.id === u.id ? 'bg-blue-900/30 text-blue-200' : 'text-slate-300'
-                    }`}
-                  >
-                    <div className="w-6 h-6 rounded-full bg-slate-700 flex items-center justify-center text-[10px] font-bold text-slate-200 mt-0.5 shrink-0">
-                      {u.name.charAt(0)}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-xs font-medium text-slate-200 truncate">{u.name}</div>
-                      <div className="text-[10px] text-slate-400 truncate">
-                        {u.role.toUpperCase()} · {u.branch}
-                      </div>
-                    </div>
-                    {currentUser.id === u.id && (
-                      <span className="text-xs text-blue-400 font-bold">✓</span>
-                    )}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
       </div>
     </header>

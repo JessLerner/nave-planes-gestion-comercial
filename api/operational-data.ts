@@ -1,6 +1,7 @@
 import { Pool } from 'pg';
+import { verifySupabaseAccessToken } from './_auth';
 
-type VercelRequest = { method?: string };
+type VercelRequest = { method?: string; headers?: Record<string, string | string[] | undefined> };
 type VercelResponse = {
   status: (code: number) => VercelResponse;
   json: (body: unknown) => VercelResponse;
@@ -33,8 +34,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
   }
 
+  const identity = await verifySupabaseAccessToken(req);
+  if (!identity) return res.status(401).json({ success: false, message: 'Sesión no válida o vencida.' });
+
   try {
-    const [teamsResult, sellersResult, operationsResult, scoringRowsResult] = await Promise.all([
+    const profileResult = await pool.query(
+      `select id, role, team_id, staff_member_id from public.profiles where id = $1 limit 1`,
+      [identity.id],
+    );
+    const profile = profileResult.rows[0] as { role: string; team_id: string | null; staff_member_id: string | null } | undefined;
+    if (!profile) return res.status(403).json({ success: false, message: 'Tu cuenta no tiene perfil operativo asignado.' });
+
+    const scopedTeamFilter = profile.role === 'admin' || profile.role === 'rrhh'
+      ? { sql: 'true', params: [] as unknown[] }
+      : profile.role === 'supervisor'
+        ? { sql: 't.id = $1', params: [profile.team_id] }
+        : { sql: 't.manager_staff_id = $1', params: [profile.staff_member_id] };
+
+    const [teamsResult, sellersResult, operationsResult, scoringRowsResult, leadsResult] = await Promise.all([
       pool.query(`
         select
           t.id,
@@ -49,32 +66,49 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         from public.teams t
         left join public.staff_members supervisor on supervisor.id = t.supervisor_staff_id
         left join public.staff_members manager on manager.id = t.manager_staff_id
+        where ${scopedTeamFilter.sql}
         order by t.name
-      `),
+      `, scopedTeamFilter.params),
       pool.query(`
         select id, full_name, team_id, staff_member_id, active, hire_date,
                termination_date, individual_target, employment_type
-        from public.sellers
-        where active = true
+        from public.sellers s
+        where active = true and s.team_id in (select t.id from public.teams t where ${scopedTeamFilter.sql})
         order by full_name
-      `),
+      `, scopedTeamFilter.params),
       pool.query(`
         select id, operation_date, subscription_number, brand, model, plan_type,
                cuota_1_value, total_collected, factory_account, used_car_flag,
                seller_id, team_id, lead_source, status, scoring_status, scoring_notes,
                audited_at
-        from public.sales_operations
+        from public.sales_operations o
+        where o.team_id in (select t.id from public.teams t where ${scopedTeamFilter.sql})
         order by operation_date desc
-      `),
+      `, scopedTeamFilter.params),
       pool.query(`
         select id, brand, subscription_number, scoring_date, seller_name,
                supervisor_name, observed_category, rejection_reason_1,
                rejection_reason_2, approval_reason, cancellation_reason,
                last_seen_at
-        from public.scoring_source_rows
+        from public.scoring_source_rows sr
+        where ${profile.role === 'admin' || profile.role === 'rrhh'
+          ? 'true'
+          : `exists (
+              select 1 from public.teams t
+              left join public.staff_members supervisor on supervisor.id = t.supervisor_staff_id
+              where ${scopedTeamFilter.sql}
+                and lower(trim(supervisor.full_name)) = lower(trim(sr.supervisor_name))
+            )`}
         order by scoring_date desc nulls last, last_seen_at desc
         limit 500
-      `),
+      `, scopedTeamFilter.params),
+      pool.query(`
+        select id, entry_date, seller_id, team_id, assigned_leads, contacted_leads,
+               closed_leads, lost_leads, lead_source, loss_reasons
+        from public.leads_distribution ld
+        where ld.team_id in (select t.id from public.teams t where ${scopedTeamFilter.sql})
+        order by entry_date desc
+      `, scopedTeamFilter.params),
     ]);
 
     return res.status(200).json({
@@ -85,6 +119,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         sellers: sellersResult.rows,
         operations: operationsResult.rows,
         scoring_rows: scoringRowsResult.rows,
+        lead_distributions: leadsResult.rows,
       },
     });
   } catch (error) {

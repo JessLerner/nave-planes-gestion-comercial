@@ -16,6 +16,8 @@ import { CarteraMoraModule } from './components/cartera/CarteraMoraModule';
 import { DatabaseConnectorsModule } from './components/database/DatabaseConnectorsModule';
 import { ExtractorHubModule } from './components/extractor/ExtractorHubModule';
 import { CalendarConfigModal } from './components/calendar/CalendarConfigModal';
+import { AuthProvider, useAuth } from './auth/AuthProvider';
+import { LoginScreen } from './auth/LoginScreen';
 
 function MainLayout() {
   const { currentUser } = useApp();
@@ -75,10 +77,19 @@ function MainLayout() {
   );
 }
 
-export default function App() {
+function AuthenticatedApp() {
+  const { user, session, loading } = useAuth();
+  if (loading) {
+    return <div className="min-h-screen bg-[#18191b] text-white flex items-center justify-center text-sm">Validando acceso seguro…</div>;
+  }
+  if (!user || !session) return <LoginScreen />;
   return (
-    <AppProvider>
+    <AppProvider initialUser={user} accessToken={session.access_token}>
       <MainLayout />
     </AppProvider>
   );
+}
+
+export default function App() {
+  return <AuthProvider><AuthenticatedApp /></AuthProvider>;
 }

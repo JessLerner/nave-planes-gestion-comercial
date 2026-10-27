@@ -8,9 +8,11 @@ type AuthState = {
   user: User | null;
   loading: boolean;
   configurationError: string | null;
+  mustSetPassword: boolean;
   signIn: (email: string, password: string) => Promise<{ error?: string }>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<{ error?: string }>;
+  updatePassword: (password: string) => Promise<{ error?: string }>;
 };
 
 const AuthContext = createContext<AuthState | null>(null);
@@ -32,6 +34,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [configurationError, setConfigurationError] = useState<string | null>(null);
+  const [mustSetPassword, setMustSetPassword] = useState(() => {
+    const fragment = window.location.hash;
+    return fragment.includes('type=invite') || fragment.includes('type=recovery');
+  });
 
   const hydrateProfile = async (activeSession: Session | null) => {
     if (!activeSession) {
@@ -74,8 +80,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       void hydrateProfile(data.session);
       });
 
-      const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      const { data: listener } = supabase.auth.onAuthStateChange((event, nextSession) => {
       setSession(nextSession);
+      if (event === 'PASSWORD_RECOVERY') setMustSetPassword(true);
       setLoading(true);
       void hydrateProfile(nextSession);
       });
@@ -104,7 +111,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
       return error ? { error: error.message } : {};
     },
-  }), [session, user, loading, configurationError]);
+    updatePassword: async password => {
+      const supabase = await getSupabaseClient();
+      if (!supabase) return { error: 'La conexión de acceso no está configurada.' };
+      const { error } = await supabase.auth.updateUser({ password });
+      if (!error) {
+        setMustSetPassword(false);
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+      return error ? { error: error.message } : {};
+    },
+  }), [session, user, loading, configurationError, mustSetPassword]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

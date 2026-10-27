@@ -15,6 +15,7 @@ import {
   LogOut,
 } from 'lucide-react';
 import { useAuth } from '../../auth/AuthProvider';
+import { AccountSettingsModal } from '../../auth/AccountSettingsModal';
 
 interface HeaderProps {
   activeTab: string;
@@ -42,6 +43,8 @@ export const Header: React.FC<HeaderProps> = ({
   const { signOut } = useAuth();
 
   const [showNotifications, setShowNotifications] = useState(false);
+  const [showAccountMenu, setShowAccountMenu] = useState(false);
+  const [showAccountSettings, setShowAccountSettings] = useState(false);
 
   const getBreadcrumbTitle = () => {
     switch (activeTab) {
@@ -211,10 +214,10 @@ export const Header: React.FC<HeaderProps> = ({
         {/* Authenticated user menu */}
         <div className="relative">
           <button
-            onClick={() => void signOut()}
+            onClick={() => setShowAccountMenu(value => !value)}
             className="flex items-center gap-2.5 px-3 py-1.5 rounded bg-slate-800/90 hover:bg-slate-700 border border-slate-700 text-left transition-colors"
-            aria-label="Cerrar sesión"
-            title="Cerrar sesión"
+            aria-label="Abrir menú de cuenta"
+            aria-expanded={showAccountMenu}
           >
             <div className="w-7 h-7 rounded-full bg-blue-600/30 border border-blue-500/40 flex items-center justify-center text-xs font-bold text-blue-300 shrink-0">
               {currentUser.name.charAt(0)}
@@ -231,10 +234,12 @@ export const Header: React.FC<HeaderProps> = ({
                   : 'RRHH & Calidad'}
               </div>
             </div>
-            <LogOut className="w-3.5 h-3.5 text-slate-400 ml-1" />
+            <ChevronDown className="w-3.5 h-3.5 text-slate-400 ml-1" />
           </button>
+          {showAccountMenu && <div className="absolute right-0 mt-2 w-56 overflow-hidden rounded-lg border border-slate-700 bg-slate-900 shadow-2xl z-50"><button onClick={() => { setShowAccountMenu(false); setShowAccountSettings(true); }} className="w-full px-4 py-3 text-left text-xs font-medium text-slate-200 hover:bg-slate-800">Mi cuenta y contraseña</button><button onClick={() => void signOut()} className="flex w-full items-center gap-2 border-t border-slate-800 px-4 py-3 text-left text-xs font-medium text-red-300 hover:bg-slate-800"><LogOut className="h-3.5 w-3.5" />Cerrar sesión</button></div>}
         </div>
       </div>
+      {showAccountSettings && <AccountSettingsModal onClose={() => setShowAccountSettings(false)} />}
     </header>
   );
 };

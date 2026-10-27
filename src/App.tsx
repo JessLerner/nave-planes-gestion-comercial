@@ -18,6 +18,7 @@ import { ExtractorHubModule } from './components/extractor/ExtractorHubModule';
 import { CalendarConfigModal } from './components/calendar/CalendarConfigModal';
 import { AuthProvider, useAuth } from './auth/AuthProvider';
 import { LoginScreen } from './auth/LoginScreen';
+import { PasswordSetupScreen } from './auth/PasswordSetupScreen';
 
 function MainLayout() {
   const { currentUser } = useApp();
@@ -78,11 +79,12 @@ function MainLayout() {
 }
 
 function AuthenticatedApp() {
-  const { user, session, loading } = useAuth();
+  const { user, session, loading, mustSetPassword } = useAuth();
   if (loading) {
     return <div className="min-h-screen bg-[#18191b] text-white flex items-center justify-center text-sm">Validando acceso seguro…</div>;
   }
   if (!user || !session) return <LoginScreen />;
+  if (mustSetPassword) return <PasswordSetupScreen mode={window.location.hash.includes('type=invite') ? 'invite' : 'recovery'} />;
   return (
     <AppProvider initialUser={user} accessToken={session.access_token}>
       <MainLayout />

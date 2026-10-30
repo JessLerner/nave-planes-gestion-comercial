@@ -99,7 +99,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const { data: listener } = supabase.auth.onAuthStateChange((event, nextSession) => {
       setSession(nextSession);
       if (event === 'PASSWORD_RECOVERY') setMustSetPassword(true);
-      setLoading(true);
+      // A background TOKEN_REFRESHED event commonly fires when the browser
+      // regains focus. Keeping `loading` true here unmounted the entire
+      // operational workspace, which discarded forms and selected files.
+      // Initial authentication is already blocking; subsequent refreshes
+      // must update the profile without replacing the mounted application.
+      if (!nextSession) {
+        setUser(null);
+        setLoading(false);
+        return;
+      }
       void hydrateProfile(nextSession);
       });
       subscription = listener.subscription;

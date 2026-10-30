@@ -4,7 +4,7 @@ import { FileUp, LoaderCircle, Pencil, Plus, UsersRound } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../auth/AuthProvider';
 
-type Team = { id: string; name: string; manager_staff_id: string | null; supervisor_staff_id: string | null; manager_name?: string; supervisor_name?: string };
+type Team = { id: string; name: string; is_sales_team?: boolean; manager_staff_id: string | null; supervisor_staff_id: string | null; manager_name?: string; supervisor_name?: string };
 type Staff = { id: string; full_name: string; role: string; active: boolean; legajo?: string | null; dni?: string | null; employment_type?: string | null; commercial_structure?: string | null; location?: string | null; hire_date?: string | null; termination_date?: string | null; supervisor_staff_id?: string | null; manager_staff_id?: string | null; supervisor_name?: string | null; manager_name?: string | null };
 type Seller = { id: string; staff_member_id?: string | null; team_id: string; active: boolean };
 type Roster = { teams: Team[]; staff: Staff[]; sellers: Seller[] };
@@ -165,6 +165,16 @@ export const RosterManagementModule: React.FC = () => {
     } catch (error) { setMessage(error instanceof Error ? error.message : 'No se pudo actualizar el equipo.'); }
     finally { setSaving(false); }
   };
+  const setTeamSalesStatus = async (team: Team, isSalesTeam: boolean) => {
+    setSaving(true); setMessage(null);
+    try {
+      const response = await fetch('/api/roster', { method: 'POST', headers: headers(), body: JSON.stringify({ action: 'set_team_sales_status', teamId: team.id, isSalesTeam }) });
+      const payload = await response.json() as { success?: boolean; message?: string; data?: Roster };
+      if (!response.ok || !payload.success || !payload.data) throw new Error(payload.message || 'No se pudo actualizar el estado comercial del equipo.');
+      setRoster(payload.data); setMessage(isSalesTeam ? `${team.name} quedó visible como equipo de venta.` : `${team.name} quedó archivado y dejó de aparecer en los selectores comerciales.`);
+    } catch (error) { setMessage(error instanceof Error ? error.message : 'No se pudo actualizar el estado comercial del equipo.'); }
+    finally { setSaving(false); }
+  };
   const moveSelectedSellers = async () => {
     if (!selectedSellerIds.length || !bulkTeamId) return;
     setSaving(true); setMessage(null);
@@ -211,12 +221,11 @@ export const RosterManagementModule: React.FC = () => {
   const activeStaffById = new Map((roster?.staff || []).filter(staff => staff.active).map(staff => [staff.id, staff]));
   const salesCountByTeam = new Map<string, number>();
   (roster?.sellers || []).filter(seller => seller.active).forEach(seller => salesCountByTeam.set(seller.team_id, (salesCountByTeam.get(seller.team_id) || 0) + 1));
-  // A selectable sales team must have both conditions: an active Supervisor
-  // and at least one active seller. Orphan teams are surfaced separately for
-  // reassignment instead of silently remaining in operational selectors.
+  // A selectable sales team is explicitly enabled by Administración and must
+  // also have an active Supervisor plus at least one active seller.
   const isValidSalesTeam = (team: Team) => {
     const supervisor = team.supervisor_staff_id ? activeStaffById.get(team.supervisor_staff_id) : null;
-    return Boolean(supervisor?.role === 'supervisor' && (salesCountByTeam.get(team.id) || 0) > 0);
+    return Boolean(team.is_sales_team !== false && supervisor?.role === 'supervisor' && (salesCountByTeam.get(team.id) || 0) > 0);
   };
   const visibleTeams = (roster?.teams || []).filter(isValidSalesTeam);
   const normalizedSearch = normalizeHeader(search);
@@ -248,6 +257,7 @@ export const RosterManagementModule: React.FC = () => {
       <label className="flex items-end gap-2 pb-2 text-xs text-slate-300"><input type="checkbox" checked={form.active} onChange={e => set('active', e.target.checked)} /> Recurso activo</label>
     </div><div className="mt-4 flex gap-2"><button disabled={saving} onClick={() => void saveResource().then(saved => { if (saved) setIsFormOpen(false); })} className="rounded bg-indigo-600 px-3 py-2 text-xs font-bold text-white disabled:opacity-50">{saving ? 'Guardando…' : 'Guardar recurso'}</button><button onClick={() => { setForm(emptyForm()); setIsFormOpen(false); }} className="rounded px-3 py-2 text-xs text-slate-300 hover:bg-slate-800">Cancelar</button></div></section></div>}
     <section className="rounded-xl border border-slate-800 bg-slate-900 p-5"><div className="flex items-start gap-3"><FileUp className="mt-0.5 h-4 w-4 text-emerald-300"/><div><h3 className="font-semibold text-white">Carga desde Estructura RRHH Activa</h3><p className="mt-1 text-xs text-slate-400">Sólo se admite la pestaña “ESTRUCTURA RRHH ACTIVA OK”. Se toman recursos activos y se excluye NÓMINA CONVENCIONAL.</p></div></div><input type="file" accept=".xlsx,.xls,.csv" onChange={e => void readImport(e.target.files?.[0] || null)} className="mt-4 block w-full text-xs text-slate-300" />{importRows.length > 0 && <div className="mt-4 rounded border border-slate-800 p-3 text-xs text-slate-300"><p><b>{importRows.length}</b> recursos activos no convencionales detectados. Muestra: {importRows.slice(0, 4).map(row => String(row.fullName)).join(' · ')}</p><label className="mt-3 flex items-start gap-2 rounded border border-amber-700/60 bg-amber-950/20 p-3 text-xs text-amber-100"><input type="checkbox" checked={replaceActiveRoster} onChange={e => setReplaceActiveRoster(e.target.checked)} className="mt-0.5"/><span><b>Reconstruir nómina activa desde esta fuente.</b> Los recursos activos que no estén en la planilla se darán de baja lógicamente. Se conserva el historial de ventas, Fox y Scoring, y queda un resguardo de la estructura anterior.</span></label><button disabled={saving} onClick={() => void applyImport()} className="mt-3 rounded bg-emerald-600 px-3 py-2 font-bold text-white disabled:opacity-50">{replaceActiveRoster ? 'Reconstruir nómina activa' : 'Aplicar altas y actualizaciones'}</button></div>}</section>
+    <section className="rounded-xl border border-slate-800 bg-slate-900 p-5"><h3 className="font-semibold text-white">Visibilidad de equipos comerciales</h3><p className="mt-1 text-xs leading-5 text-slate-400">Administración decide aquí qué equipos aparecen en filtros, reportes y fichas de vendedores. Archivar un equipo no modifica personas, ventas ni historial.</p><div className="mt-4 max-h-64 space-y-2 overflow-auto">{(roster?.teams || []).map(team => <div key={team.id} className="flex items-center justify-between gap-3 rounded border border-slate-800 px-3 py-2"><div><p className="text-sm font-medium text-white">{team.name}</p><p className="text-xs text-slate-400">{salesCountByTeam.get(team.id) || 0} vendedor(es) activos · {team.is_sales_team === false ? 'Archivado' : 'Visible como equipo de venta'}</p></div><button disabled={saving} onClick={() => void setTeamSalesStatus(team, team.is_sales_team === false)} className={`rounded px-3 py-1.5 text-xs font-semibold disabled:opacity-50 ${team.is_sales_team === false ? 'bg-emerald-600 text-white' : 'bg-slate-700 text-slate-100'}`}>{team.is_sales_team === false ? 'Activar' : 'Archivar'}</button></div>)}</div></section>
     <section className="overflow-hidden rounded-xl border border-slate-800 bg-slate-900">
       <div className="border-b border-slate-800 p-5">
         <div className="flex items-start justify-between gap-3"><div><h3 className="font-semibold text-white">Nómina registrada</h3><p className="mt-1 text-xs text-slate-400">{roster?.staff.filter(staff => staff.active).length || 0} activos · {roster?.staff.filter(staff => !staff.active).length || 0} bajas / históricos.</p></div><div className="flex rounded border border-slate-700 text-xs"><button onClick={() => { setView('active'); setSelectedSellerIds([]); }} className={`px-3 py-2 ${view === 'active' ? 'bg-indigo-600 text-white' : 'text-slate-300'}`}>Activos</button><button onClick={() => { setView('inactive'); setSelectedSellerIds([]); }} className={`px-3 py-2 ${view === 'inactive' ? 'bg-slate-700 text-white' : 'text-slate-300'}`}>Bajas e históricos</button></div></div>

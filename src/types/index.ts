@@ -20,6 +20,8 @@ export interface Team {
   manager_staff_id?: string;
   manager_name?: string;
   commercial_structure?: string;
+  /** Administración decide si este equipo se muestra en circuitos comerciales. */
+  is_sales_team?: boolean;
   branch: string;
   target_override?: number;
   color: string;

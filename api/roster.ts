@@ -81,7 +81,7 @@ async function logChange(db: PoolClient, entityType: string, entityId: string | 
 
 async function roster(db: PoolClient) {
   const [teams, staff, sellers] = await Promise.all([
-    db.query(`select t.id, t.name, t.branch, t.commercial_structure, t.manager_staff_id, t.supervisor_staff_id, manager.full_name as manager_name, supervisor.full_name as supervisor_name from public.teams t left join public.staff_members manager on manager.id = t.manager_staff_id left join public.staff_members supervisor on supervisor.id = t.supervisor_staff_id order by t.name`),
+    db.query(`select t.id, t.name, t.branch, t.commercial_structure, t.is_sales_team, t.manager_staff_id, t.supervisor_staff_id, manager.full_name as manager_name, supervisor.full_name as supervisor_name from public.teams t left join public.staff_members manager on manager.id = t.manager_staff_id left join public.staff_members supervisor on supervisor.id = t.supervisor_staff_id order by t.name`),
     db.query(`select staff.id, staff.full_name, staff.role, staff.active, staff.legajo, staff.dni, staff.employment_type, staff.commercial_structure, staff.location, staff.hire_date, staff.termination_date, staff.source_label, staff.supervisor_staff_id, staff.manager_staff_id, supervisor.full_name as supervisor_name, manager.full_name as manager_name from public.staff_members staff left join public.staff_members supervisor on supervisor.id=staff.supervisor_staff_id left join public.staff_members manager on manager.id=staff.manager_staff_id order by staff.active desc, staff.full_name`),
     db.query(`select id, full_name, team_id, staff_member_id, active, hire_date, termination_date, legajo, employment_type, individual_target from public.sellers order by active desc, full_name`),
   ]);
@@ -244,7 +244,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
       const previous = id ? await db.query(`select * from public.staff_members where id = $1`, [id]) : { rows: [] as unknown[] };
       if (teamId) {
-        const team = await db.query(`select t.id from public.teams t join public.staff_members supervisor on supervisor.id=t.supervisor_staff_id where t.id=$1 and supervisor.active=true and supervisor.role='supervisor' and exists (select 1 from public.sellers s where s.team_id=t.id and s.active=true)`, [teamId]);
+        const team = await db.query(`select t.id from public.teams t join public.staff_members supervisor on supervisor.id=t.supervisor_staff_id where t.id=$1 and t.is_sales_team=true and supervisor.active=true and supervisor.role='supervisor' and exists (select 1 from public.sellers s where s.team_id=t.id and s.active=true)`, [teamId]);
         if (!team.rows[0]) return res.status(400).json({ success: false, message: 'El equipo elegido no tiene un supervisor activo con vendedores a cargo.' });
       }
       let staffId = id;
@@ -322,6 +322,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
       await db.query('commit');
       return res.status(200).json({ success: true, deactivated: activeIds.length, data: await roster(db) });
+    } else if (action === 'set_team_sales_status') {
+      const teamId = optionalText(body?.teamId, 80);
+      const isSalesTeam = body?.isSalesTeam === true;
+      if (!teamId) return res.status(400).json({ success: false, message: 'Equipo inválido.' });
+      const before = await db.query(`select id, name, is_sales_team from public.teams where id=$1`, [teamId]);
+      if (!before.rows[0]) return res.status(404).json({ success: false, message: 'Equipo no encontrado.' });
+      await db.query(`update public.teams set is_sales_team=$2 where id=$1`, [teamId, isSalesTeam]);
+      await logChange(db, 'team', teamId, isSalesTeam ? 'activated_for_sales' : 'archived_from_sales', before.rows[0], { isSalesTeam }, userId);
     } else if (action === 'save_team') {
       const teamId = optionalText(body?.teamId, 80); const managerId = optionalText(body?.managerStaffId, 80); const supervisorId = optionalText(body?.supervisorStaffId, 80);
       if (!teamId) return res.status(400).json({ success: false, message: 'Equipo inválido.' });

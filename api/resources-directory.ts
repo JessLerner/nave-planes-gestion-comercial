@@ -23,7 +23,11 @@ export default async function handler(req: Req, res: Res) {
   const q = text(req.query?.q); const area = text(req.query?.area); const team = text(req.query?.team); const status = text(req.query?.status) || 'active';
   const page = Math.max(1, Number(text(req.query?.page)) || 1); const size = Math.min(100, Math.max(20, Number(text(req.query?.size)) || 50));
   const where: string[] = []; const values: unknown[] = []; const add = (sql: string, value?: unknown) => { if (value !== undefined) values.push(value); where.push(sql.replace('?', `$${values.length}`)); };
-  if (!globalAccess) { values.push(viewer!.staff_member_id); where.push(`staff.id in (with recursive hierarchy as (select id from public.staff_members where id=$1 union select child.id from public.staff_members child join hierarchy parent on child.responsible_staff_id=parent.id) select id from hierarchy)`); }
+  if (!globalAccess) {
+    values.push(viewer!.staff_member_id);
+    const hierarchy = `staff.id in (with recursive hierarchy as (select id from public.staff_members where id=$1 union select child.id from public.staff_members child join hierarchy parent on child.responsible_staff_id=parent.id) select id from hierarchy)`;
+    where.push(viewer!.role === 'gerente' ? `(${hierarchy} or staff.effective_manager_staff_id=$1)` : hierarchy);
+  }
   if (status === 'active') where.push('staff.active=true'); else if (status === 'inactive') where.push('staff.active=false');
   if (q) { values.push(q); const index = values.length; where.push(`(unaccent(lower(staff.full_name)) like '%' || unaccent(lower($${index})) || '%' or staff.dni like '%' || $${index} || '%' or staff.legajo like '%' || $${index} || '%')`); }
   if (area) add('staff.area_id=?', area);

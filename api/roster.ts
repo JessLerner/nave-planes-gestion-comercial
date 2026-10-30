@@ -8,6 +8,12 @@ const connectionString = rawConnectionString.replace(/([?&])sslmode=[^&]*/i, '$1
 const pool = new Pool({ connectionString, ssl: { rejectUnauthorized: false } });
 
 const validRoles = new Set(['administrador_general', 'director', 'gerente', 'supervisor', 'vendedor', 'administracion', 'rrhh', 'mora', 'contable', 'otro']);
+const administrationManagerName = 'gonzalez matias hernan';
+const formalManagerNames = new Set([
+  'soldano leonardo vicente',
+  'gonzalez fabrizio ignacio',
+  'rodriguez florencia cecilia',
+]);
 const text = (value: unknown, max = 180) => typeof value === 'string' && value.trim() && value.trim().length <= max ? value.trim() : null;
 const optionalText = (value: unknown, max = 180) => value == null || value === '' ? null : text(value, max);
 const date = (value: unknown) => {
@@ -24,6 +30,7 @@ const date = (value: unknown) => {
     : null;
 };
 const normalize = (value: string | null) => value ? value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^\p{L}\p{N}]+/gu, ' ').trim().replace(/\s+/g, ' ').toLowerCase() : null;
+const normalizeReferenceName = (value: string | null) => normalize(value?.replace(/\s+(?:np|pda|lum|lms|nvp-?o|pvn|coa|leg)\b.*$/i, '').replace(/\s+\d{7,11}\s*$/, '') || null);
 const nameTokens = (value: string | null) => (normalize(value) || '').split(' ').filter(Boolean);
 const editDistance = (left: string, right: string) => {
   if (left === right) return 0;
@@ -108,7 +115,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const imported = new Map<string, { staffId: string; fullName: string; role: string; supervisorName: string | null; managerName: string | null; hireDate: string | null; dni: string | null; legajo: string | null; employmentType: string | null; commercialStructure: string | null; location: string | null }>();
       for (const row of resources) {
         const fullName = text(row.fullName); const roleCandidate = text(row.role, 40)?.toLowerCase() || 'vendedor';
-        const role = normalize(fullName) === 'lerner jesica' ? 'administrador_general' : validRoles.has(roleCandidate) ? roleCandidate : 'vendedor';
+        const normalizedFullName = normalize(fullName);
+        const normalizedManagerName = normalizeReferenceName(text(row.managerName));
+        // These rules are enforced server-side as well as in the importer so
+        // a stale browser bundle cannot create an incorrect organizational role.
+        const role = normalizedFullName === 'lerner jesica'
+          ? 'administrador_general'
+          : normalizedFullName === administrationManagerName
+            ? 'director'
+            : normalizedFullName && formalManagerNames.has(normalizedFullName)
+              ? 'gerente'
+              : normalizedManagerName === administrationManagerName
+                ? 'administracion'
+                : validRoles.has(roleCandidate) ? roleCandidate : 'vendedor';
         if (!fullName) { unresolvedRows++; continue; }
         const key = normalize(fullName)!;
         const dni = optionalText(row.dni, 30)?.replace(/\D/g, '') || null;
@@ -126,7 +145,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           const created = await db.query(`insert into public.staff_members (full_name, role, active, dni, legajo, employment_type, commercial_structure, location, hire_date, source_label) values ($1,$2::public.staff_role,true,$3,$4,$5,$6,$7,$8::date,'ESTRUCTURA RRHH ACTIVA OK') returning id`, [fullName, role, dni, legajo, employmentType, commercialStructure, location, hireDate]);
           staffId = created.rows[0].id as string; staffByName.set(key, staffId); if (dni) staffByDni.set(dni, staffId); staffCandidates.push({ id: staffId, fullName }); createdStaff++;
         }
-        imported.set(staffId, { staffId, fullName, role, supervisorName: optionalText(row.supervisorName), managerName: optionalText(row.managerName), hireDate, dni, legajo, employmentType, commercialStructure, location });
+        imported.set(staffId, { staffId, fullName, role, supervisorName: normalizeReferenceName(optionalText(row.supervisorName)), managerName: normalizedManagerName, hireDate, dni, legajo, employmentType, commercialStructure, location });
       }
       // Resolve reporting lines only after every employee exists.  The source
       // sheet writes the leader's name together with an internal code, so the

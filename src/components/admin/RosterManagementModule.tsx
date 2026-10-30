@@ -17,7 +17,13 @@ const roleFrom = (value: string) => { const normalized = normalizeHeader(value);
 // The source uses suffixes such as "NP LEG 662" and "LUM LEG 947" in
 // reporting columns. Remove only the known employment-code suffix, never a
 // surname or a middle name, before matching it to a resource.
-const cleanReference = (value: string) => value.replace(/\s+(?:np|pda|lum|lms|nvp-?o|pvn|coa|leg)\b.*$/i, '').trim();
+const cleanReference = (value: string) => value
+  .replace(/\s+(?:np|pda|lum|lms|nvp-?o|pvn|coa|leg)\b.*$/i, '')
+  // Dirección is referenced in the HR source as "NOMBRE APELLIDO DNI",
+  // without an employment-code prefix. Keep the name and discard only a
+  // standalone DNI-like suffix so hierarchy matching remains deterministic.
+  .replace(/\s+\d{7,11}\s*$/, '')
+  .trim();
 const normalizedNameIs = (value: string, expected: string) => normalizeHeader(value) === normalizeHeader(expected);
 const administrationManager = 'GONZALEZ MATIAS HERNAN';
 const managerNames = new Set([

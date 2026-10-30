@@ -2,7 +2,6 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
 import {
   FileSpreadsheet,
-  Globe,
   Database,
   RefreshCw,
   Send,
@@ -61,8 +60,9 @@ export const ExtractorHubModule: React.FC = () => {
   // Active sub-tab inside Extractor
   const [activeSubTab, setActiveSubTab] = useState<'hub' | 'explorer' | 'supabase' | 'extension' | 'logs'>('hub');
 
-  // Source Selection: 'sheets' | 'file' | 'web'
-  const [sourceType, setSourceType] = useState<'sheets' | 'file' | 'web'>('sheets');
+  // Only real sources are available here. Fox is synchronized by the dedicated
+  // Chrome extension, never through a browser-side simulated dataset.
+  const [sourceType, setSourceType] = useState<'sheets' | 'file'>('sheets');
 
   // Google Sheets Auth & Tabs State
   const [googleUser, setGoogleUser] = useState<FirebaseUser | null>(null);
@@ -80,11 +80,6 @@ export const ExtractorHubModule: React.FC = () => {
   const [isParsingFile, setIsParsingFile] = useState<boolean>(false);
   const [isDraggingFile, setIsDraggingFile] = useState<boolean>(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  // Web/CRM URL Source State
-  const [webUrl, setWebUrl] = useState<string>('');
-  const [webMonthFilter, setWebMonthFilter] = useState<'current' | 'all'>('current');
-  const [webTeamFilter, setWebTeamFilter] = useState<string>('all');
 
   // Column Selection for Export / Sync
   const [detectedColumns, setDetectedColumns] = useState<string[]>([]);
@@ -367,19 +362,6 @@ export const ExtractorHubModule: React.FC = () => {
     }
   };
 
-  // Web CRM Dataset Simulator / Generator
-  const webCrmRows = useMemo(() => {
-    const sample = [
-      { codigo_crm: 'CRM-2026-1001', cliente: 'Laboratorios Farmacéuticos Andinos', contacto: 'Dr. Alejandro Ruiz', equipo: 'Equipo Enterprise', fecha: '2026-10-02', monto: 18500, moneda: 'USD', estado: 'Cerrado Ganado', canal: 'Portal Web CRM' },
-      { codigo_crm: 'CRM-2026-1002', cliente: 'Soluciones Logísticas del Plata', contacto: 'Ing. Marcelo Gómez', equipo: 'Equipo Ventas Oficial', fecha: '2026-10-06', monto: 7400, moneda: 'USD', estado: 'En Negociación', canal: 'Run One' },
-      { codigo_crm: 'CRM-2026-1003', cliente: 'Metalúrgica San Jorge S.A.', contacto: 'Carlos Fontana', equipo: 'Equipo Central', fecha: '2026-10-10', monto: 12000, moneda: 'USD', estado: 'Propuesta Enviada', canal: 'Stand' },
-      { codigo_crm: 'CRM-2026-1004', cliente: 'Consultora de Software Cono Sur', contacto: 'Lic. Mariana Valdez', equipo: 'Equipo Enterprise', fecha: '2026-10-12', monto: 9200, moneda: 'USD', estado: 'Cerrado Ganado', canal: 'Subite' },
-      { codigo_crm: 'CRM-2026-1005', cliente: 'Agropecuaria Las Marías', contacto: 'Esteban Benítez', equipo: 'Equipo Ventas Oficial', fecha: '2026-10-15', monto: 24500, moneda: 'USD', estado: 'Cerrado Ganado', canal: 'Facebook Ads' },
-      { codigo_crm: 'CRM-2026-1006', cliente: 'Distribuidora Mayorista del Norte', contacto: 'Paula Méndez', equipo: 'Equipo Central', fecha: '2026-10-18', monto: 11000, moneda: 'USD', estado: 'En Negociación', canal: 'Dato Propio' }
-    ];
-    return sample;
-  }, []);
-
   // Update detected columns based on active source
   useEffect(() => {
     if (sourceType === 'file' && parsedFileData) {
@@ -389,12 +371,8 @@ export const ExtractorHubModule: React.FC = () => {
       const cols = sheetsDetectedData.headers.filter(h => h !== '_source_tab');
       setDetectedColumns(cols);
       setSelectedColumns(prev => prev.length === 0 ? cols : prev);
-    } else if (sourceType === 'web') {
-      const cols = Object.keys(webCrmRows[0] || {});
-      setDetectedColumns(cols);
-      setSelectedColumns(prev => prev.length === 0 ? cols : prev);
     }
-  }, [sourceType, parsedFileData, sheetsDetectedData, webCrmRows]);
+  }, [sourceType, parsedFileData, sheetsDetectedData]);
 
   // Filter columns to export
   const toggleColumn = (col: string) => {
@@ -439,10 +417,6 @@ export const ExtractorHubModule: React.FC = () => {
         rowsToProcess = parsedFileData.rows;
         sourceName = parsedFileData.activeSheet;
         spreadsheetTitle = parsedFileData.fileName;
-      } else if (sourceType === 'web') {
-        rowsToProcess = webCrmRows;
-        sourceName = 'Web_CRM_Extraccion';
-        spreadsheetTitle = 'Portal Fox CRM & Web';
       }
 
       if (rowsToProcess.length === 0) {
@@ -690,7 +664,7 @@ export const ExtractorHubModule: React.FC = () => {
               </span>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <button
                 type="button"
                 onClick={() => setSourceType('sheets')}
@@ -731,25 +705,6 @@ export const ExtractorHubModule: React.FC = () => {
                 </div>
               </button>
 
-              <button
-                type="button"
-                onClick={() => setSourceType('web')}
-                className={`p-4 rounded-xl border text-left transition-all ${
-                  sourceType === 'web'
-                    ? 'bg-blue-600/10 border-blue-500 text-white shadow-md shadow-blue-500/10'
-                    : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-200'
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <div className={`p-2 rounded-lg ${sourceType === 'web' ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-400'}`}>
-                    <Globe className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <div className="text-xs font-bold text-white">Portal Web / Fox CRM</div>
-                    <div className="text-[11px] text-slate-400 mt-0.5">Captura web sin API directa</div>
-                  </div>
-                </div>
-              </button>
             </div>
 
             {/* Source Configuration Body */}
@@ -902,37 +857,6 @@ export const ExtractorHubModule: React.FC = () => {
                 </div>
               )}
 
-              {/* WEB / CRM SOURCE */}
-              {sourceType === 'web' && (
-                <div className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                    <div className="md:col-span-2 space-y-1.5">
-                      <label className="text-xs font-medium text-slate-300">URL del Portal / Fox CRM:</label>
-                      <input
-                        type="text"
-                        value={webUrl}
-                        onChange={e => setWebUrl(e.target.value)}
-                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3.5 py-2 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-medium text-slate-300">Rango de Datos:</label>
-                      <select
-                        value={webMonthFilter}
-                        onChange={e => setWebMonthFilter(e.target.value as any)}
-                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                      >
-                        <option value="current">Mes en Curso (Octubre 2026)</option>
-                        <option value="all">Todo el Histórico</option>
-                      </select>
-                    </div>
-                  </div>
-                  <div className="p-3 bg-slate-900/80 rounded-lg border border-slate-800 text-xs flex items-center justify-between text-slate-400">
-                    <span>Dataset CRM simulado con normalización automática de campos comerciales.</span>
-                    <span className="text-blue-400 font-semibold">{webCrmRows.length} registros listos para transferir</span>
-                  </div>
-                </div>
-              )}
             </div>
           </div>
 

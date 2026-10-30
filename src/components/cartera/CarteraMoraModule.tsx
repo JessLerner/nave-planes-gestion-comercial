@@ -2,10 +2,8 @@ import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import {
   PieChart,
-  UploadCloud,
   FileSpreadsheet,
   AlertTriangle,
-  CheckCircle2,
   TrendingDown,
   User,
   Layers,
@@ -13,16 +11,14 @@ import {
   Filter,
   DollarSign,
 } from 'lucide-react';
-import { CarteraMora } from '../../types';
 import { formatARS } from '../../utils/businessLogic';
 
 export const CarteraMoraModule: React.FC = () => {
-  const { carteraMora, sellers, teams, importCarteraBatch, selectedTeamId, currentUser } = useApp();
+  const { carteraMora, sellers, teams, selectedTeamId, currentUser } = useApp();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterGrouping, setFilterGrouping] = useState<string>('all');
-  const [importNotice, setImportNotice] = useState<string | null>(null);
 
   // Filter cartera records
   const filteredRecords = carteraMora.filter(record => {
@@ -49,50 +45,6 @@ export const CarteraMoraModule: React.FC = () => {
   const moraLeveCount = filteredRecords.filter(r => r.plan_status === 'Mora Leve (1-2)').length;
   const moraSeveraCount = filteredRecords.filter(r => r.plan_status === 'Mora Severa (3+)').length;
 
-  // Simulate bulk import
-  const handleSimulateImport = () => {
-    const sampleImportBatch: CarteraMora[] = [
-      {
-        id: `cm-${Date.now()}-1`,
-        operation_id: 'op-batch-01',
-        subscription_number: 'SUB-FIAT-9912',
-        client_name: 'Santiago Andrés Leguizamón',
-        seller_id: 'seller-6',
-        team_id: 'team-2',
-        brand: 'Fiat',
-        model: 'Cronos Drive',
-        grouping_status: 'Agrupado',
-        group_number: 'GRP-9901',
-        order_number: 'ORD-022',
-        overdue_installments: 0,
-        total_debt: 0,
-        plan_status: 'Al Día',
-        last_payment_date: '2026-10-18',
-      },
-      {
-        id: `cm-${Date.now()}-2`,
-        operation_id: 'op-batch-02',
-        subscription_number: 'SUB-PEUG-5541',
-        client_name: 'Clara Elena Valenzuela',
-        seller_id: 'seller-1',
-        team_id: 'team-1',
-        brand: 'Peugeot',
-        model: '2008 Allure',
-        grouping_status: 'Agrupado',
-        group_number: 'GRP-9012',
-        order_number: 'ORD-077',
-        overdue_installments: 2,
-        total_debt: 660000,
-        plan_status: 'Mora Leve (1-2)',
-        last_payment_date: '2026-08-20',
-      },
-    ];
-
-    importCarteraBatch(sampleImportBatch);
-    setImportNotice(`Se importaron exitosamente ${sampleImportBatch.length} contratos desde informe bancario de Fábrica.`);
-    setTimeout(() => setImportNotice(null), 3000);
-  };
-
   return (
     <div className="space-y-6">
       {/* 1. Header Banner */}
@@ -110,23 +62,10 @@ export const CarteraMoraModule: React.FC = () => {
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
-          <button
-            onClick={handleSimulateImport}
-            className="flex items-center gap-2 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-semibold shadow-lg shadow-emerald-600/20 transition-all"
-          >
-            <UploadCloud className="w-3.5 h-3.5" />
-            <span>Importar CSV / Excel de Fábrica</span>
-          </button>
+        <div className="max-w-xs rounded-lg border border-amber-800/70 bg-amber-950/30 px-3 py-2 text-xs text-amber-200">
+          Fuente de mora pendiente de definir. No se muestran ni se generan datos de prueba.
         </div>
       </div>
-
-      {importNotice && (
-        <div className="p-3 bg-emerald-950/60 border border-emerald-800 rounded-lg text-xs text-emerald-200 flex items-center gap-2">
-          <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-          <span>{importNotice}</span>
-        </div>
-      )}
 
       {/* 2. KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
@@ -222,15 +161,9 @@ export const CarteraMoraModule: React.FC = () => {
                     <div className="text-slate-300 font-semibold text-sm">
                       Sin contratos de cartera o mora cargados
                     </div>
-                    <p className="text-xs text-slate-500 max-w-md mx-auto mt-1 mb-4">
-                      Importe un archivo Excel / CSV de Fábrica o conecte su base de datos para sincronizar el estado de agrupamiento y cuotas impagas.
+                    <p className="text-xs text-slate-500 max-w-md mx-auto mt-1">
+                      Todavía no hay una fuente real aprobada para mora y agrupamiento. Esta sección se habilitará cuando recibamos el reporte de fábrica o una integración verificable.
                     </p>
-                    <button
-                      onClick={handleSimulateImport}
-                      className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-semibold shadow-md shadow-emerald-600/20"
-                    >
-                      Importar Archivo de Fábrica
-                    </button>
                   </td>
                 </tr>
               ) : (

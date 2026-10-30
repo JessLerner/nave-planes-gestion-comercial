@@ -6,7 +6,7 @@ Este documento describe qué sistema es dueño de cada dato. No se cargan datos 
 | --- | --- | --- | --- |
 | App Control Operaciones | `ID Ventas` | Operaciones, cobros, cuota 1, cuenta de fábrica, sobrepauta, usado, equipo, vendedor y origen | `N° Suscripción` |
 | App Control Operaciones | `Modelos_y_Precios` | Marca, modelo, plan, cuota 1 y cuenta de fábrica | marca + modelo + tipo de plan + vigencia |
-| App Control Operaciones | `Equipos_de_venta` | Supervisor y vendedores por equipo | nombre normalizado; luego identificador interno de vendedor |
+| Estructura RRHH Activa | hoja de estructura de RRHH | Personal, función, responsable directo y jerarquía | legajo como identificador estable; DNI sólo como control |
 | App Control Operaciones | `Origen_datos` | Canales de origen de leads | nombre normalizado |
 | Scoring Peugeot | planilla de Scoring | Estado de auditoría, motivos y comentarios | `SX` = `N° Suscripción` |
 | Fox CRM / Data Extractor | reporte o webhook aprobado | Entrada, reparto y gestión de leads | identificador externo del CRM |
@@ -29,7 +29,10 @@ El registro de auditoría conserva la fila original y se asocia a la operación 
 ## Flujo de sincronización
 
 1. Apps Script expone la lectura de `ID Ventas`, `Modelos_y_Precios`, `Equipos_de_venta` y `Origen_datos` mediante un endpoint de sólo lectura. Parte Diario no se modifica.
-2. La función `sync-app-control-roster` de Supabase lee ese endpoint y actualiza exclusivamente la nómina. Excluye siempre `Convencional`.
-3. La Edge Function normaliza las columnas y hace *upsert*.
+2. **Estructura RRHH Activa** es la única fuente autorizada de Recursos. Parte
+   Diario y `Equipos_de_venta` no crean ni modifican personas, cargos, jerarquías
+   o equipos en Nave.Plan.
+3. Antes de cada alta o actualización, el importador debe mostrar una vista previa
+   y validar el legajo; no puede inferir cargos ni responsables.
 4. Para cada marca se registra una fuente de Scoring independiente; Peugeot es la primera.
 5. Nave Planes consulta exclusivamente Supabase y muestra, aun sin datos, el estado y la fecha de cada fuente.

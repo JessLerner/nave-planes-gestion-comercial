@@ -232,7 +232,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const teamId = optionalText(resource.teamId, 80);
       const supervisorId = optionalText(resource.supervisorId, 80);
       const managerId = optionalText(resource.managerId, 80);
-      if (!fullName || !validRoles.has(role) || (role === 'vendedor' && !teamId)) return res.status(400).json({ success: false, message: 'Nombre, cargo o equipo inválido.' });
+      if (!fullName || !validRoles.has(role)) return res.status(400).json({ success: false, message: 'Completá nombre y cargo.' });
+      if (role === 'vendedor' && !teamId) return res.status(400).json({ success: false, message: 'Un vendedor debe pertenecer a un equipo comercial válido. Si su equipo perdió supervisor, resolvelo primero en “Equipos de venta a resolver”.' });
       if (id && (id === supervisorId || id === managerId)) return res.status(400).json({ success: false, message: 'La persona no puede depender de sí misma.' });
       if (supervisorId && managerId && supervisorId === managerId) return res.status(400).json({ success: false, message: 'El responsable directo y la jerarquía superior deben ser personas distintas.' });
       const reportingIds = [supervisorId, managerId].filter((value): value is string => Boolean(value));
@@ -241,8 +242,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const allowedDirectRoles = directLeaderRolesFor(role);
         if (reporting.rows.length !== reportingIds.length || reporting.rows.some(row => !row.active) || reporting.rows.some(row => row.id === supervisorId && !allowedDirectRoles.has(row.role)) || reporting.rows.some(row => row.id === managerId && !seniorLeaderRoles.has(row.role))) return res.status(400).json({ success: false, message: 'El responsable directo o la Gerencia/Dirección seleccionados no corresponden al área elegida.' });
       }
-      if (teamId) { const team = await db.query(`select id from public.teams where id = $1`, [teamId]); if (!team.rows[0]) return res.status(400).json({ success: false, message: 'El equipo seleccionado no existe.' }); }
       const previous = id ? await db.query(`select * from public.staff_members where id = $1`, [id]) : { rows: [] as unknown[] };
+      if (id && (previous.rows[0] as { role?: string } | undefined)?.role === 'supervisor' && role !== 'supervisor') {
+        const activeReports = await db.query(`select count(*)::int as count from public.sellers s join public.teams t on t.id=s.team_id where t.supervisor_staff_id=$1 and s.active=true`, [id]);
+        if (activeReports.rows[0]?.count > 0) return res.status(400).json({ success: false, message: `Antes de quitar la función de Supervisor reasigná sus ${activeReports.rows[0].count} vendedor(es) desde “Equipos de venta a resolver”.` });
+      }
+      if (teamId) {
+        const team = await db.query(`select t.id from public.teams t join public.staff_members supervisor on supervisor.id=t.supervisor_staff_id where t.id=$1 and supervisor.active=true and supervisor.role='supervisor' and exists (select 1 from public.sellers s where s.team_id=t.id and s.active=true)`, [teamId]);
+        if (!team.rows[0]) return res.status(400).json({ success: false, message: 'El equipo elegido no tiene un supervisor activo con vendedores a cargo. Resolvelo desde “Equipos de venta a resolver”.' });
+      }
       let staffId = id;
       if (id) {
         await db.query(`update public.staff_members set full_name=$2, role=$3::public.staff_role, active=$4, dni=$5, legajo=$6, employment_type=$7, commercial_structure=$8, location=$9, hire_date=$10::date, termination_date=$11::date, supervisor_staff_id=$12::uuid, manager_staff_id=$13::uuid, source_label='Administración Nave.Plan', updated_at=now() where id=$1`, [id, fullName, role, active, dni, legajo, employmentType, commercialStructure, location, hireDate, terminationDate, supervisorId, managerId]);

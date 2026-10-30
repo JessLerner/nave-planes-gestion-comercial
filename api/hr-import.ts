@@ -68,7 +68,16 @@ export default async function handler(request: Request, response: Response) {
   if (!userId) return response.status(401).json({ success: false, message: 'Sesión no válida.' });
 
   const submitted = (request.body?.rows || []).map(normalizeRow);
-  const rows = submitted.filter((row) => !['excluido', 'excluded'].includes(row.decision));
+  const approvedRows = submitted.filter((row) => !['excluido', 'excluded'].includes(row.decision));
+  const identities = new Set<string>();
+  const duplicates: Required<ImportRow>[] = [];
+  const rows = approvedRows.filter((row) => {
+    // DNI is the stable identity. Where it is absent, the normalized name is
+    // used only to prevent a duplicate row inside this single import batch.
+    const key = row.dni.replace(/\D/g, '') ? `dni:${row.dni.replace(/\D/g, '')}` : `name:${normalize(row.name)}`;
+    if (identities.has(key)) { duplicates.push(row); return false; }
+    identities.add(key); return true;
+  });
   if (!rows.length || rows.length > 1000 || rows.some((row) => !row.name || !row.category || ['revisar', 'review'].includes(row.decision))) {
     return response.status(400).json({ success: false, message: 'La estructura contiene filas sin aprobar o no es válida.' });
   }
@@ -84,7 +93,7 @@ export default async function handler(request: Request, response: Response) {
     const run = await database.query(
       `insert into public.hr_import_runs(source_name,status,received_rows,summary,created_by)
        values($1,'applied',$2,$3,$4) returning id`,
-      ['ESTRUCTURA RRHH ACTIVA OK', submitted.length, JSON.stringify({ imported: rows.length, excluded: submitted.length - rows.length }), userId],
+      ['ESTRUCTURA RRHH ACTIVA OK', submitted.length, JSON.stringify({ imported: rows.length, excluded: submitted.length - approvedRows.length, duplicate_source_rows: duplicates.length }), userId],
     );
     const runId = run.rows[0].id as string;
     const roleResult = await database.query<Role>(
@@ -172,7 +181,7 @@ export default async function handler(request: Request, response: Response) {
     }
 
     await database.query('commit');
-    return response.status(200).json({ success: true, runId, created: created.length, teams: teamBySupervisor.size });
+    return response.status(200).json({ success: true, runId, created: created.length, teams: teamBySupervisor.size, duplicateSourceRows: duplicates.length });
   } catch (error) {
     await database.query('rollback');
     return response.status(400).json({ success: false, message: error instanceof Error ? error.message : 'No se pudo aplicar la estructura.' });

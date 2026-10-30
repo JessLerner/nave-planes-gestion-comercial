@@ -109,7 +109,7 @@ export const LegajosDirectory: React.FC = () => {
         body: JSON.stringify({ rows: preview }),
       });
       const result = await response.json();
-      setPreviewMessage(result.success ? `${result.created} recursos y ${result.teams} equipos de venta cargados.` : result.message || 'No se pudo cargar.');
+      setPreviewMessage(result.success ? `${result.created} recursos y ${result.teams} equipos de venta cargados.${result.duplicateSourceRows ? ` Se omitieron ${result.duplicateSourceRows} fila(s) repetida(s) del archivo.` : ''}` : result.message || 'No se pudo cargar.');
       if (result.success) { setPreview([]); await load(); }
     } finally { setApplying(false); }
   };

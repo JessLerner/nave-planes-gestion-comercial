@@ -18,6 +18,25 @@ const roleFrom = (value: string) => { const normalized = normalizeHeader(value);
 // reporting columns. Remove only the known employment-code suffix, never a
 // surname or a middle name, before matching it to a resource.
 const cleanReference = (value: string) => value.replace(/\s+(?:np|pda|lum|lms|nvp-?o|pvn|coa|leg)\b.*$/i, '').trim();
+const normalizedNameIs = (value: string, expected: string) => normalizeHeader(value) === normalizeHeader(expected);
+const administrationManager = 'GONZALEZ MATIAS HERNAN';
+const managerNames = new Set([
+  'SOLDANO LEONARDO VICENTE',
+  'GONZALEZ FABRIZIO IGNACIO',
+  'RODRIGUEZ FLORENCIA CECILIA',
+].map(normalizeHeader));
+
+const roleForImportedRow = (row: { fullName: string; managerName: string; explicitRole: string }, referencedSupervisors: Set<string>) => {
+  // Organizational instruction confirmed by Administración: people reporting
+  // to Dirección (Matías González) belong to Administración, except the three
+  // formal Managers. This takes precedence over legacy spreadsheet labels.
+  if (normalizedNameIs(row.fullName, 'LERNER JESICA')) return 'administrador_general';
+  if (normalizedNameIs(row.managerName, administrationManager)) {
+    return managerNames.has(normalizeHeader(row.fullName)) ? 'gerente' : 'administracion';
+  }
+  if (row.explicitRole !== 'otro') return row.explicitRole;
+  return referencedSupervisors.has(normalizeHeader(row.fullName)) ? 'supervisor' : 'vendedor';
+};
 
 export const RosterManagementModule: React.FC = () => {
   const { currentUser } = useApp();
@@ -111,10 +130,7 @@ export const RosterManagementModule: React.FC = () => {
       const referencedSupervisors = new Set(sourceRows.map(row => normalizeHeader(row.supervisorName)).filter(Boolean));
       const rows = sourceRows.map(({ explicitRole, activeInSource: _activeInSource, ...row }) => ({
         ...row,
-        // "CATEGORÍA" wins whenever it contains an explicit role. For the
-        // frequent blank category case, a person named as supervisor of other
-        // source rows is the supervisor; everyone else remains a seller.
-        role: explicitRole !== 'otro' ? explicitRole : referencedSupervisors.has(normalizeHeader(row.fullName)) ? 'supervisor' : 'vendedor',
+        role: roleForImportedRow({ ...row, explicitRole }, referencedSupervisors),
       }));
       if (!rows.length) throw new Error('No se identificaron nombres. Descargá específicamente la pestaña “ESTRUCTURA RRHH ACTIVA OK”.');
       setImportRows(rows); setMessage(`${rows.length} recursos activos no convencionales leídos desde “${sourceSheetName}”. Revisá la muestra antes de aplicar: la importación sólo crea o actualiza altas; nunca da bajas automáticas.`);

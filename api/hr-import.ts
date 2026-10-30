@@ -6,7 +6,7 @@ type ImportRow = {
 };
 type Request = { method?: string; headers?: Record<string, string | string[] | undefined>; body?: { rows?: ImportRow[] } };
 type Response = { status: (code: number) => Response; json: (body: unknown) => Response };
-type Role = { id: string; name: string; area_id: string; can_supervise_sales_team: boolean; creates_seller_record: boolean };
+type Role = { id: string; name: string; area_id: string; can_supervise_sales_team: boolean; creates_seller_record: boolean; app_role_mapping?: string | null; source_label?: string | null };
 type Created = { id: string; full_name: string; role: Role; row: Required<ImportRow> };
 
 const connectionString = (process.env.POSTGRES_URL || process.env.DATABASE_URL || '')
@@ -19,7 +19,21 @@ const tokens = (value: unknown) => normalize(value).split(' ').filter((token) =>
 const similarity = (reference: unknown, candidate: unknown) => {
   const left = tokens(reference); const right = tokens(candidate);
   if (!left.length || !right.length) return 0;
-  return right.filter((part) => left.some((item) => item === part || item.startsWith(part) || part.startsWith(item))).length / right.length;
+  const tokenScore = right.filter((part) => left.some((item) => item === part || item.startsWith(part) || part.startsWith(item) || editSimilarity(item, part) >= 0.82)).length / right.length;
+  return Math.max(tokenScore, editSimilarity(normalize(reference), normalize(candidate)));
+};
+const editSimilarity = (left: string, right: string) => {
+  if (!left || !right) return 0;
+  const previous = Array.from({ length: right.length + 1 }, (_, index) => index);
+  for (let row = 1; row <= left.length; row += 1) {
+    let diagonal = previous[0]; previous[0] = row;
+    for (let column = 1; column <= right.length; column += 1) {
+      const stored = previous[column];
+      previous[column] = Math.min(previous[column] + 1, previous[column - 1] + 1, diagonal + (left[row - 1] === right[column - 1] ? 0 : 1));
+      diagonal = stored;
+    }
+  }
+  return 1 - previous[right.length] / Math.max(left.length, right.length);
 };
 const bestMatch = <T extends { full_name: string }>(reference: unknown, candidates: T[], except?: string) => {
   if (!normalize(reference)) return undefined;
@@ -74,14 +88,24 @@ export default async function handler(request: Request, response: Response) {
     );
     const runId = run.rows[0].id as string;
     const roleResult = await database.query<Role>(
-      `select id,name,area_id,can_supervise_sales_team,creates_seller_record
-       from public.hr_roles where active=true`,
+      `select role.id,role.name,role.area_id,role.can_supervise_sales_team,role.creates_seller_record,
+              role.app_role_mapping,label.source_label
+       from public.hr_roles role
+       left join public.hr_role_source_labels label on label.role_id=role.id
+       where role.active=true`,
     );
     const roles = roleResult.rows;
+    const knownProfiles = (await database.query<{ id: string; full_name: string; role: string }>('select id,full_name,role from public.profiles')).rows;
     const created: Created[] = [];
 
     for (const row of rows) {
-      const roleMatch = roles.map((role) => ({ role, score: similarity(row.category, role.name) })).sort((a, b) => b.score - a.score)[0];
+      const linkedProfile = knownProfiles.map((profile) => ({ profile, score: similarity(row.name, profile.full_name) })).sort((a, b) => b.score - a.score)[0];
+      const configuredRole = linkedProfile?.score && linkedProfile.score >= 0.9
+        ? roles.find((role) => role.app_role_mapping === linkedProfile.profile.role)
+        : undefined;
+      const roleMatch = configuredRole
+        ? { role: configuredRole, score: 1 }
+        : roles.map((role) => ({ role, score: Math.max(similarity(row.category, role.name), similarity(row.category, role.source_label || '')) })).sort((a, b) => b.score - a.score)[0];
       if (!roleMatch || roleMatch.score < 0.7) throw new Error(`Cargo sin configurar: ${row.category}`);
       const inserted = await database.query<{ id: string; full_name: string }>(
         `insert into public.staff_members
@@ -92,6 +116,9 @@ export default async function handler(request: Request, response: Response) {
           normalize(row.legajo) === 'COACHING', ['freelance', 'free lance'].includes(row.decision), 'ESTRUCTURA RRHH ACTIVA OK'],
       );
       created.push({ ...inserted.rows[0], role: roleMatch.role, row });
+      if (linkedProfile?.score && linkedProfile.score >= 0.9) {
+        await database.query('update public.profiles set staff_member_id=$2 where id=$1', [linkedProfile.profile.id, inserted.rows[0].id]);
+      }
       await database.query(
         `insert into public.hr_import_rows
           (import_run_id,source_line,source_payload,normalized_payload,decision,approved,reviewed_by,reviewed_at)

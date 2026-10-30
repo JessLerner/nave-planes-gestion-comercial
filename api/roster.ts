@@ -293,10 +293,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const staffIds = Array.isArray(body?.staffIds) ? [...new Set((body?.staffIds as unknown[]).map(value => optionalText(value, 80)).filter((id): id is string => Boolean(id)))] : [];
       const supervisorId = optionalText(body?.supervisorId, 80); const managerId = optionalText(body?.managerId, 80);
       if (!staffIds.length || staffIds.length > 300 || (!supervisorId && !managerId)) return res.status(400).json({ success: false, message: 'Seleccioná recursos y al menos un responsable.' });
-      const selected = await db.query(`select id from public.staff_members where id=any($1::uuid[]) and active=true`, [staffIds]);
+      const selected = await db.query(`select id, role from public.staff_members where id=any($1::uuid[]) and active=true`, [staffIds]);
       if (selected.rows.length !== staffIds.length || staffIds.includes(supervisorId || '') || staffIds.includes(managerId || '')) return res.status(400).json({ success: false, message: 'La selección contiene recursos inválidos o un responsable asignado a sí mismo.' });
       const leaders = await db.query(`select id, role, active from public.staff_members where id=any($1::uuid[])`, [[supervisorId, managerId].filter(Boolean)]);
-      if (leaders.rows.some(row => !row.active) || (supervisorId && !leaders.rows.some(row => row.id === supervisorId && commercialDirectLeaderRoles.has(row.role))) || (managerId && !leaders.rows.some(row => row.id === managerId && seniorLeaderRoles.has(row.role)))) return res.status(400).json({ success: false, message: 'El responsable directo o la Gerencia/Dirección seleccionados no son válidos.' });
+      const directLeader = supervisorId ? leaders.rows.find(row => row.id === supervisorId) : null;
+      if (leaders.rows.some(row => !row.active) || (supervisorId && (!directLeader || selected.rows.some(row => !directLeaderRolesFor(row.role).has(directLeader.role)))) || (managerId && !leaders.rows.some(row => row.id === managerId && seniorLeaderRoles.has(row.role)))) return res.status(400).json({ success: false, message: 'El responsable directo o la jerarquía superior no corresponden a todos los recursos seleccionados. Seleccioná recursos de una misma área.' });
       if (supervisorId) await db.query(`update public.staff_members set supervisor_staff_id=$2::uuid, updated_at=now() where id=any($1::uuid[])`, [staffIds, supervisorId]);
       if (managerId) await db.query(`update public.staff_members set manager_staff_id=$2::uuid, updated_at=now() where id=any($1::uuid[])`, [staffIds, managerId]);
       await logChange(db, 'staff_member_batch', null, 'updated', null, { staffIds, supervisorId, managerId }, userId);

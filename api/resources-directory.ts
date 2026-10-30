@@ -16,11 +16,14 @@ const text = (value: string | string[] | undefined) => typeof value === 'string'
 export default async function handler(req: Req, res: Res) {
   if (req.method !== 'GET') return res.status(405).json({ success: false, message: 'Método no permitido.' });
   const id = await userId(req); if (!id) return res.status(401).json({ success: false, message: 'Sesión no válida.' });
-  const profile = await pool.query(`select role from public.profiles where id=$1`, [id]);
-  if (!['admin', 'gerente', 'rrhh'].includes(profile.rows[0]?.role)) return res.status(403).json({ success: false, message: 'No tenés acceso a Legajos.' });
+  const profile = await pool.query(`select p.role, p.staff_member_id, area.name as area_name, hr_role.name as resource_role from public.profiles p left join public.staff_members staff on staff.id=p.staff_member_id left join public.hr_areas area on area.id=staff.area_id left join public.hr_roles hr_role on hr_role.id=staff.role_id where p.id=$1`, [id]);
+  const viewer = profile.rows[0] as { role?: string; staff_member_id?: string | null; area_name?: string | null; resource_role?: string | null } | undefined;
+  const globalAccess = viewer?.role === 'admin' || viewer?.role === 'rrhh' || viewer?.area_name === 'Administración' || viewer?.resource_role === 'Director';
+  if (!viewer || (!globalAccess && !['gerente', 'supervisor'].includes(viewer.role || '')) || (!globalAccess && !viewer.staff_member_id)) return res.status(403).json({ success: false, message: 'No tenés acceso a Legajos.' });
   const q = text(req.query?.q); const area = text(req.query?.area); const team = text(req.query?.team); const status = text(req.query?.status) || 'active';
   const page = Math.max(1, Number(text(req.query?.page)) || 1); const size = Math.min(100, Math.max(20, Number(text(req.query?.size)) || 50));
   const where: string[] = []; const values: unknown[] = []; const add = (sql: string, value?: unknown) => { if (value !== undefined) values.push(value); where.push(sql.replace('?', `$${values.length}`)); };
+  if (!globalAccess) { values.push(viewer!.staff_member_id); where.push(`staff.id in (with recursive hierarchy as (select id from public.staff_members where id=$1 union select child.id from public.staff_members child join hierarchy parent on child.responsible_staff_id=parent.id) select id from hierarchy)`); }
   if (status === 'active') where.push('staff.active=true'); else if (status === 'inactive') where.push('staff.active=false');
   if (q) { values.push(q); const index = values.length; where.push(`(unaccent(lower(staff.full_name)) like '%' || unaccent(lower($${index})) || '%' or staff.dni like '%' || $${index} || '%' or staff.legajo like '%' || $${index} || '%')`); }
   if (area) add('staff.area_id=?', area);

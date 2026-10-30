@@ -13,8 +13,11 @@ type Form = { id?: string; fullName: string; role: string; active: boolean; team
 const emptyForm = (): Form => ({ fullName: '', role: 'vendedor', active: true, teamId: '', supervisorId: '', managerId: '', dni: '', legajo: '', employmentType: '', commercialStructure: '', location: '', hireDate: '', terminationDate: '' });
 const normalizeHeader = (value: unknown) => String(value ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 const read = (row: Record<string, unknown>, candidates: string[]) => { const key = Object.keys(row).find(header => candidates.some(candidate => normalizeHeader(header) === candidate || normalizeHeader(header).includes(candidate))); const value = key ? row[key] : null; return value == null ? '' : String(value).trim(); };
-const roleFrom = (value: string) => { const normalized = normalizeHeader(value); if (normalized.includes('direccion') || normalized.includes('director')) return 'director'; if (normalized.includes('gerent')) return 'gerente'; if (normalized.includes('supervis')) return 'supervisor'; if (normalized.includes('mora')) return 'mora'; if (normalized.includes('contab')) return 'contable'; if (normalized.includes('rrhh') || normalized.includes('recursos humanos')) return 'rrhh'; if (normalized.includes('administr')) return 'administracion'; if (normalized.includes('vendedor')) return 'vendedor'; return 'otro'; };
-const cleanReference = (value: string) => value.replace(/\s+(?:np|pda)\s+.*$/i, '').trim();
+const roleFrom = (value: string) => { const normalized = normalizeHeader(value); if (normalized.includes('direccion') || normalized.includes('director')) return 'director'; if (normalized.includes('gerent')) return 'gerente'; if (normalized.includes('supervis')) return 'supervisor'; if (normalized.includes('mora')) return 'mora'; if (normalized.includes('contab')) return 'contable'; if (normalized.includes('rrhh') || normalized.includes('recursos humanos')) return 'rrhh'; if (normalized.includes('administr') || normalized.includes('admisntr')) return 'administracion'; if (normalized.includes('vendedor')) return 'vendedor'; return 'otro'; };
+// The source uses suffixes such as "NP LEG 662" and "LUM LEG 947" in
+// reporting columns. Remove only the known employment-code suffix, never a
+// surname or a middle name, before matching it to a resource.
+const cleanReference = (value: string) => value.replace(/\s+(?:np|pda|lum|lms|nvp-?o|pvn|coa|leg)\b.*$/i, '').trim();
 
 export const RosterManagementModule: React.FC = () => {
   const { currentUser } = useApp();
@@ -94,15 +97,26 @@ export const RosterManagementModule: React.FC = () => {
     setImportFile(file || null); setImportRows([]); setMessage(null); if (!file) return;
     try {
       const workbook = XLSX.read(await file.arrayBuffer(), { type: 'array', cellDates: false, raw: false });
-      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      const sourceSheetName = workbook.SheetNames.find(name => normalizeHeader(name) === 'estructura rrhh activa ok' || normalizeHeader(name).includes('estructura rrhh activa'));
+      if (!sourceSheetName) throw new Error('El archivo no contiene la pestaña “ESTRUCTURA RRHH ACTIVA OK”. No se importó nada.');
+      const sheet = workbook.Sheets[sourceSheetName];
       const raw = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: '' });
-      const rows = raw.map(row => {
+      const sourceRows = raw.map(row => {
         const firstName = read(row, ['nombre']); const lastName = read(row, ['apellido']);
         const fullName = read(row, ['nombre del recurso', 'nombre completo', 'nombre y apellido', 'apellidos y nombres', 'colaborador', 'recurso', 'vendedor']) || `${firstName} ${lastName}`.trim();
-        return { fullName, role: roleFrom(read(row, ['categoria', 'cargo', 'rol', 'puesto', 'funcion'])), teamName: read(row, ['equipo', 'team', 'grupo']), supervisorName: cleanReference(read(row, ['supervisor responsable'])), managerName: cleanReference(read(row, ['gerente a cargo'])), dni: read(row, ['numero de dni', 'dni', 'documento']), legajo: read(row, ['legajo']), employmentType: read(row, ['nomina', 'tipo de vinculo', 'vinculo', 'modalidad']), commercialStructure: read(row, ['estructura comercial', 'estructura']), location: read(row, ['locacion', 'sucursal', 'ubicacion', 'localidad']), hireDate: read(row, ['fecha de ingreso', 'ingreso', 'alta']) };
-      }).filter(row => row.fullName && !normalizeHeader(row.fullName).includes('total'));
+        const employmentType = read(row, ['nomina', 'tipo de vinculo', 'vinculo', 'modalidad']);
+        return { fullName, explicitRole: roleFrom(read(row, ['categoria', 'cargo', 'rol', 'puesto', 'funcion'])), teamName: read(row, ['equipo', 'team', 'grupo']), supervisorName: cleanReference(read(row, ['supervisor responsable'])), managerName: cleanReference(read(row, ['gerente a cargo'])), dni: read(row, ['numero de dni', 'dni', 'documento']), legajo: read(row, ['legajo']), employmentType, commercialStructure: read(row, ['estructura comercial', 'estructura']), location: read(row, ['locacion', 'sucursal', 'ubicacion', 'localidad']), hireDate: read(row, ['fecha de ingreso', 'ingreso', 'alta']), activeInSource: normalizeHeader(read(row, ['estado'])) === 'activo' };
+      }).filter(row => row.fullName && !normalizeHeader(row.fullName).includes('total') && row.activeInSource && normalizeHeader(row.employmentType) !== 'convencional');
+      const referencedSupervisors = new Set(sourceRows.map(row => normalizeHeader(row.supervisorName)).filter(Boolean));
+      const rows = sourceRows.map(({ explicitRole, activeInSource: _activeInSource, ...row }) => ({
+        ...row,
+        // "CATEGORÍA" wins whenever it contains an explicit role. For the
+        // frequent blank category case, a person named as supervisor of other
+        // source rows is the supervisor; everyone else remains a seller.
+        role: explicitRole !== 'otro' ? explicitRole : referencedSupervisors.has(normalizeHeader(row.fullName)) ? 'supervisor' : 'vendedor',
+      }));
       if (!rows.length) throw new Error('No se identificaron nombres. Descargá específicamente la pestaña “ESTRUCTURA RRHH ACTIVA OK”.');
-      setImportRows(rows); setMessage(`${rows.length} recursos leídos. Revisá la muestra antes de aplicar: la importación sólo crea o actualiza altas; nunca da bajas automáticas.`);
+      setImportRows(rows); setMessage(`${rows.length} recursos activos no convencionales leídos desde “${sourceSheetName}”. Revisá la muestra antes de aplicar: la importación sólo crea o actualiza altas; nunca da bajas automáticas.`);
     } catch (error) { setMessage(error instanceof Error ? error.message : 'No se pudo leer el archivo.'); }
   };
   const applyImport = async () => {

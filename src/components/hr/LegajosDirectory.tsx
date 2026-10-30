@@ -8,7 +8,7 @@ type Directory = { rows:DirectoryRow[]; total:number; areas:{id:string;name:stri
 type ImportRow = { line:number; name:string; dni:string; legajo:string; nomina:string; category:string; supervisor:string; manager:string; decision:'listo'|'freelance'|'excluido'|'revisar'; note:string };
 
 const upper=(v:unknown)=>String(v??'').trim().toUpperCase();
-const category=(v:string)=>v.replace('ADMISNTRACION','ADMINISTRACION').replace(/\s+PDA$/,'').trim();
+const category=(v:string)=>v.trim();
 
 export const LegajosDirectory:React.FC=()=>{
   const { session } = useAuth();

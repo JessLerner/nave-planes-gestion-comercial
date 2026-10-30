@@ -8,8 +8,11 @@ const connectionString = rawConnectionString.replace(/([?&])sslmode=[^&]*/i, '$1
 const pool = new Pool({ connectionString, ssl: { rejectUnauthorized: false } });
 
 const validRoles = new Set(['administrador_general', 'director', 'gerente', 'supervisor', 'vendedor', 'administracion', 'rrhh', 'mora', 'contable', 'otro']);
-const directLeaderRoles = new Set(['supervisor', 'administracion', 'rrhh', 'mora', 'contable', 'director']);
+const commercialRoles = new Set(['vendedor', 'supervisor', 'gerente']);
+const commercialDirectLeaderRoles = new Set(['supervisor', 'gerente']);
+const administrativeDirectLeaderRoles = new Set(['administracion', 'rrhh', 'mora', 'contable', 'gerente', 'director']);
 const seniorLeaderRoles = new Set(['gerente', 'director']);
+const directLeaderRolesFor = (role: string) => commercialRoles.has(role) ? commercialDirectLeaderRoles : administrativeDirectLeaderRoles;
 const administrationManagerName = 'gonzalez matias hernan';
 const formalManagerNames = new Set([
   'soldano leonardo vicente',
@@ -231,10 +234,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const managerId = optionalText(resource.managerId, 80);
       if (!fullName || !validRoles.has(role) || (role === 'vendedor' && !teamId)) return res.status(400).json({ success: false, message: 'Nombre, cargo o equipo inválido.' });
       if (id && (id === supervisorId || id === managerId)) return res.status(400).json({ success: false, message: 'La persona no puede depender de sí misma.' });
+      if (supervisorId && managerId && supervisorId === managerId) return res.status(400).json({ success: false, message: 'El responsable directo y la jerarquía superior deben ser personas distintas.' });
       const reportingIds = [supervisorId, managerId].filter((value): value is string => Boolean(value));
       if (reportingIds.length) {
         const reporting = await db.query(`select id, role, active from public.staff_members where id = any($1::uuid[])`, [reportingIds]);
-        if (reporting.rows.length !== reportingIds.length || reporting.rows.some(row => !row.active) || reporting.rows.some(row => row.id === supervisorId && !directLeaderRoles.has(row.role)) || reporting.rows.some(row => row.id === managerId && !seniorLeaderRoles.has(row.role))) return res.status(400).json({ success: false, message: 'El responsable directo o la Gerencia/Dirección seleccionados no están activos o no tienen esa función.' });
+        const allowedDirectRoles = directLeaderRolesFor(role);
+        if (reporting.rows.length !== reportingIds.length || reporting.rows.some(row => !row.active) || reporting.rows.some(row => row.id === supervisorId && !allowedDirectRoles.has(row.role)) || reporting.rows.some(row => row.id === managerId && !seniorLeaderRoles.has(row.role))) return res.status(400).json({ success: false, message: 'El responsable directo o la Gerencia/Dirección seleccionados no corresponden al área elegida.' });
       }
       if (teamId) { const team = await db.query(`select id from public.teams where id = $1`, [teamId]); if (!team.rows[0]) return res.status(400).json({ success: false, message: 'El equipo seleccionado no existe.' }); }
       const previous = id ? await db.query(`select * from public.staff_members where id = $1`, [id]) : { rows: [] as unknown[] };
@@ -291,7 +296,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const selected = await db.query(`select id from public.staff_members where id=any($1::uuid[]) and active=true`, [staffIds]);
       if (selected.rows.length !== staffIds.length || staffIds.includes(supervisorId || '') || staffIds.includes(managerId || '')) return res.status(400).json({ success: false, message: 'La selección contiene recursos inválidos o un responsable asignado a sí mismo.' });
       const leaders = await db.query(`select id, role, active from public.staff_members where id=any($1::uuid[])`, [[supervisorId, managerId].filter(Boolean)]);
-      if (leaders.rows.some(row => !row.active) || (supervisorId && !leaders.rows.some(row => row.id === supervisorId && directLeaderRoles.has(row.role))) || (managerId && !leaders.rows.some(row => row.id === managerId && seniorLeaderRoles.has(row.role)))) return res.status(400).json({ success: false, message: 'El responsable directo o la Gerencia/Dirección seleccionados no son válidos.' });
+      if (leaders.rows.some(row => !row.active) || (supervisorId && !leaders.rows.some(row => row.id === supervisorId && commercialDirectLeaderRoles.has(row.role))) || (managerId && !leaders.rows.some(row => row.id === managerId && seniorLeaderRoles.has(row.role)))) return res.status(400).json({ success: false, message: 'El responsable directo o la Gerencia/Dirección seleccionados no son válidos.' });
       if (supervisorId) await db.query(`update public.staff_members set supervisor_staff_id=$2::uuid, updated_at=now() where id=any($1::uuid[])`, [staffIds, supervisorId]);
       if (managerId) await db.query(`update public.staff_members set manager_staff_id=$2::uuid, updated_at=now() where id=any($1::uuid[])`, [staffIds, managerId]);
       await logChange(db, 'staff_member_batch', null, 'updated', null, { staffIds, supervisorId, managerId }, userId);

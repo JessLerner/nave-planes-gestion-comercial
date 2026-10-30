@@ -10,7 +10,19 @@ const pool = new Pool({ connectionString, ssl: { rejectUnauthorized: false } });
 const validRoles = new Set(['administrador_general', 'director', 'gerente', 'supervisor', 'vendedor', 'administracion', 'rrhh', 'mora', 'contable', 'otro']);
 const text = (value: unknown, max = 180) => typeof value === 'string' && value.trim() && value.trim().length <= max ? value.trim() : null;
 const optionalText = (value: unknown, max = 180) => value == null || value === '' ? null : text(value, max);
-const date = (value: unknown) => { const result = optionalText(value, 10); return result && /^\d{4}-\d{2}-\d{2}$/.test(result) ? result : null; };
+const date = (value: unknown) => {
+  const result = optionalText(value, 10);
+  if (!result) return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(result)) return result;
+  const match = result.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/);
+  if (!match) return null;
+  const [, dayText, monthText, yearText] = match;
+  const day = Number(dayText); const month = Number(monthText); const year = Number(yearText);
+  const parsed = new Date(Date.UTC(year, month - 1, day));
+  return parsed.getUTCFullYear() === year && parsed.getUTCMonth() === month - 1 && parsed.getUTCDate() === day
+    ? `${yearText}-${monthText.padStart(2, '0')}-${dayText.padStart(2, '0')}`
+    : null;
+};
 const normalize = (value: string | null) => value ? value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^\p{L}\p{N}]+/gu, ' ').trim().replace(/\s+/g, ' ').toLowerCase() : null;
 const nameTokens = (value: string | null) => (normalize(value) || '').split(' ').filter(Boolean);
 const editDistance = (left: string, right: string) => {
@@ -79,28 +91,31 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (action === 'import_roster') {
       const sourceFileName = text(body?.sourceFileName, 240);
       const resources = Array.isArray(body?.resources) ? body?.resources as Array<Record<string, unknown>> : null;
+      const replaceActiveRoster = body?.replaceActiveRoster === true;
       if (!sourceFileName || !resources?.length || resources.length > 1000) return res.status(400).json({ success: false, message: 'La importación no contiene recursos válidos.' });
       const [currentStaff, currentTeams] = await Promise.all([
-        db.query(`select id, full_name from public.staff_members`),
+        db.query(`select id, full_name, dni from public.staff_members`),
         db.query(`select id, name from public.teams`),
       ]);
       const staffByName = new Map<string, string>();
+      const staffByDni = new Map<string, string>();
       const staffCandidates = currentStaff.rows.map(row => ({ id: row.id as string, fullName: row.full_name as string }));
-      currentStaff.rows.forEach(row => { const key = normalize(row.full_name); if (key) staffByName.set(key, row.id); });
+      currentStaff.rows.forEach(row => { const key = normalize(row.full_name); if (key) staffByName.set(key, row.id); if (row.dni) staffByDni.set(String(row.dni).replace(/\D/g, ''), row.id); });
       const teamByName = new Map<string, string>();
       currentTeams.rows.forEach(row => { const key = normalize(row.name); if (key) teamByName.set(key, row.id); });
+      const beforeSnapshot = replaceActiveRoster ? await roster(db) : null;
       let createdStaff = 0; let createdSellers = 0; let unresolvedRows = 0;
       const imported = new Map<string, { staffId: string; fullName: string; role: string; supervisorName: string | null; managerName: string | null; hireDate: string | null; dni: string | null; legajo: string | null; employmentType: string | null; commercialStructure: string | null; location: string | null }>();
       for (const row of resources) {
         const fullName = text(row.fullName); const roleCandidate = text(row.role, 40)?.toLowerCase() || 'vendedor';
-        const role = validRoles.has(roleCandidate) ? roleCandidate : 'vendedor';
+        const role = normalize(fullName) === 'lerner jesica' ? 'administrador_general' : validRoles.has(roleCandidate) ? roleCandidate : 'vendedor';
         if (!fullName) { unresolvedRows++; continue; }
         const key = normalize(fullName)!;
         const dni = optionalText(row.dni, 30)?.replace(/\D/g, '') || null;
         const legajo = optionalText(row.legajo, 80); const employmentType = optionalText(row.employmentType, 80);
         const commercialStructure = optionalText(row.commercialStructure, 180); const location = optionalText(row.location, 180);
         const hireDate = date(row.hireDate); const teamName = optionalText(row.teamName, 180); const teamId = teamName ? teamByName.get(normalize(teamName) || '') : null;
-        let staffId: string | null = staffByName.get(key) ?? null;
+        let staffId: string | null = (dni ? staffByDni.get(dni) : null) ?? staffByName.get(key) ?? null;
         if (!staffId) {
           const compatible = staffCandidates.filter(candidate => namesCompatible(fullName, candidate.fullName));
           if (compatible.length === 1) staffId = compatible[0].id;
@@ -109,7 +124,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           await db.query(`update public.staff_members set active=true, role=$2::public.staff_role, dni=coalesce($3,dni), legajo=coalesce($4,legajo), employment_type=coalesce($5,employment_type), commercial_structure=coalesce($6,commercial_structure), location=coalesce($7,location), hire_date=coalesce($8::date,hire_date), termination_date=null, source_label='ESTRUCTURA RRHH ACTIVA OK', updated_at=now() where id=$1`, [staffId, role, dni, legajo, employmentType, commercialStructure, location, hireDate]);
         } else {
           const created = await db.query(`insert into public.staff_members (full_name, role, active, dni, legajo, employment_type, commercial_structure, location, hire_date, source_label) values ($1,$2::public.staff_role,true,$3,$4,$5,$6,$7,$8::date,'ESTRUCTURA RRHH ACTIVA OK') returning id`, [fullName, role, dni, legajo, employmentType, commercialStructure, location, hireDate]);
-          staffId = created.rows[0].id as string; staffByName.set(key, staffId); staffCandidates.push({ id: staffId, fullName }); createdStaff++;
+          staffId = created.rows[0].id as string; staffByName.set(key, staffId); if (dni) staffByDni.set(dni, staffId); staffCandidates.push({ id: staffId, fullName }); createdStaff++;
         }
         imported.set(staffId, { staffId, fullName, role, supervisorName: optionalText(row.supervisorName), managerName: optionalText(row.managerName), hireDate, dni, legajo, employmentType, commercialStructure, location });
       }
@@ -150,8 +165,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (seller.rows[0]) await db.query(`update public.sellers set full_name=$2, team_id=$3, active=true, termination_date=null, hire_date=coalesce($4::date,hire_date), legajo=coalesce($5,legajo), employment_type=coalesce($6,employment_type) where id=$1`, [seller.rows[0].id, row.fullName, resolvedTeamId, row.hireDate, row.legajo, row.employmentType]);
         else { await db.query(`insert into public.sellers (full_name, team_id, staff_member_id, active, hire_date, dni, legajo, employment_type) values ($1,$2,$3,true,$4::date,$5,$6,$7)`, [row.fullName, resolvedTeamId, row.staffId, row.hireDate, row.dni, row.legajo, row.employmentType]); createdSellers++; }
       }
-      const run = await db.query(`insert into public.roster_import_runs (source_file_name, received_rows, created_staff, created_sellers, unresolved_rows, imported_by, summary) values ($1,$2,$3,$4,$5,$6,$7::jsonb) returning id`, [sourceFileName, resources.length, createdStaff, createdSellers, unresolvedRows, userId, JSON.stringify({ source: 'ESTRUCTURA RRHH ACTIVA OK' })]);
-      await logChange(db, 'import', run.rows[0].id, 'imported', null, { sourceFileName, receivedRows: resources.length, createdStaff, createdSellers, unresolvedRows }, userId);
+      let deactivatedStaff = 0;
+      let deactivatedSellers = 0;
+      if (replaceActiveRoster) {
+        const importedIds = [...imported.keys()];
+        const staleStaff = await db.query(`select id from public.staff_members where active=true and not (id = any($1::uuid[]))`, [importedIds]);
+        const staleIds = staleStaff.rows.map(row => row.id as string);
+        if (staleIds.length) {
+          const staleSellers = await db.query(`select id from public.sellers where active=true and staff_member_id = any($1::uuid[])`, [staleIds]);
+          deactivatedStaff = staleIds.length;
+          deactivatedSellers = staleSellers.rows.length;
+          await db.query(`update public.staff_members set active=false, termination_date=coalesce(termination_date,current_date), supervisor_staff_id=null, manager_staff_id=null, updated_at=now() where id=any($1::uuid[])`, [staleIds]);
+          await db.query(`update public.sellers set active=false, termination_date=coalesce(termination_date,current_date) where staff_member_id=any($1::uuid[]) and active=true`, [staleIds]);
+          await db.query(`update public.teams set manager_staff_id=null where manager_staff_id=any($1::uuid[])`, [staleIds]);
+          await db.query(`update public.teams set supervisor_staff_id=null where supervisor_staff_id=any($1::uuid[])`, [staleIds]);
+          await db.query(`update public.staff_members set supervisor_staff_id=null where supervisor_staff_id=any($1::uuid[])`, [staleIds]);
+          await db.query(`update public.staff_members set manager_staff_id=null where manager_staff_id=any($1::uuid[])`, [staleIds]);
+        }
+      }
+      const summary = { source: 'ESTRUCTURA RRHH ACTIVA OK', replaceActiveRoster, deactivatedStaff, deactivatedSellers };
+      const run = await db.query(`insert into public.roster_import_runs (source_file_name, received_rows, created_staff, created_sellers, unresolved_rows, imported_by, summary) values ($1,$2,$3,$4,$5,$6,$7::jsonb) returning id`, [sourceFileName, resources.length, createdStaff, createdSellers, unresolvedRows, userId, JSON.stringify(summary)]);
+      await logChange(db, 'import', run.rows[0].id, 'imported', beforeSnapshot, { sourceFileName, receivedRows: resources.length, createdStaff, createdSellers, unresolvedRows, ...summary }, userId);
     } else if (action === 'save_resource') {
       const resource = (body?.resource || {}) as Record<string, unknown>;
       const id = optionalText(resource.id, 80);

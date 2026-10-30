@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { Candidate, WageAdvance, Seller } from '../../types';
 import { formatARS, validateAdvanceEligibility } from '../../utils/businessLogic';
+import { LegajosDirectory } from './LegajosDirectory';
 
 export const HrAndAdvancesModule: React.FC = () => {
   const {
@@ -34,7 +35,7 @@ export const HrAndAdvancesModule: React.FC = () => {
     updateCandidateDocs,
   } = useApp();
 
-  const [activeSubTab, setActiveSubTab] = useState<'advances' | 'recruitment' | 'turnover'>('advances');
+  const [activeSubTab, setActiveSubTab] = useState<'advances' | 'recruitment' | 'turnover' | 'legajos'>('advances');
 
   // Advance request form state
   const [showRequestModal, setShowRequestModal] = useState(false);
@@ -153,7 +154,15 @@ export const HrAndAdvancesModule: React.FC = () => {
               : 'text-slate-400 hover:text-white'
           }`}
         >
-          Reclutamiento & Legajos ({visibleCandidates.length})
+          Reclutamiento ({visibleCandidates.length})
+        </button>
+        <button
+          onClick={() => setActiveSubTab('legajos')}
+          className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+            activeSubTab === 'legajos' ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20' : 'text-slate-400 hover:text-white'
+          }`}
+        >
+          Legajos
         </button>
         <button
           onClick={() => setActiveSubTab('turnover')}
@@ -166,6 +175,8 @@ export const HrAndAdvancesModule: React.FC = () => {
           Métricas de Rotación & Permanencia
         </button>
       </div>
+
+      {activeSubTab === 'legajos' && <LegajosDirectory />}
 
       {/* SUB-TAB 1: WAGE ADVANCES */}
       {activeSubTab === 'advances' && (

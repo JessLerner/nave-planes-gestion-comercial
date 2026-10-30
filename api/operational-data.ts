@@ -76,9 +76,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           supervisor.full_name as supervisor_name,
           manager.full_name as manager_name
         from public.teams t
-        left join public.staff_members supervisor on supervisor.id = t.supervisor_staff_id
+        join public.staff_members supervisor on supervisor.id = t.supervisor_staff_id
         left join public.staff_members manager on manager.id = t.manager_staff_id
         where ${scopedTeamFilter.sql}
+          and supervisor.active = true
+          and supervisor.role = 'supervisor'::public.staff_role
+          and exists (select 1 from public.sellers active_seller where active_seller.team_id = t.id and active_seller.active = true)
         order by t.name
       `, scopedTeamFilter.params),
       pool.query(`

@@ -28,6 +28,7 @@ const normalizedNameIs = (value: string, expected: string) => normalizeHeader(va
 const administrationManager = 'GONZALEZ MATIAS HERNAN';
 const managerNames = new Set([
   'SOLDANO LEONARDO VICENTE',
+  'GONZALEZ FABRICIO IGNACIO',
   'GONZALEZ FABRIZIO IGNACIO',
   'RODRIGUEZ FLORENCIA CECILIA',
 ].map(normalizeHeader));

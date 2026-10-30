@@ -11,6 +11,7 @@ const validRoles = new Set(['administrador_general', 'director', 'gerente', 'sup
 const administrationManagerName = 'gonzalez matias hernan';
 const formalManagerNames = new Set([
   'soldano leonardo vicente',
+  'gonzalez fabricio ignacio',
   'gonzalez fabrizio ignacio',
   'rodriguez florencia cecilia',
 ]);

@@ -154,7 +154,7 @@ export default async function handler(request: Request, response: Response) {
       await database.query(
         `update public.staff_members
          set responsible_staff_id=$2,effective_manager_staff_id=$3,effective_manager_source=$4 where id=$1`,
-        [item.id, responsibleId, manager?.id || null, manager ? 'inherited' : 'source'],
+        [item.id, responsibleId, manager?.id || null, 'inherited'],
       );
     }
 

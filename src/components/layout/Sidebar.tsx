@@ -12,7 +12,6 @@ import {
   Car,
   Database,
   Sparkles,
-  Network,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -87,14 +86,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
     },
     ...(currentUser.role === 'admin'
       ? [
-          {
-            id: 'structure',
-            label: 'Estructura y Recursos',
-            icon: Network,
-            badge: 'Admin',
-            badgeColor: 'bg-indigo-500/20 text-indigo-200 border border-indigo-500/30',
-            description: 'Nómina, equipos y responsables',
-          },
           {
             id: 'extractor',
             label: 'Extractor Google & Supabase',

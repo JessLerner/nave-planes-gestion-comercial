@@ -15,7 +15,6 @@ import { HrAndAdvancesModule } from './components/hr/HrAndAdvancesModule';
 import { CarteraMoraModule } from './components/cartera/CarteraMoraModule';
 import { DatabaseConnectorsModule } from './components/database/DatabaseConnectorsModule';
 import { ExtractorHubModule } from './components/extractor/ExtractorHubModule';
-import { RosterManagementModule } from './components/admin/RosterManagementModule';
 import { CalendarConfigModal } from './components/calendar/CalendarConfigModal';
 import { AuthProvider, useAuth } from './auth/AuthProvider';
 import { LoginScreen } from './auth/LoginScreen';
@@ -32,7 +31,7 @@ function MainLayout() {
 
   // If user switches away from admin while on extractor, gracefully return to pacing
   React.useEffect(() => {
-    if ((activeTab === 'extractor' || activeTab === 'structure') && currentUser.role !== 'admin') {
+    if (activeTab === 'extractor' && currentUser.role !== 'admin') {
       setActiveTab('pacing');
     }
   }, [currentUser.role, activeTab]);
@@ -72,7 +71,6 @@ function MainLayout() {
             {visitedTabs.has('cartera') && <div className={activeTab === 'cartera' ? '' : 'hidden'}><CarteraMoraModule /></div>}
             {visitedTabs.has('database') && <div className={activeTab === 'database' ? '' : 'hidden'}><DatabaseConnectorsModule /></div>}
             {visitedTabs.has('extractor') && <div className={activeTab === 'extractor' ? '' : 'hidden'}><ExtractorHubModule /></div>}
-            {visitedTabs.has('structure') && <div className={activeTab === 'structure' ? '' : 'hidden'}><RosterManagementModule /></div>}
           </div>
         </main>
       </div>

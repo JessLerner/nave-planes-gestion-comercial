@@ -13,14 +13,26 @@ const optionalText = (value: unknown, max = 180) => value == null || value === '
 const date = (value: unknown) => { const result = optionalText(value, 10); return result && /^\d{4}-\d{2}-\d{2}$/.test(result) ? result : null; };
 const normalize = (value: string | null) => value ? value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^\p{L}\p{N}]+/gu, ' ').trim().replace(/\s+/g, ' ').toLowerCase() : null;
 const nameTokens = (value: string | null) => (normalize(value) || '').split(' ').filter(Boolean);
+const editDistance = (left: string, right: string) => {
+  if (left === right) return 0;
+  if (Math.abs(left.length - right.length) > 1) return 2;
+  let previous = Array.from({ length: right.length + 1 }, (_, index) => index);
+  for (let row = 1; row <= left.length; row++) {
+    const current = [row];
+    for (let column = 1; column <= right.length; column++) current[column] = Math.min(current[column - 1] + 1, previous[column] + 1, previous[column - 1] + (left[row - 1] === right[column - 1] ? 0 : 1));
+    previous = current;
+  }
+  return previous[right.length];
+};
 // The HR sheet often omits a middle name or flips apellido/nombre.  Treat it
 // as the same resource only when every token of the shorter name is present
-// in the longer one; ambiguous candidates stay unresolved instead of guessed.
+// in the longer one. A one-letter typo is allowed only in a long token (for
+// example Fabricio/Fabrizio); ambiguous candidates stay unresolved instead of guessed.
 const namesCompatible = (left: string, right: string) => {
   const a = nameTokens(left); const b = nameTokens(right);
   if (a.length < 2 || b.length < 2) return false;
   const [shorter, longer] = a.length <= b.length ? [a, b] : [b, a];
-  return shorter.every(token => longer.includes(token));
+  return shorter.every(token => longer.some(candidate => candidate === token || (token.length >= 6 && candidate.length >= 6 && editDistance(token, candidate) <= 1)));
 };
 
 async function userIdFromRequest(req: VercelRequest) {

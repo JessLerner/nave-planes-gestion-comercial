@@ -20,6 +20,11 @@ automáticas: cada fuente debe verificarse antes de pasar a producción.
 - [ ] Reemplazar “Legajos” por una grilla operativa paginada y con búsqueda de
   servidor: nombre y apellido, DNI, legajo o condición Coaching, responsable,
   cargo y estado. No reutilizar la interfaz retirada.
+- [ ] Incluir filtros dinámicos de Legajos: búsqueda única por nombre, apellido,
+  DNI o legajo; sector; y equipo de venta. Los sectores se administran como
+  configuración de cargos/áreas, no como personas fijadas en código. El filtro
+  de equipos se construye exclusivamente con recursos activos cuyo cargo sea
+  Supervisor y sus equipos vigentes.
 - [ ] Permitir que Administración, Gerencia y RRHH editen estado y ejecuten una
   desvinculación lógica; conservar el historial y separar inactivos de la vista
   activa.

@@ -17,6 +17,17 @@ automáticas: cada fuente debe verificarse antes de pasar a producción.
   baja lógica, responsable directo y jerarquía; sin inferir cargos ni crear equipos.
 - [ ] Construir equipos comerciales sólo después de validar Supervisores y Gerentes
   de la fuente maestra.
+- [ ] Reemplazar “Legajos” por una grilla operativa paginada y con búsqueda de
+  servidor: nombre y apellido, DNI, legajo o condición Coaching, responsable,
+  cargo y estado. No reutilizar la interfaz retirada.
+- [ ] Permitir que Administración, Gerencia y RRHH editen estado y ejecuten una
+  desvinculación lógica; conservar el historial y separar inactivos de la vista
+  activa.
+- [ ] Modelar vendedores **Freelance**: son vendedores activos sin Supervisor ni
+  equipo obligatorio; nunca deben aparecer como casos de error por esa condición.
+- [ ] Crear una tabla de equivalencias aprobadas con Fox (`recurso` ↔ `nombre/ID
+  de Fox`). Las coincidencias ambiguas quedan pendientes de revisión y no se
+  asignan automáticamente.
 
 ## Bloque 2 — Datos comerciales y fuentes
 

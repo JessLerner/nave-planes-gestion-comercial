@@ -42,12 +42,13 @@ export default async function handler(req: Req, res: Res) {
     const count = await pool.query(`select count(*)::int as total from public.staff_members staff left join public.teams team on team.supervisor_staff_id=staff.id ${clause}`, values);
     values.push(size, (page - 1) * size);
     const rows = await pool.query(`select staff.id, staff.full_name, staff.dni, staff.legajo, staff.employment_type, staff.role_id, staff.responsible_staff_id, staff.effective_manager_staff_id, staff.effective_manager_source, staff.is_coaching, staff.is_freelance, staff.active, area.name as area_name, role.name as role_name, responsible.full_name as responsible_name, manager.full_name as effective_manager_name, team.id as team_id, team.name as team_name from public.staff_members staff left join public.hr_areas area on area.id=staff.area_id left join public.hr_roles role on role.id=staff.role_id left join public.staff_members responsible on responsible.id=staff.responsible_staff_id left join public.staff_members manager on manager.id=staff.effective_manager_staff_id left join public.teams team on team.supervisor_staff_id=staff.id ${clause} order by staff.full_name limit $${values.length-1} offset $${values.length}`, values);
-    const [areas, teams, roles, responsibles] = await Promise.all([
+    const [areas, teams, roles, responsibles, managers] = await Promise.all([
       pool.query(`select id,name from public.hr_areas where active=true order by sort_order,name`),
       pool.query(`select t.id,t.name from public.teams t join public.staff_members staff on staff.id=t.supervisor_staff_id join public.hr_roles role on role.id=staff.role_id where t.active=true and t.is_sales_team=true and staff.active=true and role.app_role_mapping='supervisor'::public.app_role order by t.name`),
       pool.query(`select id,name,area_id from public.hr_roles where active=true order by sort_order,name`),
       pool.query(`select staff.id,staff.full_name from public.staff_members staff join public.hr_roles role on role.id=staff.role_id where staff.active=true and role.app_role_mapping in ('supervisor'::public.app_role,'gerente'::public.app_role,'admin'::public.app_role) order by staff.full_name`),
+      pool.query(`select staff.id,staff.full_name from public.staff_members staff join public.hr_roles role on role.id=staff.role_id where staff.active=true and role.app_role_mapping in ('gerente'::public.app_role,'admin'::public.app_role) order by staff.full_name`),
     ]);
-    return res.status(200).json({ success: true, data: { rows: rows.rows, total: count.rows[0]?.total || 0, page, size, areas: areas.rows, teams: teams.rows, roles: roles.rows, responsibles: responsibles.rows } });
+    return res.status(200).json({ success: true, data: { rows: rows.rows, total: count.rows[0]?.total || 0, page, size, areas: areas.rows, teams: teams.rows, roles: roles.rows, responsibles: responsibles.rows, managers: managers.rows } });
   } catch { return res.status(500).json({ success: false, message: 'No se pudo cargar la nómina.' }); }
 }

@@ -49,7 +49,7 @@ export default async function handler(request: Request, response: Response) {
     if (!existing.rows[0]) return response.status(404).json({ success: false, message: 'No existe el recurso.' });
     const isNewDeactivation = existing.rows[0].active && !active;
     if (isNewDeactivation && !['termination', 'administrative_correction'].includes(deactivationType || '')) return response.status(400).json({ success: false, message: 'Indicá si la baja es real o una corrección administrativa.' });
-    const role = await database.query<{ area_id: string; app_role_mapping: 'admin' | 'gerente' | 'supervisor' | 'rrhh' | null }>('select area_id,app_role_mapping from public.hr_roles where id=$1 and active=true', [roleId]);
+    const role = await database.query<{ area_id: string; creates_seller_record: boolean; app_role_mapping: 'admin' | 'gerente' | 'supervisor' | 'rrhh' | null }>('select area_id,creates_seller_record,app_role_mapping from public.hr_roles where id=$1 and active=true', [roleId]);
     if (!role.rows[0]) return response.status(400).json({ success: false, message: 'Cargo inválido.' });
     if (responsibleId === id) return response.status(400).json({ success: false, message: 'Una persona no puede ser su propio responsable.' });
     if (managerId === id) return response.status(400).json({ success: false, message: 'Una persona no puede ser su propio gerente.' });
@@ -98,6 +98,20 @@ export default async function handler(request: Request, response: Response) {
     } else {
       await database.query(`update public.teams set active=false,is_sales_team=false where supervisor_staff_id=$1`, [id]);
     }
+    if (role.rows[0].creates_seller_record && active) {
+      const sellerTeam = responsibleId
+        ? await database.query<{ id: string }>(`select id from public.teams where supervisor_staff_id=$1 and active=true and is_sales_team=true limit 1`, [responsibleId])
+        : { rows: [] };
+      await database.query(
+        `insert into public.sellers(full_name,team_id,active,hire_date,dni,staff_member_id,legajo,employment_type)
+         values($1,$2,true,null,$3,$4,$5,$6)
+         on conflict (staff_member_id) where staff_member_id is not null
+         do update set full_name=excluded.full_name,team_id=excluded.team_id,active=true,dni=excluded.dni,legajo=excluded.legajo,employment_type=excluded.employment_type`,
+        [updated.rows[0].full_name, sellerTeam.rows[0]?.id || null, dni, id, legajo || null, employmentType || null],
+      );
+    } else {
+      await database.query(`update public.sellers set active=false where staff_member_id=$1 and active=true`, [id]);
+    }
     await database.query(`
       with recursive descendants as (
         select id from public.staff_members where id = $1
@@ -111,7 +125,11 @@ export default async function handler(request: Request, response: Response) {
          and effective_manager_source = 'inherited'
     `, [id, effectiveManager]);
     await database.query('commit');
-    return response.status(200).json({ success: true, resource: updated.rows[0] });
+    const saved = await database.query<{ id: string; effective_manager_staff_id: string | null; effective_manager_name: string | null; effective_manager_source: string }>(
+      `select staff.id,staff.effective_manager_staff_id,staff.effective_manager_source,manager.full_name as effective_manager_name
+       from public.staff_members staff left join public.staff_members manager on manager.id=staff.effective_manager_staff_id where staff.id=$1`, [id],
+    );
+    return response.status(200).json({ success: true, resource: saved.rows[0] || updated.rows[0] });
   } catch (error) {
     await database.query('rollback');
     return response.status(400).json({ success: false, message: error instanceof Error ? error.message : 'No se pudo guardar el recurso.' });

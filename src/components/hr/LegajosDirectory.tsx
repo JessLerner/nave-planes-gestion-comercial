@@ -138,6 +138,18 @@ export const LegajosDirectory: React.FC = () => {
       const result = await fetch('/api/resource-update', { method: 'PATCH', headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ id: editing.id, ...form }) });
       const payload = await result.json();
       if (!payload.success) { setPreviewMessage(payload.message || 'No se pudo guardar el recurso.'); return; }
+      if (payload.resource) {
+        setData((current) => current ? {
+          ...current,
+          rows: current.rows.map((row) => row.id === editing.id ? {
+            ...row,
+            effective_manager_staff_id: payload.resource.effective_manager_staff_id,
+            effective_manager_name: payload.resource.effective_manager_name,
+            effective_manager_source: payload.resource.effective_manager_source,
+          } : row),
+        } : current);
+        setPreviewMessage(`Cambios guardados. Gerente responsable: ${payload.resource.effective_manager_name || 'Sin gerente'}.`);
+      }
       setEditing(undefined); await load();
     } finally { setSaving(false); }
   };

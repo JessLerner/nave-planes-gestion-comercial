@@ -29,7 +29,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     if (!(await assertAdmin(db, userId))) return res.status(403).json({ success: false, message: 'Sólo Administración puede asociar usuarios de Fox.' });
     if (req.method === 'GET') {
-      const [users, sellers] = await Promise.all([
+      const [users, resources] = await Promise.all([
         db.query(`
           with latest as (select max(snapshot_date) as snapshot_date from public.fox_lead_daily_snapshots)
           select s.fox_user_key, max(s.fox_user_name) as fox_user_name, count(*)::int as lead_count
@@ -37,13 +37,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           where s.snapshot_date = latest.snapshot_date and s.seller_id is null and s.fox_user_key is not null
           group by s.fox_user_key order by lead_count desc, fox_user_name
         `),
-        db.query(`select id, full_name, team_id from public.sellers where active = true order by full_name`),
+        db.query(`
+          select staff.id,staff.full_name,team.id as team_id
+          from public.staff_members staff
+          join public.hr_roles role on role.id=staff.role_id
+          left join public.teams team on team.supervisor_staff_id=staff.responsible_staff_id and team.active=true and team.is_sales_team=true
+          where staff.active=true and role.creates_seller_record=true
+          order by staff.full_name
+        `),
       ]);
       const unmappedUsers = users.rows.map((user) => ({
         ...user,
-        suggested_seller_id: confidentNameMatch(user.fox_user_name, sellers.rows)?.id || null,
+        suggested_seller_id: confidentNameMatch(user.fox_user_name, resources.rows)?.id || null,
       }));
-      return res.status(200).json({ success: true, unmappedUsers, sellers: sellers.rows });
+      return res.status(200).json({ success: true, unmappedUsers, sellers: resources.rows });
     }
     if (req.method !== 'POST') return res.status(405).json({ success: false, message: 'Método no permitido.' });
     const mappings = (req.body as { mappings?: unknown })?.mappings;
@@ -54,9 +61,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const foxUserKey = typeof item.foxUserKey === 'string' ? item.foxUserKey.trim() : '';
       const sellerId = typeof item.sellerId === 'string' ? item.sellerId.trim() : '';
       if (!foxUserKey || !sellerId) continue;
-      const seller = await db.query(`select id, team_id, full_name from public.sellers where id = $1 and active = true`, [sellerId]);
-      if (!seller.rows[0]) continue;
-      const { id, team_id, full_name } = seller.rows[0];
+      const resource = await db.query<{ id: string; full_name: string; dni: string | null; legajo: string | null; employment_type: string | null; team_id: string | null }>(`
+        select staff.id,staff.full_name,staff.dni,staff.legajo,staff.employment_type,team.id as team_id
+        from public.staff_members staff
+        join public.hr_roles role on role.id=staff.role_id
+        left join public.teams team on team.supervisor_staff_id=staff.responsible_staff_id and team.active=true and team.is_sales_team=true
+        where staff.id=$1 and staff.active=true and role.creates_seller_record=true
+      `, [sellerId]);
+      if (!resource.rows[0]) continue;
+      const candidate = resource.rows[0];
+      const seller = await db.query<{ id: string }>(`
+        insert into public.sellers(full_name,team_id,active,hire_date,dni,staff_member_id,legajo,employment_type)
+        values($1,$2,true,null,$3,$4,$5,$6)
+        on conflict (staff_member_id) where staff_member_id is not null
+        do update set full_name=excluded.full_name,team_id=excluded.team_id,active=true,dni=excluded.dni,legajo=excluded.legajo,employment_type=excluded.employment_type
+        returning id
+      `, [candidate.full_name, candidate.team_id, candidate.dni, candidate.id, candidate.legajo, candidate.employment_type]);
+      const id = seller.rows[0].id;
+      const { team_id, full_name } = candidate;
       await db.query(`
         insert into public.fox_user_mappings (fox_user_key, fox_user_name, seller_id, updated_at)
         values ($1, $2, $3, now())

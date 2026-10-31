@@ -7,6 +7,10 @@
     "nodejs_compat",
     "nodejs_compat_populate_process_env"
   ],
+  "vars": {
+    "SUPABASE_URL": "https://vguoyqfdmwktrsclkqjd.supabase.co",
+    "SUPABASE_PUBLISHABLE_KEY": "sb_publishable_zvtQuwJci3FRHIwJSrpE0Q_H7EPj0BV"
+  },
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS",

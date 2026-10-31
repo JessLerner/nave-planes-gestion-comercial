@@ -1,5 +1,6 @@
 import { Pool } from 'pg';
 import { confidentNameMatch } from './lib/name-match';
+import { databasePoolConfig } from './lib/database';
 
 type VercelRequest = { method?: string; headers?: Record<string, string | string[] | undefined>; body?: unknown };
 type VercelResponse = { status: (code: number) => VercelResponse; json: (body: unknown) => VercelResponse };
@@ -21,8 +22,7 @@ type ImportedLead = {
 };
 
 const rawConnectionString = process.env.POSTGRES_URL || process.env.DATABASE_URL || '';
-const connectionString = rawConnectionString.replace(/([?&])sslmode=[^&]*/i, '$1').replace(/[?&]$/, '');
-const pool = new Pool({ connectionString, ssl: { rejectUnauthorized: false } });
+const pool = new Pool(databasePoolConfig(rawConnectionString));
 const MAX_ROWS = 20_000;
 
 const text = (value: unknown, max = 180) => {

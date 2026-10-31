@@ -44,6 +44,7 @@ function configureLegacyEnvironment(environment: Environment) {
   if (connectionString) {
     process.env.DATABASE_URL = connectionString;
     process.env.POSTGRES_URL = connectionString;
+    process.env.CLOUDFLARE_HYPERDRIVE = environment.HYPERDRIVE?.connectionString ? 'true' : '';
   }
   if (environment.SUPABASE_URL) process.env.SUPABASE_URL = environment.SUPABASE_URL;
   const key = environment.SUPABASE_PUBLISHABLE_KEY || environment.SUPABASE_ANON_KEY;

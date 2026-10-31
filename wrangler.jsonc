@@ -21,5 +21,13 @@
       "binding": "HYPERDRIVE",
       "id": "7528871f71bd481682da3e8b4be513ee"
     }
-  ]
+  ],
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1,
+    "logs": {
+      "invocation_logs": true,
+      "redact_query_string": true
+    }
+  }
 }

@@ -130,6 +130,12 @@ export default async function handler(request: Request, response: Response) {
       `select staff.id,staff.effective_manager_staff_id,staff.effective_manager_source,manager.full_name as effective_manager_name
        from public.staff_members staff left join public.staff_members manager on manager.id=staff.effective_manager_staff_id where staff.id=$1`, [id],
     );
+    console.info('Resource manager assignment saved', {
+      staffId: id,
+      requestedManagerId: managerId || null,
+      persistedManagerId: saved.rows[0]?.effective_manager_staff_id || null,
+      persistedSource: saved.rows[0]?.effective_manager_source || null,
+    });
     return response.status(200).json({ success: true, resource: saved.rows[0] || updated.rows[0] });
   } catch (error) {
     await database.query('rollback');

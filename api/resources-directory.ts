@@ -21,7 +21,7 @@ export default async function handler(req: Req, res: Res) {
   const globalAccess = viewer?.role === 'admin' || viewer?.role === 'rrhh' || viewer?.area_name === 'Administración' || viewer?.resource_role === 'Director';
   if (!viewer || (!globalAccess && !['gerente', 'supervisor'].includes(viewer.role || '')) || (!globalAccess && !viewer.staff_member_id)) return res.status(403).json({ success: false, message: 'No tenés acceso a Legajos.' });
   const q = text(req.query?.q); const area = text(req.query?.area); const team = text(req.query?.team); const status = text(req.query?.status) || 'active';
-  const page = Math.max(1, Number(text(req.query?.page)) || 1); const size = Math.min(250, Math.max(20, Number(text(req.query?.size)) || 200));
+  const page = Math.max(1, Number(text(req.query?.page)) || 1); const size = Math.min(100, Math.max(20, Number(text(req.query?.size)) || 50));
   const where: string[] = []; const values: unknown[] = []; const add = (sql: string, value?: unknown) => { if (value !== undefined) values.push(value); where.push(sql.replace('?', `$${values.length}`)); };
   if (!globalAccess) {
     values.push(viewer!.staff_member_id);

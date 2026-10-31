@@ -12,18 +12,22 @@ begin
   -- Every active seller inherits the manager currently assigned to the direct
   -- supervisor. Freelance/no-responsible sellers deliberately remain null.
   update public.staff_members seller
-  set effective_manager_staff_id = coalesce(
-        supervisor.effective_manager_staff_id,
-        case when supervisor_role.app_role_mapping in ('gerente'::public.app_role, 'admin'::public.app_role) then supervisor.id end
-      ),
+  set effective_manager_staff_id = source.inherited_manager_id,
       effective_manager_source = 'inherited'::public.manager_assignment_source,
       updated_at = now()
-  from public.hr_roles seller_role
-  left join public.staff_members supervisor on supervisor.id=seller.responsible_staff_id
-  left join public.hr_roles supervisor_role on supervisor_role.id=supervisor.role_id
-  where seller.role_id=seller_role.id
-    and seller.active=true
-    and seller_role.creates_seller_record=true;
+  from (
+    select child.id,
+      coalesce(
+        supervisor.effective_manager_staff_id,
+        case when supervisor_role.app_role_mapping in ('gerente'::public.app_role, 'admin'::public.app_role) then supervisor.id end
+      ) as inherited_manager_id
+    from public.staff_members child
+    join public.hr_roles child_role on child_role.id=child.role_id
+    left join public.staff_members supervisor on supervisor.id=child.responsible_staff_id
+    left join public.hr_roles supervisor_role on supervisor_role.id=supervisor.role_id
+    where child.active=true and child_role.creates_seller_record=true
+  ) source
+  where seller.id=source.id;
 
   -- Team projection: one active commercial team for each active Supervisor in
   -- Legajos, with its manager copied from that supervisor's effective manager.

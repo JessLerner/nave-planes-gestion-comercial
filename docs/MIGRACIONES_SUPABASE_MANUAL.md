@@ -11,3 +11,7 @@ staging de importación, detalle de usados y notas de anticipos.
 
 No ejecutar `20261030_012_reset_roster_foundation.sql` en producción: esa
 migración fue un reinicio histórico y elimina nómina, vendedores y equipos.
+
+Después de cambiar la aplicación para que un Supervisor cree su equipo
+automáticamente, ejecutar una vez `20261030_023_backfill_supervisor_teams.sql`
+para reconciliar los Supervisores que ya existían.

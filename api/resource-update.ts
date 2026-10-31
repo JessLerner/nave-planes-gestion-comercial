@@ -43,7 +43,7 @@ export default async function handler(request: Request, response: Response) {
     const specialWithoutLegajo = /COACHING|FREE\s*LANCE|FREELANCE/i.test(employmentType);
     if (dni.length < 7 || dni.length > 8) return response.status(400).json({ success: false, message: 'El DNI es obligatorio y debe contener entre 7 y 8 dígitos.' });
     if (!legajo && !specialWithoutLegajo) return response.status(400).json({ success: false, message: 'El legajo es obligatorio salvo para Coaching o Freelance.' });
-    const role = await database.query<{ area_id: string }>('select area_id from public.hr_roles where id=$1 and active=true', [roleId]);
+    const role = await database.query<{ area_id: string; app_role_mapping: 'admin' | 'gerente' | 'supervisor' | 'rrhh' | null }>('select area_id,app_role_mapping from public.hr_roles where id=$1 and active=true', [roleId]);
     if (!role.rows[0]) return response.status(400).json({ success: false, message: 'Cargo inválido.' });
     if (responsibleId === id) return response.status(400).json({ success: false, message: 'Una persona no puede ser su propio responsable.' });
     if (managerId === id) return response.status(400).json({ success: false, message: 'Una persona no puede ser su propio gerente.' });
@@ -77,6 +77,14 @@ export default async function handler(request: Request, response: Response) {
         Boolean(request.body?.active), effectiveManager, managerSource],
     );
     if (!updated.rows[0]) throw new Error('No existe el recurso.');
+    if (role.rows[0].app_role_mapping === 'supervisor' && Boolean(request.body?.active)) {
+      const currentTeam = await database.query<{ id: string }>(`update public.teams set name=$2,manager_staff_id=$3::uuid,active=true,is_sales_team=true where supervisor_staff_id=$1 returning id`, [id, updated.rows[0].full_name, effectiveManager]);
+      if (!currentTeam.rows[0]) {
+        await database.query(`insert into public.teams(name,supervisor_staff_id,manager_staff_id,active,is_sales_team) values($1,$2,$3::uuid,true,true)`, [updated.rows[0].full_name, id, effectiveManager]);
+      }
+    } else {
+      await database.query(`update public.teams set active=false,is_sales_team=false where supervisor_staff_id=$1`, [id]);
+    }
     await database.query(`
       with recursive descendants as (
         select id from public.staff_members where id = $1

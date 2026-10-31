@@ -78,7 +78,7 @@ export default async function handler(req: Req, res: Res) {
     const [areas, teams, roles, responsibles, managers] = await Promise.all([
       pool.query(`select id,name from public.hr_areas where active=true order by sort_order,name`),
       pool.query(`select t.id,t.name from public.teams t join public.staff_members staff on staff.id=t.supervisor_staff_id join public.hr_roles role on role.id=staff.role_id where t.active=true and t.is_sales_team=true and staff.active=true and role.app_role_mapping='supervisor'::public.app_role order by t.name`),
-      pool.query(`select id,name,area_id from public.hr_roles where active=true order by sort_order,name`),
+      pool.query(`select id,name,area_id,creates_seller_record from public.hr_roles where active=true order by sort_order,name`),
       pool.query(`select staff.id,staff.full_name from public.staff_members staff join public.hr_roles role on role.id=staff.role_id where staff.active=true and role.app_role_mapping in ('supervisor'::public.app_role,'gerente'::public.app_role,'admin'::public.app_role) order by staff.full_name`),
       pool.query(`select staff.id,staff.full_name from public.staff_members staff join public.hr_roles role on role.id=staff.role_id where staff.active=true and role.app_role_mapping in ('gerente'::public.app_role,'admin'::public.app_role) order by staff.full_name`),
     ]);

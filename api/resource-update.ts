@@ -67,11 +67,12 @@ export default async function handler(request: Request, response: Response) {
     const inheritedManager = parent.rows[0]
       ? (parent.rows[0].effective_manager_staff_id || (['gerente', 'admin'].includes(parent.rows[0].app_role_mapping || '') ? parent.rows[0].id : null))
       : null;
-    const selectedManager = managerId ? await database.query<{ id: string }>(`select staff.id from public.staff_members staff join public.hr_roles role on role.id=staff.role_id where staff.id=$1 and staff.active=true and role.app_role_mapping in ('gerente'::public.app_role,'admin'::public.app_role)`, [managerId]) : { rows: [] };
-    if (managerId && !selectedManager.rows[0]) throw new Error('El gerente seleccionado no está activo o no tiene un cargo de gerencia habilitado.');
-    const effectiveManager = managerId || inheritedManager;
-    const managerSource = managerId ? 'manual' : 'inherited';
-    if (!managerId) await database.query(`select set_config('nave.allow_manual_manager_reset', 'true', true)`);
+    const canChooseManager = !role.rows[0].creates_seller_record;
+    const selectedManager = managerId && canChooseManager ? await database.query<{ id: string }>(`select staff.id from public.staff_members staff join public.hr_roles role on role.id=staff.role_id where staff.id=$1 and staff.active=true and role.app_role_mapping in ('gerente'::public.app_role,'admin'::public.app_role)`, [managerId]) : { rows: [] };
+    if (managerId && canChooseManager && !selectedManager.rows[0]) throw new Error('El gerente seleccionado no está activo o no tiene un cargo de gerencia habilitado.');
+    const effectiveManager = canChooseManager && managerId ? managerId : inheritedManager;
+    const managerSource = canChooseManager && managerId ? 'manual' : 'inherited';
+    if (managerSource === 'inherited') await database.query(`select set_config('nave.allow_manual_manager_reset', 'true', true)`);
     const updated = await database.query(
       `update public.staff_members set full_name=$2,dni=$3,legajo=$4,employment_type=$5,
        role_id=$6,area_id=$7,responsible_staff_id=$8,active=$9,

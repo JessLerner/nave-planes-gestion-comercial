@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { FileUp, LoaderCircle, LockKeyhole, ShieldCheck } from 'lucide-react';
 import { useAuth } from '../../auth/AuthProvider';
+import { getSupabaseClient } from '../../auth/supabase';
 import { parseFoxLeadReport, type FoxLeadReportPreview } from '../../services/fox/parseFoxLeadReport';
 
 const isoToday = () => new Date().toISOString().slice(0, 10);
@@ -44,27 +45,21 @@ export const FoxReportImportPanel: React.FC = () => {
       const batches = Math.ceil(preview.rows.length / IMPORT_BATCH_SIZE);
       for (let index = 0; index < batches; index += 1) {
         setMessage(`Registrando corte Fox: lote ${index + 1} de ${batches}…`);
-        const response = await fetch('/api/fox-leads-import', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
-          body: JSON.stringify({
-            snapshotDate,
-            periodStart,
-            periodEnd: snapshotDate,
-            fileName: file.name,
-            fileHash: preview.sha256,
-            // The raw file never leaves the browser. This payload intentionally
-            // contains no customer name, phone, email, DNI, address or notes.
-            leads: preview.rows.slice(index * IMPORT_BATCH_SIZE, (index + 1) * IMPORT_BATCH_SIZE),
-          }),
+        const supabase = await getSupabaseClient();
+        if (!supabase) throw new Error('No se pudo abrir la conexión segura con Supabase.');
+        const { data, error } = await supabase.rpc('import_fox_leads', {
+          p_snapshot_date: snapshotDate,
+          p_period_start: periodStart,
+          p_period_end: snapshotDate,
+          p_source_file_name: file.name,
+          p_source_file_sha256: preview.sha256,
+          // The raw file never leaves the browser. This payload intentionally
+          // contains no customer name, phone, email, DNI, address or notes.
+          p_leads: preview.rows.slice(index * IMPORT_BATCH_SIZE, (index + 1) * IMPORT_BATCH_SIZE),
         });
-        const raw = await response.text();
-        let result: ImportResult | null = null;
-        try { result = JSON.parse(raw) as ImportResult; } catch { /* Response was intercepted before the API. */ }
-        if (!response.ok || !result?.success) {
-          const detail = result?.message || `El servidor respondió HTTP ${response.status}${raw.startsWith('<') ? ' antes de llegar a la API.' : '.'}`;
-          throw new Error(detail);
-        }
+        if (error) throw new Error(error.message);
+        const result = data as ImportResult | null;
+        if (!result?.success) throw new Error(result?.message || 'La importación fue rechazada por Supabase.');
         stored += result.stored || 0;
         unmappedRows += result.unmappedRows || 0;
       }

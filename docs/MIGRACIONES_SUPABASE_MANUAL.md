@@ -30,3 +30,7 @@ Para conciliar Fox por nombre más supervisor histórico, ejecutar una vez
 `20261031_027_fox_supervisor_context.sql`. Esta migración no borra reportes:
 agrega el supervisor extraído de `Sucursal`, conserva la sucursal original y
 garantiza que un recurso activo sólo pueda quedar asociado a un usuario Fox.
+
+Después ejecutar `20261031_028_fox_import_rpc.sql`. El corte de Fox se procesa
+directamente dentro de Supabase, evitando el límite de CPU del plan gratuito de
+Cloudflare Workers; sólo Administración autenticada puede invocarlo.

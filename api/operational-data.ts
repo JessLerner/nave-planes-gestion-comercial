@@ -65,11 +65,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           t.manager_staff_id,
           supervisor.full_name as supervisor_name,
           manager.full_name as manager_name
-        from public.teams t
-        join public.staff_members supervisor on supervisor.id = t.supervisor_staff_id
+        from public.staff_members supervisor
         join public.hr_roles supervisor_role on supervisor_role.id = supervisor.role_id
+        join public.teams t on t.supervisor_staff_id = supervisor.id
         left join public.staff_members manager on manager.id = t.manager_staff_id
         where ${scopedTeamFilter.sql}
+          and t.active = true
           and t.is_sales_team = true
           and supervisor.active = true
           and supervisor_role.app_role_mapping = 'supervisor'::public.app_role

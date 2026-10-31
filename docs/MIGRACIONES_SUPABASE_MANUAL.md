@@ -38,3 +38,6 @@ Cloudflare Workers; sólo Administración autenticada puede invocarlo.
 Para que Supervisión pueda proponer asociaciones Fox sin aplicarlas, ejecutar
 `20261031_029_fox_mapping_suggestions.sql`. Administración General es quien
 confirma la propuesta y realiza el cambio efectivo.
+
+Para reconstruir los equipos exclusivamente desde Legajos y sus cargos activos,
+ejecutar `20261031_030_reconcile_supervisor_team_projection.sql`.

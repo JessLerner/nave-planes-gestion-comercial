@@ -108,16 +108,20 @@ validación/migración manual, `[ ]` pendiente.
 - [x] UUID interno, DNI obligatorio y excepción de legajo para Coaching/Freelance.
 - [x] Legajos con búsqueda de servidor, paginación, sector, equipo, estado,
   responsable, gerente y ficha editable.
-- [x] Equipos derivados exclusivamente de Supervisores activos y filtro por
-  integrantes reales del equipo.
+- [-] Equipos y recursos derivados desde Legajos: la reconstrucción de
+  proyecciones está implementada, pero falta resolver como P0 la actualización
+  inmediata y consistente de toda la plataforma después de cambiar cargo,
+  responsable o gerente. Hoy Legajos puede reflejar el cambio antes que la
+  cabecera, Pacing u otros módulos.
 - [x] Responsable directo limitado a Supervisión, Gerencia y Administración
   General.
 - [x] Baja lógica diferenciada entre corrección administrativa y baja real en
   el código; falta confirmar en producción la migración `024` y su pestaña de
   Históricos.
 - [-] Regla de gerente: vendedores heredan del supervisor y no pueden editarlo;
-  cargos no vendedores pueden elegir gerente. Falta ejecutar `026` y completar
-  la prueba de actualización de descendientes/equipos al mover un supervisor.
+  cargos no vendedores pueden elegir gerente. La recalibración masiva existe,
+  pero queda pendiente crítico garantizar propagación inmediata y verificable
+  a todos los descendientes/equipos tras cada cambio en Legajos.
 - [ ] Bitácora individual antes/después de cambios de cargo, responsable,
   gerente y condición laboral.
 - [ ] Alta nueva por Supervisión con DNI/documentos privados, revisión RRHH y

@@ -85,7 +85,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     let subscription: { unsubscribe: () => void } | null = null;
     void getSupabaseClient().then(supabase => {
       if (!supabase) {
-      setConfigurationError('Falta configurar la conexión pública de Supabase en Vercel.');
+      setConfigurationError('Falta configurar la conexión pública de Supabase.');
       setLoading(false);
       return;
       }

@@ -34,3 +34,7 @@ garantiza que un recurso activo sólo pueda quedar asociado a un usuario Fox.
 Después ejecutar `20261031_028_fox_import_rpc.sql`. El corte de Fox se procesa
 directamente dentro de Supabase, evitando el límite de CPU del plan gratuito de
 Cloudflare Workers; sólo Administración autenticada puede invocarlo.
+
+Para que Supervisión pueda proponer asociaciones Fox sin aplicarlas, ejecutar
+`20261031_029_fox_mapping_suggestions.sql`. Administración General es quien
+confirma la propuesta y realiza el cambio efectivo.

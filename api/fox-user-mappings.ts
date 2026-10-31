@@ -16,9 +16,9 @@ async function userIdFromRequest(req: VercelRequest) {
   return (await response.json() as { id?: string }).id || null;
 }
 
-async function assertAdmin(db: PoolClient, userId: string) {
-  const result = await db.query(`select role from public.profiles where id = $1 limit 1`, [userId]);
-  return result.rows[0]?.role === 'admin';
+async function accessProfile(db: PoolClient, userId: string) {
+  const result = await db.query<{ role: 'admin' | 'supervisor'; team_id: string | null }>(`select role,team_id from public.profiles where id = $1 limit 1`, [userId]);
+  return result.rows[0] || null;
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -27,9 +27,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!userId) return res.status(401).json({ success: false, message: 'Sesión no válida o vencida.' });
   const db = await pool.connect();
   try {
-    if (!(await assertAdmin(db, userId))) return res.status(403).json({ success: false, message: 'Sólo Administración puede asociar usuarios de Fox.' });
+    const profile = await accessProfile(db, userId);
+    if (!profile || !['admin', 'supervisor'].includes(profile.role)) return res.status(403).json({ success: false, message: 'No tenés permisos para revisar asociaciones de Fox.' });
     if (req.method === 'GET') {
-      const [users, historicalMappings, resources] = await Promise.all([
+      const [users, historicalMappings, resources, pendingSuggestions] = await Promise.all([
         db.query(`
           with latest as (select max(snapshot_date) as snapshot_date from public.fox_lead_daily_snapshots)
           select s.fox_user_key, max(s.fox_user_name) as fox_user_name,
@@ -63,6 +64,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           where staff.active=true
           order by staff.full_name
         `),
+        profile.role === 'admin'
+          ? db.query(`
+              select suggestion.id as suggestion_id, suggestion.fox_user_key, staff.id as suggested_seller_id,
+                staff.full_name as suggested_resource_name, proposer.full_name as proposed_by_name
+              from public.fox_user_mapping_suggestions suggestion
+              join public.staff_members staff on staff.id=suggestion.proposed_staff_member_id
+              left join public.profiles proposer on proposer.id=suggestion.proposed_by
+              where suggestion.status='pending'
+              order by suggestion.created_at asc
+            `)
+          : Promise.resolve({ rows: [] }),
       ]);
       const unmappedUsers = users.rows.map((user) => {
         const candidate = confidentNameMatch(user.fox_user_name, resources.rows);
@@ -71,20 +83,36 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const validContext = candidate && matchesSupervisorContext(user.fox_supervisor_name, candidate.responsible_name);
         return { ...user, suggested_seller_id: validContext ? candidate.id : null };
       });
-      return res.status(200).json({ success: true, unmappedUsers, sellers: [
+      return res.status(200).json({ success: true, canConfirm: profile.role === 'admin', unmappedUsers, sellers: [
         ...resources.rows,
         { id: '__terminated__', full_name: 'RECURSOS CON BAJA — histórico Fox', team_id: null },
-      ], reviewUsers: historicalMappings.rows });
+      ], reviewUsers: historicalMappings.rows, pendingSuggestions: pendingSuggestions.rows });
     }
     if (req.method !== 'POST') return res.status(405).json({ success: false, message: 'Método no permitido.' });
-    const mappings = (req.body as { mappings?: unknown })?.mappings;
+    const body = req.body as { mappings?: unknown; suggestions?: unknown };
+    const mappings = profile.role === 'admin' ? body?.mappings : body?.suggestions;
     if (!Array.isArray(mappings) || mappings.length === 0 || mappings.length > 200) return res.status(400).json({ success: false, message: 'Las asociaciones no tienen un formato válido.' });
     await db.query('begin');
     let updated = 0;
-    for (const item of mappings as Array<{ foxUserKey?: unknown; sellerId?: unknown }>) {
+    for (const item of mappings as Array<{ foxUserKey?: unknown; sellerId?: unknown; suggestionId?: unknown }>) {
       const foxUserKey = typeof item.foxUserKey === 'string' ? item.foxUserKey.trim() : '';
       const sellerId = typeof item.sellerId === 'string' ? item.sellerId.trim() : '';
       if (!foxUserKey || !sellerId) continue;
+      if (profile.role === 'supervisor') {
+        const candidate = await db.query<{ id: string }>(`
+          select staff.id from public.staff_members staff
+          left join public.teams own_team on own_team.supervisor_staff_id=staff.id and own_team.active=true and own_team.is_sales_team=true
+          left join public.teams parent_team on parent_team.supervisor_staff_id=staff.responsible_staff_id and parent_team.active=true and parent_team.is_sales_team=true
+          where staff.id=$1 and staff.active=true and coalesce(own_team.id,parent_team.id)=$2
+        `, [sellerId, profile.team_id]);
+        if (!candidate.rows[0]) throw new Error('Sólo podés sugerir recursos de tu equipo.');
+        await db.query(`
+          insert into public.fox_user_mapping_suggestions(fox_user_key,proposed_staff_member_id,proposed_by)
+          values($1,$2,$3) on conflict (fox_user_key,proposed_staff_member_id,proposed_by,status) do nothing
+        `, [foxUserKey, sellerId, userId]);
+        updated += 1;
+        continue;
+      }
       let id = ''; let team_id: string | null = null; let full_name = ''; let staff_member_id: string | null = null;
       if (sellerId === '__terminated__') {
         const retired = await db.query<{ id: string }>(`
@@ -126,10 +154,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       `, [foxUserKey, full_name, id, staff_member_id]);
       const snapshotResult = await db.query(`update public.fox_lead_daily_snapshots set seller_id = $2, team_id = $3 where fox_user_key = $1`, [foxUserKey, id, team_id]);
       await db.query(`update public.fox_leads set seller_id = $2, team_id = $3, updated_at = now() where fox_user_key = $1`, [foxUserKey, id, team_id]);
+      const suggestionId = typeof item.suggestionId === 'string' ? item.suggestionId : '';
+      if (suggestionId) await db.query(`update public.fox_user_mapping_suggestions set status='approved',reviewed_by=$2,reviewed_at=now() where id=$1 and status='pending'`, [suggestionId, userId]);
       updated += snapshotResult.rowCount || 0;
     }
     await db.query('commit');
-    return res.status(200).json({ success: true, updated });
+    return res.status(200).json({ success: true, updated, suggested: profile.role === 'supervisor' });
   } catch (error) {
     await db.query('rollback');
     console.error('Fox mapping update failed', error);

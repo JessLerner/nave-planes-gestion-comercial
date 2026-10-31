@@ -54,7 +54,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         ${base}
       `, scope.params),
       pool.query(`
-        select s.seller_id, s.team_id, coalesce(v.full_name, s.fox_user_name, 'Sin asignar') as seller_name,
+        select s.seller_id, s.team_id,
+          case when v.full_name = 'RECURSOS CON BAJA — histórico Fox'
+            then coalesce(s.fox_user_name, 'Usuario Fox') || ' — RECURSO CON BAJA'
+            else coalesce(v.full_name, s.fox_user_name, 'Sin asignar') end as seller_name,
           count(*)::int as total_leads,
           count(*) filter (where ${normalizedStatus} = 'sin gestion')::int as sin_gestion,
           count(*) filter (where ${normalizedStatus} <> 'sin gestion')::int as con_gestion,

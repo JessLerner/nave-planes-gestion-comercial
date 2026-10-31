@@ -47,7 +47,7 @@ export const FoxMetricsPanel: React.FC = () => {
     </section>
 
     {currentUser.role === 'admin' && <FoxReportImportPanel />}
-    {currentUser.role === 'admin' && <FoxUserMappingPanel onSaved={() => void load()} />}
+    {['admin', 'supervisor'].includes(currentUser.role) && <FoxUserMappingPanel canConfirm={currentUser.role === 'admin'} onSaved={() => void load()} />}
     {message && <section className="rounded-xl border border-slate-800 bg-slate-900 p-8 text-center text-sm text-slate-400"><BarChart3 className="mx-auto mb-3 h-8 w-8 text-slate-600" />{message}</section>}
     {summary && <>
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-5"><Kpi title="Cartera total" value={fmt(summary.total_leads)} detail={`Corte: ${summary.snapshot_date.slice(0, 10).split('-').reverse().join('/')}`} tone="text-white" /><Kpi title="Sin gestión" value={fmt(summary.sin_gestion)} detail={pct(summary.sin_gestion)} tone="text-amber-300" /><Kpi title="Con gestión" value={fmt(summary.con_gestion)} detail={pct(summary.con_gestion)} tone="text-sky-300" /><Kpi title="Abiertos" value={fmt(summary.abiertos)} detail={pct(summary.abiertos)} tone="text-violet-300" /><Kpi title="Cerrados" value={fmt(summary.cerrados)} detail={`Vendidos: ${fmt(summary.vendidos)}`} tone="text-emerald-300" /></div>

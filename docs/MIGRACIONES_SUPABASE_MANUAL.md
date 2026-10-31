@@ -25,3 +25,8 @@ ejecutar una vez `20261031_025_preserve_manual_manager_override.sql`.
 La regla vigente para vendedores es que el gerente se hereda exclusivamente
 del supervisor. Para normalizar los vendedores ya existentes, ejecutar una vez
 `20261031_026_vendor_manager_inheritance.sql` después de la `025`.
+
+Para conciliar Fox por nombre más supervisor histórico, ejecutar una vez
+`20261031_027_fox_supervisor_context.sql`. Esta migración no borra reportes:
+agrega el supervisor extraído de `Sucursal`, conserva la sucursal original y
+garantiza que un recurso activo sólo pueda quedar asociado a un usuario Fox.

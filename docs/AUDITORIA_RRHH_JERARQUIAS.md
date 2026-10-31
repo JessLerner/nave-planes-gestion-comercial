@@ -26,8 +26,9 @@ No se deben habilitar usuarios masivamente hasta completar este bloque.
    recalcular las relaciones afectadas y registrar quién lo hizo, cuándo y el
    valor anterior/nuevo.
 7. Cada identidad externa de CRM/Fox se vincula a un único recurso. Las
-   coincidencias aproximadas de nombre sólo se proponen; ante nombres
-   repetidos se exige además que el supervisor de Fox coincida con el
+   coincidencias aproximadas de nombre sólo se proponen; Fox informa el
+   supervisor histórico dentro de `Sucursal` como `supervisor - sucursal`, por
+   lo que se aísla el tramo previo al guion y se lo exige coincidir con el
    responsable directo del Legajo. La asociación aprobada queda persistida y
    no se vuelve a inferir en cada carga. Los perfiles de acceso de la plataforma,
    en cambio, se vinculan explícitamente a un recurso autorizado.

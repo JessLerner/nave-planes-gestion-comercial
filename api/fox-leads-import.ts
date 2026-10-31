@@ -1,4 +1,4 @@
-import { confidentNameMatch } from './lib/name-match';
+import { confidentNameMatch, matchesSupervisorContext } from './lib/name-match';
 import { databasePool } from './lib/database';
 
 type VercelRequest = { method?: string; headers?: Record<string, string | string[] | undefined>; body?: unknown };
@@ -11,6 +11,8 @@ type ImportedLead = {
   closedAt?: unknown;
   foxUserName?: unknown;
   foxUserKey?: unknown;
+  foxSupervisorName?: unknown;
+  foxSupervisorKey?: unknown;
   status?: unknown;
   source?: unknown;
   channel?: unknown;
@@ -68,6 +70,8 @@ function cleanLead(row: ImportedLead) {
   if (!leadId || !/^[#A-Za-z0-9_-]+$/.test(leadId)) return null;
   const foxUserName = text(row.foxUserName);
   const foxUserKey = normalizeUser(text(row.foxUserKey) || foxUserName);
+  const foxSupervisorName = text(row.foxSupervisorName);
+  const foxSupervisorKey = normalizeUser(text(row.foxSupervisorKey) || foxSupervisorName);
   return {
     lead_id: leadId,
     entry_date: timestamp(row.entryDate)?.slice(0, 10) || null,
@@ -75,6 +79,8 @@ function cleanLead(row: ImportedLead) {
     closed_at: timestamp(row.closedAt),
     fox_user_name: foxUserName,
     fox_user_key: foxUserKey,
+    fox_supervisor_name: foxSupervisorName,
+    fox_supervisor_key: foxSupervisorKey,
     lead_status: text(row.status),
     lead_source: text(row.source),
     channel: text(row.channel),
@@ -127,28 +133,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       from public.fox_user_mappings m
       left join public.sellers s on s.id = m.seller_id
     `);
-    const sellerResult = await db.query(`select id, team_id, full_name from public.sellers`);
+    const resourceResult = await db.query(`
+      select seller.id as seller_id, seller.team_id, staff.full_name, responsible.full_name as responsible_name
+      from public.staff_members staff
+      join public.sellers seller on seller.staff_member_id=staff.id
+      left join public.staff_members responsible on responsible.id=staff.responsible_staff_id
+      where staff.active=true and seller.active=true
+    `);
     const mappings = new Map<string, { sellerId: string | null; teamId: string | null }>();
-    const sellersBySignature = new Map<string, { sellerId: string | null; teamId: string | null }>();
-    const ambiguousSignatures = new Set<string>();
     for (const row of mappingResult.rows) mappings.set(row.fox_user_key, { sellerId: row.seller_id, teamId: row.team_id });
-    for (const seller of sellerResult.rows) {
-      const key = normalizeUser(seller.full_name);
-      if (key && !mappings.has(key)) mappings.set(key, { sellerId: seller.id, teamId: seller.team_id });
-      const signature = nameSignature(seller.full_name);
-      if (signature) {
-        if (sellersBySignature.has(signature)) ambiguousSignatures.add(signature);
-        else sellersBySignature.set(signature, { sellerId: seller.id, teamId: seller.team_id });
-      }
-    }
-    for (const signature of ambiguousSignatures) sellersBySignature.delete(signature);
-
-    const sellerCandidates = sellerResult.rows.map((seller) => ({ ...seller, sellerId: seller.id, teamId: seller.team_id }));
     const unmappedNames = new Set<string>();
     const enriched = leads.map(lead => {
-      const automatic = confidentNameMatch(lead.fox_user_name, sellerCandidates);
+      const candidate = confidentNameMatch(lead.fox_user_name, resourceResult.rows);
+      const automatic = candidate && matchesSupervisorContext(lead.fox_supervisor_name, candidate.responsible_name)
+        ? { sellerId: candidate.seller_id, teamId: candidate.team_id }
+        : undefined;
       const assignment = lead.fox_user_key
-        ? mappings.get(lead.fox_user_key) || sellersBySignature.get(nameSignature(lead.fox_user_name) || '') || (automatic ? { sellerId: automatic.sellerId, teamId: automatic.teamId } : undefined)
+        ? mappings.get(lead.fox_user_key) || automatic
         : automatic ? { sellerId: automatic.sellerId, teamId: automatic.teamId } : undefined;
       if (lead.fox_user_name && !assignment) unmappedNames.add(lead.fox_user_name);
       return { ...lead, seller_id: assignment?.sellerId ?? null, team_id: assignment?.teamId ?? null };
@@ -157,19 +158,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     await db.query(`
       insert into public.fox_lead_daily_snapshots (
-        snapshot_date, fox_lead_id, entry_date, managed_at, closed_at, fox_user_name, fox_user_key,
+        snapshot_date, fox_lead_id, entry_date, managed_at, closed_at, fox_user_name, fox_user_key, fox_supervisor_name, fox_supervisor_key,
         seller_id, team_id, lead_status, lead_source, channel, branch, brand, close_reason, sold, import_run_id
       )
       select $1, lead_id, entry_date::date, managed_at::timestamptz, closed_at::timestamptz, fox_user_name, fox_user_key,
-        seller_id::uuid, team_id::uuid, lead_status, lead_source, channel, branch, brand, close_reason, sold, $2::uuid
+        fox_supervisor_name, fox_supervisor_key, seller_id::uuid, team_id::uuid, lead_status, lead_source, channel, branch, brand, close_reason, sold, $2::uuid
       from jsonb_to_recordset($3::jsonb) as r(
-        lead_id text, entry_date text, managed_at text, closed_at text, fox_user_name text, fox_user_key text,
+        lead_id text, entry_date text, managed_at text, closed_at text, fox_user_name text, fox_user_key text, fox_supervisor_name text, fox_supervisor_key text,
         seller_id text, team_id text, lead_status text, lead_source text, channel text, branch text, brand text,
         close_reason text, sold boolean
       )
       on conflict (snapshot_date, fox_lead_id) do update set
         entry_date = excluded.entry_date, managed_at = excluded.managed_at, closed_at = excluded.closed_at,
-        fox_user_name = excluded.fox_user_name, fox_user_key = excluded.fox_user_key,
+        fox_user_name = excluded.fox_user_name, fox_user_key = excluded.fox_user_key, fox_supervisor_name = excluded.fox_supervisor_name, fox_supervisor_key = excluded.fox_supervisor_key,
         seller_id = excluded.seller_id, team_id = excluded.team_id, lead_status = excluded.lead_status,
         lead_source = excluded.lead_source, channel = excluded.channel, branch = excluded.branch,
         brand = excluded.brand, close_reason = excluded.close_reason, sold = excluded.sold,
@@ -178,16 +179,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     await db.query(`
       insert into public.fox_leads as current_leads (
-        fox_lead_id, first_seen_date, last_snapshot_date, entry_date, managed_at, closed_at, fox_user_name, fox_user_key,
+        fox_lead_id, first_seen_date, last_snapshot_date, entry_date, managed_at, closed_at, fox_user_name, fox_user_key, fox_supervisor_name, fox_supervisor_key,
         seller_id, team_id, lead_status, lead_source, channel, branch, brand, close_reason, sold, last_import_run_id
       )
       select fox_lead_id, $1::date, $1::date, entry_date, managed_at, closed_at, fox_user_name, fox_user_key,
-        seller_id, team_id, lead_status, lead_source, channel, branch, brand, close_reason, sold, $2::uuid
+        fox_supervisor_name, fox_supervisor_key, seller_id, team_id, lead_status, lead_source, channel, branch, brand, close_reason, sold, $2::uuid
       from public.fox_lead_daily_snapshots
       where snapshot_date = $1 and import_run_id = $2
       on conflict (fox_lead_id) do update set
         last_snapshot_date = excluded.last_snapshot_date, entry_date = excluded.entry_date, managed_at = excluded.managed_at,
-        closed_at = excluded.closed_at, fox_user_name = excluded.fox_user_name, fox_user_key = excluded.fox_user_key,
+        closed_at = excluded.closed_at, fox_user_name = excluded.fox_user_name, fox_user_key = excluded.fox_user_key, fox_supervisor_name = excluded.fox_supervisor_name, fox_supervisor_key = excluded.fox_supervisor_key,
         seller_id = excluded.seller_id, team_id = excluded.team_id, lead_status = excluded.lead_status,
         lead_source = excluded.lead_source, channel = excluded.channel, branch = excluded.branch, brand = excluded.brand,
         close_reason = excluded.close_reason, sold = excluded.sold, last_import_run_id = excluded.last_import_run_id,

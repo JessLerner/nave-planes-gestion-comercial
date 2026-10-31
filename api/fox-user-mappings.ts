@@ -1,5 +1,5 @@
 import type { PoolClient } from 'pg';
-import { confidentNameMatch } from './lib/name-match';
+import { confidentNameMatch, matchesSupervisorContext } from './lib/name-match';
 import { databasePool } from './lib/database';
 
 type VercelRequest = { method?: string; headers?: Record<string, string | string[] | undefined>; body?: unknown };
@@ -32,14 +32,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const [users, resources] = await Promise.all([
         db.query(`
           with latest as (select max(snapshot_date) as snapshot_date from public.fox_lead_daily_snapshots)
-          select s.fox_user_key, max(s.fox_user_name) as fox_user_name, count(*)::int as lead_count
+          select s.fox_user_key, max(s.fox_user_name) as fox_user_name,
+            max(s.fox_supervisor_name) as fox_supervisor_name, count(*)::int as lead_count
           from public.fox_lead_daily_snapshots s cross join latest
           where s.snapshot_date = latest.snapshot_date and s.seller_id is null and s.fox_user_key is not null
           group by s.fox_user_key order by lead_count desc, fox_user_name
         `),
         db.query(`
-          select staff.id,staff.full_name,team.id as team_id
+          select staff.id,staff.full_name,team.id as team_id,responsible.full_name as responsible_name
           from public.staff_members staff
+          left join public.staff_members responsible on responsible.id=staff.responsible_staff_id
           left join public.teams own_team on own_team.supervisor_staff_id=staff.id and own_team.active=true and own_team.is_sales_team=true
           left join public.teams parent_team on parent_team.supervisor_staff_id=staff.responsible_staff_id and parent_team.active=true and parent_team.is_sales_team=true
           cross join lateral (select coalesce(own_team.id,parent_team.id) as id) team
@@ -47,10 +49,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           order by staff.full_name
         `),
       ]);
-      const unmappedUsers = users.rows.map((user) => ({
-        ...user,
-        suggested_seller_id: confidentNameMatch(user.fox_user_name, resources.rows)?.id || null,
-      }));
+      const unmappedUsers = users.rows.map((user) => {
+        const candidate = confidentNameMatch(user.fox_user_name, resources.rows);
+        // A name alone never creates a proposal: it must also agree with the
+        // supervisor extracted from Fox's Sucursal field.
+        const validContext = candidate && matchesSupervisorContext(user.fox_supervisor_name, candidate.responsible_name);
+        return { ...user, suggested_seller_id: validContext ? candidate.id : null };
+      });
       return res.status(200).json({ success: true, unmappedUsers, sellers: [
         ...resources.rows,
         { id: '__terminated__', full_name: 'RECURSOS CON BAJA — histórico Fox', team_id: null },
@@ -65,7 +70,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const foxUserKey = typeof item.foxUserKey === 'string' ? item.foxUserKey.trim() : '';
       const sellerId = typeof item.sellerId === 'string' ? item.sellerId.trim() : '';
       if (!foxUserKey || !sellerId) continue;
-      let id = ''; let team_id: string | null = null; let full_name = '';
+      let id = ''; let team_id: string | null = null; let full_name = ''; let staff_member_id: string | null = null;
       if (sellerId === '__terminated__') {
         const retired = await db.query<{ id: string }>(`
           select id from public.sellers where full_name='RECURSOS CON BAJA — histórico Fox' and staff_member_id is null limit 1
@@ -92,13 +97,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           do update set full_name=excluded.full_name,team_id=excluded.team_id,active=true,dni=excluded.dni,legajo=excluded.legajo,employment_type=excluded.employment_type
           returning id
         `, [candidate.full_name, candidate.team_id, candidate.dni, candidate.id, candidate.legajo, candidate.employment_type]);
-        id = seller.rows[0].id; team_id = candidate.team_id; full_name = candidate.full_name;
+        id = seller.rows[0].id; team_id = candidate.team_id; full_name = candidate.full_name; staff_member_id = candidate.id;
+        const occupied = await db.query<{ fox_user_key: string }>(`
+          select fox_user_key from public.fox_user_mappings
+          where staff_member_id=$1 and fox_user_key<>$2 limit 1
+        `, [staff_member_id, foxUserKey]);
+        if (occupied.rows[0]) throw new Error(`El recurso ${full_name} ya está asociado a otro usuario de Fox.`);
       }
       await db.query(`
-        insert into public.fox_user_mappings (fox_user_key, fox_user_name, seller_id, updated_at)
-        values ($1, $2, $3, now())
-        on conflict (fox_user_key) do update set fox_user_name = excluded.fox_user_name, seller_id = excluded.seller_id, updated_at = now()
-      `, [foxUserKey, full_name, id]);
+        insert into public.fox_user_mappings (fox_user_key, fox_user_name, seller_id, staff_member_id, updated_at)
+        values ($1, $2, $3, $4, now())
+        on conflict (fox_user_key) do update set fox_user_name = excluded.fox_user_name, seller_id = excluded.seller_id, staff_member_id = excluded.staff_member_id, updated_at = now()
+      `, [foxUserKey, full_name, id, staff_member_id]);
       const snapshotResult = await db.query(`update public.fox_lead_daily_snapshots set seller_id = $2, team_id = $3 where fox_user_key = $1`, [foxUserKey, id, team_id]);
       await db.query(`update public.fox_leads set seller_id = $2, team_id = $3, updated_at = now() where fox_user_key = $1`, [foxUserKey, id, team_id]);
       updated += snapshotResult.rowCount || 0;

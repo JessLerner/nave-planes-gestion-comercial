@@ -38,3 +38,16 @@ export function confidentNameMatch<T extends NameCandidate>(sourceName: string |
   const best = scored[0]; const second = scored[1];
   return best && best.score >= 0.9 && (!second || best.score - second.score >= 0.08) ? best.candidate : undefined;
 }
+
+/**
+ * Checks the historical Fox supervisor fragment against a known supervisor.
+ * Fox often supplies only a surname (`Aguirre`) or names in a different
+ * order (`Alan Galean`).  This is intentionally stricter than generic fuzzy
+ * matching: every meaningful Fox token must identify the same person.
+ */
+export function matchesSupervisorContext(foxSupervisor: string | null | undefined, supervisorName: string | null | undefined) {
+  const source = [...new Set(normalizeName(foxSupervisor).split(' ').filter((token) => token.length > 1))];
+  const target = [...new Set(normalizeName(supervisorName).split(' ').filter((token) => token.length > 1))];
+  if (!source.length || !target.length) return false;
+  return source.every((token) => target.some((other) => sameToken(token, other)));
+}

@@ -7,6 +7,8 @@ export type FoxLeadImportRow = {
   closedAt: string | null;
   foxUserName: string | null;
   foxUserKey: string | null;
+  foxSupervisorName: string | null;
+  foxSupervisorKey: string | null;
   status: string | null;
   source: string | null;
   channel: string | null;
@@ -32,6 +34,17 @@ const cleanText = (value: unknown) => {
 export const normalizeFoxUser = (value: string | null) => value
   ? value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().replace(/\s+/g, ' ').toLowerCase()
   : null;
+
+/**
+ * Fox overloads `Sucursal` with the supervisor who historically owned the
+ * profile, followed by the physical branch: `Galean Alan - Fiat Jumbo`.
+ * Keep the original branch too; this extracted name is only matching context.
+ */
+export const supervisorFromFoxBranch = (value: string | null) => {
+  if (!value) return null;
+  const [candidate] = value.split(/\s*[-–—]\s*/, 1);
+  return cleanText(candidate);
+};
 
 function parseFoxDate(value: unknown): string | null {
   const text = cleanText(value);
@@ -75,6 +88,8 @@ export async function parseFoxLeadReport(file: File): Promise<FoxLeadReportPrevi
     if (knownIds.has(leadId)) duplicateIds += 1;
     knownIds.add(leadId);
     const foxUserName = cleanText(pick(source, 'Usuario Gestion'));
+    const branch = cleanText(pick(source, 'Sucursal'));
+    const foxSupervisorName = supervisorFromFoxBranch(branch);
     const soldValue = cleanText(pick(source, 'Vendido'));
     rows.push({
       leadId,
@@ -83,10 +98,12 @@ export async function parseFoxLeadReport(file: File): Promise<FoxLeadReportPrevi
       closedAt: parseFoxDate(pick(source, 'Fecha de Cierre')),
       foxUserName,
       foxUserKey: normalizeFoxUser(foxUserName),
+      foxSupervisorName,
+      foxSupervisorKey: normalizeFoxUser(foxSupervisorName),
       status: cleanText(pick(source, 'Estado')),
       source: cleanText(pick(source, 'Origen')),
       channel: cleanText(pick(source, 'Canal')),
-      branch: cleanText(pick(source, 'Sucursal')),
+      branch,
       brand: cleanText(pick(source, 'Marca')),
       closeReason: cleanText(pick(source, 'Motivo de Cierre')),
       sold: soldValue ? ['si', 'sí', 'yes', 'true', '1'].includes(soldValue.toLocaleLowerCase('es-AR')) : null,

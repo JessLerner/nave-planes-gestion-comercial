@@ -36,12 +36,18 @@ export default async function handler(req: Req, res: Res) {
     where.push(`(${normalizedName} like '%' || ${normalizedQuery} || '%' or coalesce(staff.dni::text,'') like '%' || $${index} || '%' or coalesce(staff.legajo,'') like '%' || $${index} || '%')`);
   }
   if (area) add('staff.area_id=?', area);
-  if (team) add('team.id=?', team);
+  if (team) {
+    values.push(team); const index = values.length;
+    // A team is defined by its supervisor. Its members report directly to
+    // that supervisor, so filtering by the supervisor's own team row would
+    // otherwise return only the supervisor and omit every subordinate.
+    where.push(`(team.id=$${index} or staff.id=(select supervisor_staff_id from public.teams where id=$${index}))`);
+  }
   const clause = where.length ? `where ${where.join(' and ')}` : '';
   try {
-    const count = await pool.query(`select count(*)::int as total from public.staff_members staff left join public.teams team on team.supervisor_staff_id=staff.id ${clause}`, values);
+    const count = await pool.query(`select count(*)::int as total from public.staff_members staff left join public.teams team on team.supervisor_staff_id=staff.responsible_staff_id ${clause}`, values);
     values.push(size, (page - 1) * size);
-    const rows = await pool.query(`select staff.id, staff.full_name, staff.dni, staff.legajo, staff.employment_type, staff.role_id, staff.responsible_staff_id, staff.effective_manager_staff_id, staff.effective_manager_source, staff.is_coaching, staff.is_freelance, staff.active, area.name as area_name, role.name as role_name, responsible.full_name as responsible_name, manager.full_name as effective_manager_name, team.id as team_id, team.name as team_name from public.staff_members staff left join public.hr_areas area on area.id=staff.area_id left join public.hr_roles role on role.id=staff.role_id left join public.staff_members responsible on responsible.id=staff.responsible_staff_id left join public.staff_members manager on manager.id=staff.effective_manager_staff_id left join public.teams team on team.supervisor_staff_id=staff.id ${clause} order by staff.full_name limit $${values.length-1} offset $${values.length}`, values);
+    const rows = await pool.query(`select staff.id, staff.full_name, staff.dni, staff.legajo, staff.employment_type, staff.role_id, staff.responsible_staff_id, staff.effective_manager_staff_id, staff.effective_manager_source, staff.is_coaching, staff.is_freelance, staff.active, area.name as area_name, role.name as role_name, responsible.full_name as responsible_name, manager.full_name as effective_manager_name, team.id as team_id, team.name as team_name from public.staff_members staff left join public.hr_areas area on area.id=staff.area_id left join public.hr_roles role on role.id=staff.role_id left join public.staff_members responsible on responsible.id=staff.responsible_staff_id left join public.staff_members manager on manager.id=staff.effective_manager_staff_id left join public.teams team on team.supervisor_staff_id=staff.responsible_staff_id ${clause} order by staff.full_name limit $${values.length-1} offset $${values.length}`, values);
     const [areas, teams, roles, responsibles, managers] = await Promise.all([
       pool.query(`select id,name from public.hr_areas where active=true order by sort_order,name`),
       pool.query(`select t.id,t.name from public.teams t join public.staff_members staff on staff.id=t.supervisor_staff_id join public.hr_roles role on role.id=staff.role_id where t.active=true and t.is_sales_team=true and staff.active=true and role.app_role_mapping='supervisor'::public.app_role order by t.name`),

@@ -53,12 +53,13 @@ import { extractorApi, realtimeStream } from '../../services/extractor/extractor
 import { SheetRecord, SyncLog, SystemStats } from '../../types/extractor';
 import { parseSpreadsheetFile, filterColumns, ParsedFileResult } from '../../services/extractor/fileParser';
 import { downloadExtensionZip } from '../../services/extractor/extensionBundle';
+import { FoxReportImportPanel } from '../crm/FoxReportImportPanel';
 
 export const ExtractorHubModule: React.FC = () => {
   const { currentUser } = useApp();
 
   // Active sub-tab inside Extractor
-  const [activeSubTab, setActiveSubTab] = useState<'hub' | 'explorer' | 'supabase' | 'extension' | 'logs'>('hub');
+  const [activeSubTab, setActiveSubTab] = useState<'hub' | 'fox' | 'explorer' | 'supabase' | 'extension' | 'logs'>('hub');
 
   // Only real sources are available here. Fox is synchronized by the dedicated
   // Chrome extension, never through a browser-side simulated dataset.
@@ -579,6 +580,18 @@ export const ExtractorHubModule: React.FC = () => {
             <span className="text-[10px] bg-slate-800 px-1.5 py-0.5 rounded text-slate-300">
               {syncedRecords.length}
             </span>
+          </button>
+
+          <button
+            onClick={() => setActiveSubTab('fox')}
+            className={`flex items-center gap-2 px-3.5 py-2 rounded-lg font-medium transition-all ${
+              activeSubTab === 'fox'
+                ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+            }`}
+          >
+            <UploadCloud className="w-4 h-4" />
+            <span>Carga Fox CRM</span>
           </button>
 
           <button
@@ -1115,6 +1128,8 @@ export const ExtractorHubModule: React.FC = () => {
           </div>
         </div>
       )}
+
+      {activeSubTab === 'fox' && <div className="max-w-5xl"><FoxReportImportPanel /></div>}
 
       {/* ==================== SUB-VIEW 2: EXPLORADOR DE DATOS ==================== */}
       {activeSubTab === 'explorer' && (

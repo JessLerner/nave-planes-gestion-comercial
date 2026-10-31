@@ -34,7 +34,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (!result.rowCount) return res.status(403).json({ success: false, message: 'Tu cuenta no tiene perfil operativo asignado.' });
     return res.status(200).json({ success: true, profile: result.rows[0] });
   } catch (error) {
-    console.error('Unable to load authenticated profile', error);
+    const details = error instanceof Error
+      ? { name: error.name, message: error.message, code: (error as Error & { code?: string }).code }
+      : { message: String(error) };
+    console.error('Unable to load authenticated profile', details);
     return res.status(500).json({ success: false, message: 'No se pudo validar el perfil operativo.' });
   }
 }

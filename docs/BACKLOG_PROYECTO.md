@@ -34,9 +34,11 @@ automáticas: cada fuente debe verificarse antes de pasar a producción.
 - [x] Modelar vendedores **Freelance**: son vendedores activos sin Supervisor ni
   equipo obligatorio; nunca deben aparecer como casos de error por esa condición.
 - [-] Crear una tabla de equivalencias aprobadas con Fox (`recurso` ↔
-  `nombre/ID de Fox`) que admita varios alias por recurso. Las coincidencias
-  aproximadas se usan para proponer asociaciones, las ambiguas quedan a
-  revisión y una asociación aprobada nunca se reemplaza automáticamente.
+  `usuario/ID de Fox`) de relación **uno a uno**. Un nombre repetido representa
+  personas distintas: las coincidencias se proponen por nombre y sólo se
+  aprueban cuando también coincide el supervisor de Fox con el responsable
+  directo del Legajo. Las ambiguas quedan a revisión y una asociación aprobada
+  nunca se reemplaza automáticamente.
 - [ ] Diseñar el alta nueva desde Supervisión: documentación requerida en
   storage privado, revisión RRHH, creación del recurso, cargo, responsable,
   equipo y vendedor si aplica. La cuenta Auth sólo se habilita para
@@ -128,7 +130,9 @@ validación/migración manual, `[ ]` pendiente.
 - [-] Asociación aprobada persistente: la UI ya conserva borradores, incluye
   perfiles activos de vendedores, supervisión, gerencia, dirección y MKT, y
   ofrece `RECURSOS CON BAJA — histórico Fox`. Falta probar estas tres rutas en
-  producción y definir soporte formal de múltiples alias por recurso.
+  producción; falta capturar el supervisor de Fox, exigir coincidencia de
+  supervisor para nombres ambiguos y asegurar por base de datos la relación
+  uno a uno recurso ↔ usuario Fox.
 - [ ] Sincronización diaria automática desde Fox; por ahora la carga de reportes
   es manual/asistida.
 

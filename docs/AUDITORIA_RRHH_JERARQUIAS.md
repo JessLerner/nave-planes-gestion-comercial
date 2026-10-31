@@ -25,10 +25,11 @@ No se deben habilitar usuarios masivamente hasta completar este bloque.
 6. Cambiar cargo, responsable, gerente, estado o condición freelance debe
    recalcular las relaciones afectadas y registrar quién lo hizo, cuándo y el
    valor anterior/nuevo.
-7. Las identidades externas de CRM/Fox pueden proponerse por coincidencia
-   aproximada de nombre, porque la fuente no tiene identificador de vendedor
-   confiable. La asociación aprobada queda persistida como alias/mapping y no
-   se vuelve a inferir en cada carga. Los perfiles de acceso de la plataforma,
+7. Cada identidad externa de CRM/Fox se vincula a un único recurso. Las
+   coincidencias aproximadas de nombre sólo se proponen; ante nombres
+   repetidos se exige además que el supervisor de Fox coincida con el
+   responsable directo del Legajo. La asociación aprobada queda persistida y
+   no se vuelve a inferir en cada carga. Los perfiles de acceso de la plataforma,
    en cambio, se vinculan explícitamente a un recurso autorizado.
 8. Sólo recursos con función de Supervisión, Gerencia, Dirección o
    Administración/RRHH pueden tener cuenta de acceso. Los vendedores, incluidos
@@ -122,7 +123,8 @@ nueva. Eso no debe confundirse con enlazar una cuenta Auth: acceso a la
 plataforma requiere vínculo explícito, rol autorizado y recurso activo.
 
 **Corrección requerida:** dos flujos separados. (1) `recurso <-> identidad
-Fox/CRM`: match aproximado controlado y alias aprobado. (2) `recurso <-> cuenta
+Fox/CRM`: relación uno a uno, match aproximado controlado, verificación de
+supervisor y asociación aprobada. (2) `recurso <-> cuenta
 Auth`: invitación o vínculo explícito, rol app autorizado y alcance de datos.
 
 ### Falta auditoría de cambios individuales
@@ -144,9 +146,9 @@ condición laboral no dejan antes/después, autor ni motivo.
   independiente de verdad.
 - `sellers`: proyección comercial del recurso cuyo cargo crea vendedor.
 - `profiles`: cuenta de acceso vinculada explícitamente al recurso.
-- `external_person_aliases` o la extensión de `fox_user_mappings`: identidad
-  externa normalizada, nombre de origen, score/propuesta, estado de aprobación,
-  recurso vinculado y trazabilidad. Debe admitir varios alias para un recurso.
+- `fox_user_mappings`: identidad externa normalizada, supervisor informado por
+  Fox, score/propuesta, estado de aprobación, recurso vinculado y trazabilidad;
+  debe garantizar un usuario Fox por recurso y un recurso por usuario Fox.
 
 ### Operaciones transaccionales
 
@@ -183,5 +185,6 @@ o rechazar el cambio antes de dejar una estructura parcial.
   vendedores activos sin equipo cuando corresponda.
 - Ningún vendedor puede tener perfil de acceso; la invitación sólo está
   disponible para Supervisión, Gerencia, Dirección y Administración/RRHH.
-- Un alias Fox aprobado mantiene el vínculo aunque el CRM entregue una variante
-  abreviada, invertida o incompleta del nombre.
+- Un usuario Fox aprobado mantiene el vínculo aunque el CRM entregue una
+  variante abreviada, invertida o incompleta del nombre; un caso ambiguo exige
+  coincidencia de supervisor y aprobación humana.

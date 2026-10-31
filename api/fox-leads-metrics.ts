@@ -1,6 +1,6 @@
 import { databasePool } from './lib/database';
 
-type VercelRequest = { method?: string; headers?: Record<string, string | string[] | undefined> };
+type VercelRequest = { method?: string; headers?: Record<string, string | string[] | undefined>; query?: Record<string, string | string[] | undefined> };
 type VercelResponse = { status: (code: number) => VercelResponse; json: (body: unknown) => VercelResponse };
 
 const rawConnectionString = process.env.POSTGRES_URL || process.env.DATABASE_URL || '';
@@ -37,10 +37,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       : profile.role === 'supervisor'
         ? { sql: 's.team_id = $1', params: [profile.team_id] }
         : { sql: 'exists (select 1 from public.teams t where t.id = s.team_id and t.manager_staff_id = $1)', params: [profile.staff_member_id] };
+    const requestedTeam = typeof req.query?.teamId === 'string' ? req.query.teamId : 'all';
+    const metricParams = requestedTeam !== 'all' ? [...scope.params, requestedTeam] : scope.params;
+    const requestedTeamFilter = requestedTeam !== 'all' ? ` and s.team_id = $${metricParams.length}` : '';
     const normalizedStatus = "lower(translate(trim(coalesce(s.lead_status, '')), 'áéíóúü', 'aeiouu'))";
     const latest = `select max(snapshot_date) as snapshot_date from public.fox_lead_daily_snapshots`;
-    const base = `from public.fox_lead_daily_snapshots s cross join (${latest}) latest where s.snapshot_date = latest.snapshot_date and ${scope.sql}`;
-    const sellerBase = `from public.fox_lead_daily_snapshots s left join public.sellers v on v.id = s.seller_id cross join (${latest}) latest where s.snapshot_date = latest.snapshot_date and ${scope.sql}`;
+    const base = `from public.fox_lead_daily_snapshots s cross join (${latest}) latest where s.snapshot_date = latest.snapshot_date and ${scope.sql}${requestedTeamFilter}`;
+    const sellerBase = `from public.fox_lead_daily_snapshots s left join public.sellers v on v.id = s.seller_id cross join (${latest}) latest where s.snapshot_date = latest.snapshot_date and ${scope.sql}${requestedTeamFilter}`;
 
     const [summaryResult, sellerResult, reasonResult] = await Promise.all([
       pool.query(`
@@ -52,7 +55,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           count(*) filter (where ${normalizedStatus} <> 'cerrado')::int as abiertos,
           count(*) filter (where s.sold is true)::int as vendidos
         ${base}
-      `, scope.params),
+      `, metricParams),
       pool.query(`
         select s.seller_id, s.team_id,
           case when v.full_name = 'RECURSOS CON BAJA — histórico Fox'
@@ -67,12 +70,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         ${sellerBase}
         group by s.seller_id, s.team_id, v.full_name, s.fox_user_name
         order by total_leads desc, seller_name
-      `, scope.params),
+      `, metricParams),
       pool.query(`
         select s.close_reason as reason, count(*)::int as total
         ${base} and ${normalizedStatus} = 'cerrado' and s.close_reason is not null
         group by s.close_reason order by total desc, reason asc limit 12
-      `, scope.params),
+      `, metricParams),
     ]);
 
     return res.status(200).json({

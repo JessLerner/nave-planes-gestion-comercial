@@ -73,7 +73,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           and t.is_sales_team = true
           and supervisor.active = true
           and supervisor_role.app_role_mapping = 'supervisor'::public.app_role
-          and exists (select 1 from public.sellers active_seller where active_seller.team_id = t.id and active_seller.active = true)
         order by t.name
       `, scopedTeamFilter.params),
       pool.query(`

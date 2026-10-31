@@ -1,4 +1,5 @@
 import { Pool } from 'pg';
+import { confidentNameMatch } from './lib/name-match';
 
 type VercelRequest = { method?: string; headers?: Record<string, string | string[] | undefined>; body?: unknown };
 type VercelResponse = { status: (code: number) => VercelResponse; json: (body: unknown) => VercelResponse };
@@ -143,11 +144,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     for (const signature of ambiguousSignatures) sellersBySignature.delete(signature);
 
+    const sellerCandidates = sellerResult.rows.map((seller) => ({ ...seller, sellerId: seller.id, teamId: seller.team_id }));
     const unmappedNames = new Set<string>();
     const enriched = leads.map(lead => {
+      const automatic = confidentNameMatch(lead.fox_user_name, sellerCandidates);
       const assignment = lead.fox_user_key
-        ? mappings.get(lead.fox_user_key) || sellersBySignature.get(nameSignature(lead.fox_user_name) || '')
-        : undefined;
+        ? mappings.get(lead.fox_user_key) || sellersBySignature.get(nameSignature(lead.fox_user_name) || '') || (automatic ? { sellerId: automatic.sellerId, teamId: automatic.teamId } : undefined)
+        : automatic ? { sellerId: automatic.sellerId, teamId: automatic.teamId } : undefined;
       if (lead.fox_user_name && !assignment) unmappedNames.add(lead.fox_user_name);
       return { ...lead, seller_id: assignment?.sellerId ?? null, team_id: assignment?.teamId ?? null };
     });

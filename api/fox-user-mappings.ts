@@ -1,4 +1,5 @@
 import { Pool, type PoolClient } from 'pg';
+import { confidentNameMatch } from './lib/name-match';
 
 type VercelRequest = { method?: string; headers?: Record<string, string | string[] | undefined>; body?: unknown };
 type VercelResponse = { status: (code: number) => VercelResponse; json: (body: unknown) => VercelResponse };
@@ -38,7 +39,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         `),
         db.query(`select id, full_name, team_id from public.sellers where active = true order by full_name`),
       ]);
-      return res.status(200).json({ success: true, unmappedUsers: users.rows, sellers: sellers.rows });
+      const unmappedUsers = users.rows.map((user) => ({
+        ...user,
+        suggested_seller_id: confidentNameMatch(user.fox_user_name, sellers.rows)?.id || null,
+      }));
+      return res.status(200).json({ success: true, unmappedUsers, sellers: sellers.rows });
     }
     if (req.method !== 'POST') return res.status(405).json({ success: false, message: 'Método no permitido.' });
     const mappings = (req.body as { mappings?: unknown })?.mappings;

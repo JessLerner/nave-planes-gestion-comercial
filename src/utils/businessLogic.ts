@@ -31,9 +31,16 @@ export function calculateWorkingDays(
   remainingWorkingDays: number;
   completionRate: number;
 } {
-  const start = new Date(startDateStr);
-  const end = new Date(endDateStr);
-  const current = currentDateStr ? new Date(currentDateStr) : new Date();
+  // `new Date('YYYY-MM-DD')` is interpreted as UTC. In Argentina that moves
+  // midnight to the preceding local day and corrupts weekday calculations.
+  const parseCalendarDate = (value: string) => {
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+    if (!match) return new Date(value);
+    return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+  };
+  const start = parseCalendarDate(startDateStr);
+  const end = parseCalendarDate(endDateStr);
+  const current = currentDateStr ? parseCalendarDate(currentDateStr) : new Date();
 
   // Clamp current to [start, end]
   const clampedCurrent = new Date(

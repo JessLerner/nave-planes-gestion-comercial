@@ -72,14 +72,17 @@ export default async function handler(request: Request, response: Response) {
   const identities = new Set<string>();
   const duplicates: Required<ImportRow>[] = [];
   const rows = approvedRows.filter((row) => {
-    // DNI is the stable identity. Where it is absent, the normalized name is
-    // used only to prevent a duplicate row inside this single import batch.
-    const key = row.dni.replace(/\D/g, '') ? `dni:${row.dni.replace(/\D/g, '')}` : `name:${normalize(row.name)}`;
+    // DNI is mandatory and is the stable identity for import de-duplication.
+    const key = `dni:${row.dni.replace(/\D/g, '')}`;
     if (identities.has(key)) { duplicates.push(row); return false; }
     identities.add(key); return true;
   });
-  if (!rows.length || rows.length > 1000 || rows.some((row) => !row.name || !row.category || ['revisar', 'review'].includes(row.decision))) {
-    return response.status(400).json({ success: false, message: 'La estructura contiene filas sin aprobar o no es válida.' });
+  if (!rows.length || rows.length > 1000 || rows.some((row) => {
+    const dni = row.dni.replace(/\D/g, '');
+    const withoutLegajo = row.category.includes('COACHING') || ['freelance', 'free lance'].includes(row.decision);
+    return !row.name || !row.category || dni.length < 7 || dni.length > 8 || (!row.legajo && !withoutLegajo) || ['revisar', 'review'].includes(row.decision);
+  })) {
+    return response.status(400).json({ success: false, message: 'La estructura contiene filas sin aprobar: DNI obligatorio (7 a 8 dígitos) y legajo obligatorio salvo Coaching o Freelance.' });
   }
 
   const database = await pool.connect();
@@ -120,9 +123,9 @@ export default async function handler(request: Request, response: Response) {
         `insert into public.staff_members
           (full_name,dni,legajo,employment_type,active,area_id,role_id,is_coaching,is_freelance,source_label)
          values($1,$2,$3,$4,true,$5,$6,$7,$8,$9) returning id,full_name`,
-        [row.name, row.dni || null, normalize(row.legajo) === 'COACHING' ? null : row.legajo || null,
+        [row.name, row.dni.replace(/\D/g, ''), (row.category.includes('COACHING') || ['freelance', 'free lance'].includes(row.decision)) ? null : row.legajo,
           row.nomina || null, roleMatch.role.area_id, roleMatch.role.id,
-          normalize(row.legajo) === 'COACHING', ['freelance', 'free lance'].includes(row.decision), 'ESTRUCTURA RRHH ACTIVA OK'],
+          row.category.includes('COACHING'), ['freelance', 'free lance'].includes(row.decision), 'ESTRUCTURA RRHH ACTIVA OK'],
       );
       created.push({ ...inserted.rows[0], role: roleMatch.role, row });
       if (linkedProfile?.score && linkedProfile.score >= 0.9) {
@@ -175,8 +178,8 @@ export default async function handler(request: Request, response: Response) {
       await database.query(
         `insert into public.sellers(full_name,team_id,active,hire_date,dni,staff_member_id,legajo,employment_type)
          values($1,$2,true,null,$3,$4,$5,$6)`,
-        [seller.full_name, teamId, seller.row.dni || null, seller.id,
-          normalize(seller.row.legajo) === 'COACHING' ? null : seller.row.legajo || null, seller.row.nomina || null],
+        [seller.full_name, teamId, seller.row.dni.replace(/\D/g, ''), seller.id,
+          (seller.row.category.includes('COACHING') || ['freelance', 'free lance'].includes(seller.row.decision)) ? null : seller.row.legajo, seller.row.nomina || null],
       );
     }
 

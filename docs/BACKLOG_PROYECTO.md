@@ -7,12 +7,15 @@ automáticas: cada fuente debe verificarse antes de pasar a producción.
 
 - [x] Retirar el módulo de Recursos inestable y vaciar la estructura contaminada,
   conservando un respaldo privado.
-- [ ] Definir el contrato de datos de **ESTRUCTURA RRHH ACTIVA** como única fuente
-  maestra de personal.
+- [ ] Formalizar **ESTRUCTURA RRHH ACTIVA** como fuente de migración y
+  conciliación inicial. Después de la transición, Nave.Plan será la nómina
+  maestra y la planilla sólo podrá proponer diferencias para revisión.
 - [ ] Construir un importador de sólo previsualización: normaliza nombres y muestra
   errores sin escribir en Supabase.
-- [ ] Definir identificador estable de cada recurso (legajo; DNI sólo como control)
-  y las reglas explícitas de altas, bajas y cambios de responsable.
+- [ ] Definir identificador estable de cada recurso (UUID interno de Nave.Plan;
+  DNI obligatorio y legajo obligatorio, excepto categorías Coaching/Freelance) y las reglas explícitas de altas,
+  bajas y cambios de responsable. Coaching/Freelance sin legajo debe poder
+  operar y contabilizarse.
 - [ ] Construir una pantalla nueva, acotada y auditable: búsqueda, ficha, alta,
   baja lógica, responsable directo y jerarquía; sin inferir cargos ni crear equipos.
 - [ ] Construir equipos comerciales sólo después de validar Supervisores y Gerentes
@@ -30,9 +33,14 @@ automáticas: cada fuente debe verificarse antes de pasar a producción.
   activa.
 - [ ] Modelar vendedores **Freelance**: son vendedores activos sin Supervisor ni
   equipo obligatorio; nunca deben aparecer como casos de error por esa condición.
-- [ ] Crear una tabla de equivalencias aprobadas con Fox (`recurso` ↔ `nombre/ID
-  de Fox`). Las coincidencias ambiguas quedan pendientes de revisión y no se
-  asignan automáticamente.
+- [ ] Crear una tabla de equivalencias aprobadas con Fox (`recurso` ↔
+  `nombre/ID de Fox`) que admita varios alias por recurso. Las coincidencias
+  aproximadas se usan para proponer asociaciones, las ambiguas quedan a
+  revisión y una asociación aprobada nunca se reemplaza automáticamente.
+- [ ] Diseñar el alta nueva desde Supervisión: documentación requerida en
+  storage privado, revisión RRHH, creación del recurso, cargo, responsable,
+  equipo y vendedor si aplica. La cuenta Auth sólo se habilita para
+  Supervisión, Gerencia, Dirección y Administración/RRHH; vendedores nunca.
 
 ## Bloque 2 — Datos comerciales y fuentes
 
@@ -57,13 +65,27 @@ automáticas: cada fuente debe verificarse antes de pasar a producción.
 
 ## Bloque 4 — Listas de precios
 
-- [ ] Revisar y aprobar [GenList](https://github.com/JessLerner/GenList) como
-  fuente de listas de precios.
-- [ ] Definir contrato de salida aprobado: marca, modelo, valor básico, tipo y
-  cuotas del plan, cuota pura, cuota 1 restringida a gerencia, valor de
-  suscripción por equipo, escalas de cuota y entregas pactadas.
-- [ ] Recién después de la aprobación, integrar GenList con Supabase mediante
-  importación trazable y versionada.
+- [ ] Integrar listas oficiales como flujo de **extracción asistida, revisión y
+  publicación**, no como incremento porcentual genérico. GenList queda como
+  visor/editor de borradores, nunca como fuente oficial por sí solo.
+- [ ] Conservar por cada importación: archivo original, hash, marca, vigencia,
+  formato detectado, usuario que revisó, usuario que publicó y estado
+  `draft`/`approved`/`superseded`/`rejected`.
+- [ ] Crear importadores por formato de origen: Excel de Renault, fichas
+  repetidas Fiat y Jeep/Ram, grillas multiproducto Peugeot, detalle por tramo
+  Citroën y carga asistida para circulares narrativas o dolarizadas de MG.
+- [ ] Normalizar por producto y tramo: modelo, código, valor móvil, plan,
+  porcentaje financiado, plazo, cuota pura, cuota 1, derecho de inscripción,
+  sellado, seguro, bonificaciones, diferimientos, recuperos, adjudicación y
+  cuotas 2-13/14-18/19/20-24/25-72/73-84/85-120 cuando apliquen.
+- [ ] Mostrar diferencias entre borrador y lista publicada; bloquear la
+  publicación cuando falten campos obligatorios o haya valores no verificables.
+- [ ] Definir contrato de salida para la plataforma: catálogo publicado por
+  marca/vigencia y vistas restringidas para cuota 1, valor de suscripción y
+  sobrepautas de gerencia.
+- [ ] Incorporar el esquema Supabase versionado (`price_import_runs`, fuentes,
+  planes, tramos y aprobaciones) y APIs Vercel con permisos; no cargar listas
+  desde estado local del navegador.
 
 ## Criterios no negociables
 

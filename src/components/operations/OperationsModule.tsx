@@ -143,7 +143,7 @@ export const OperationsModule: React.FC = () => {
     setAuditFeedback(null);
   };
 
-  const handleSaveAudit = (e: React.FormEvent) => {
+  const handleSaveAudit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedOpForAudit) return;
 
@@ -152,15 +152,17 @@ export const OperationsModule: React.FC = () => {
       return;
     }
 
-    const res = auditScoring(selectedOpForAudit.id, auditStatus, auditNotes, auditReasons);
+    const res = await auditScoring(selectedOpForAudit.id, auditStatus, auditNotes, auditReasons);
     setAuditFeedback(res.message);
-    setTimeout(() => {
-      setSelectedOpForAudit(null);
-      setAuditFeedback(null);
-    }, 1200);
+    if (res.success) {
+      setTimeout(() => {
+        setSelectedOpForAudit(null);
+        setAuditFeedback(null);
+      }, 1200);
+    }
   };
 
-  const handleCreateOperation = (e: React.FormEvent) => {
+  const handleCreateOperation = async (e: React.FormEvent) => {
     e.preventDefault();
     const seller = sellers.find(s => s.id === newOpForm.seller_id);
     const teamId = seller?.team_id || 'team-1';
@@ -194,8 +196,9 @@ export const OperationsModule: React.FC = () => {
       lead_source: newOpForm.lead_source,
     };
 
-    addOperation(opPayload);
-    setShowNewOpModal(false);
+    const result = await addOperation(opPayload);
+    if (result.success) setShowNewOpModal(false);
+    else setAuditFeedback(result.message);
   };
 
   return (
@@ -216,6 +219,7 @@ export const OperationsModule: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-3">
+          {['admin', 'rrhh', 'gerente', 'supervisor'].includes(currentUser.role) && (
           <button
             onClick={() => setShowNewOpModal(true)}
             className="flex items-center gap-2 px-3.5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-semibold shadow-lg shadow-blue-600/20 transition-all"
@@ -223,6 +227,7 @@ export const OperationsModule: React.FC = () => {
             <PlusCircle className="w-3.5 h-3.5" />
             <span>Cargar Nueva Venta</span>
           </button>
+          )}
         </div>
       </div>
 
@@ -459,12 +464,14 @@ export const OperationsModule: React.FC = () => {
                         )}
                       </td>
                       <td className="py-3 px-4 text-right">
-                        <button
-                          onClick={() => handleOpenAuditModal(op)}
-                          className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded text-xs transition-colors"
-                        >
-                          Auditar Scoring
-                        </button>
+                        {['admin', 'rrhh'].includes(currentUser.role) && (
+                          <button
+                            onClick={() => handleOpenAuditModal(op)}
+                            className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded text-xs transition-colors"
+                          >
+                            Auditar Scoring
+                          </button>
+                        )}
                       </td>
                     </tr>
                   );

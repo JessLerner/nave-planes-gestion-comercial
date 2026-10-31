@@ -63,7 +63,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         ? { sql: 't.id = $1', params: [profile.team_id] }
         : { sql: 't.manager_staff_id = $1', params: [profile.staff_member_id] };
 
-    const [teamsResult, sellersResult, operationsResult, scoringRowsResult, leadsResult] = await Promise.all([
+    const [teamsResult, sellersResult, operationsResult, scoringRowsResult, leadsResult, monthlyConfigResult, priceListsResult, advancesResult] = await Promise.all([
       pool.query(`
         select
           t.id,
@@ -77,11 +77,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           manager.full_name as manager_name
         from public.teams t
         join public.staff_members supervisor on supervisor.id = t.supervisor_staff_id
+        join public.hr_roles supervisor_role on supervisor_role.id = supervisor.role_id
         left join public.staff_members manager on manager.id = t.manager_staff_id
         where ${scopedTeamFilter.sql}
           and t.is_sales_team = true
           and supervisor.active = true
-          and supervisor.role = 'supervisor'::public.staff_role
+          and supervisor_role.app_role_mapping = 'supervisor'::public.app_role
           and exists (select 1 from public.sellers active_seller where active_seller.team_id = t.id and active_seller.active = true)
         order by t.name
       `, scopedTeamFilter.params),
@@ -94,7 +95,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       `, scopedTeamFilter.params),
       pool.query(`
         select id, operation_date, subscription_number, brand, model, plan_type,
-               cuota_1_value, total_collected, factory_account, used_car_flag,
+               cuota_1_value, total_collected, factory_account, used_car_flag, used_car_details,
                seller_id, team_id, lead_source, status, scoring_status, scoring_notes,
                audited_at
         from public.sales_operations o
@@ -125,6 +126,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         where ld.team_id in (select t.id from public.teams t where ${scopedTeamFilter.sql})
         order by entry_date desc
       `, scopedTeamFilter.params),
+      pool.query(`
+        select id, start_date, end_date, min_sales_for_advance, max_advance_amount, advance_deadline,
+               default_team_target_per_seller
+        from public.monthly_config
+        where current_date between start_date and end_date
+        order by start_date desc limit 1
+      `),
+      pool.query(`
+        select id, brand, model, coalesce(version, '') as version, coalesce(plan_type, '') as plan_type,
+               cuota_1_value, factory_quota_value, car_value, bonus_discount, effective_date as updated_at
+        from public.price_lists order by effective_date desc, brand, model
+      `),
+      pool.query(`
+        select advance.id, advance.seller_id, advance.request_date, advance.amount, advance.status,
+               advance.seller_sales_count_at_date, config.min_sales_for_advance, advance.reason,
+               advance.review_notes as rejection_reason, advance.reviewed_at, advance.reviewed_by
+        from public.wage_advances advance
+        join public.monthly_config config on config.id = advance.monthly_config_id
+        join public.sellers seller on seller.id = advance.seller_id
+        where seller.team_id in (select t.id from public.teams t where ${scopedTeamFilter.sql})
+        order by advance.request_date desc, advance.created_at desc
+      `, scopedTeamFilter.params),
     ]);
 
     return res.status(200).json({
@@ -136,6 +159,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         operations: operationsResult.rows,
         scoring_rows: scoringRowsResult.rows,
         lead_distributions: leadsResult.rows,
+        monthly_config: monthlyConfigResult.rows[0] || null,
+        price_lists: priceListsResult.rows,
+        wage_advances: advancesResult.rows,
       },
     });
   } catch (error) {

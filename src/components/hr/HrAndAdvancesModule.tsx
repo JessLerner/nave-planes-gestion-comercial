@@ -73,9 +73,9 @@ export const HrAndAdvancesModule: React.FC = () => {
     monthlyConfig.advance_deadline_day
   );
 
-  const handleAdvanceSubmit = (e: React.FormEvent) => {
+  const handleAdvanceSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const res = requestAdvance(targetSellerId, requestAmount, requestReason);
+    const res = await requestAdvance(targetSellerId, requestAmount, requestReason);
     setRequestFeedback({
       success: res.success,
       msg: res.message,
@@ -306,7 +306,7 @@ export const HrAndAdvancesModule: React.FC = () => {
                           {isPending && canApproveAdvances ? (
                             <div className="inline-flex items-center gap-1.5">
                               <button
-                                onClick={() => reviewAdvance(wa.id, 'approved')}
+                                onClick={() => { void reviewAdvance(wa.id, 'approved'); }}
                                 className="px-2 py-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-xs transition-colors"
                               >
                                 Aprobar
@@ -629,8 +629,9 @@ export const HrAndAdvancesModule: React.FC = () => {
               </button>
               <button
                 onClick={() => {
-                  reviewAdvance(selectedAdvanceForReview.id, 'rejected', rejectionNotes);
-                  setSelectedAdvanceForReview(null);
+                  void reviewAdvance(selectedAdvanceForReview.id, 'rejected', rejectionNotes).then(result => {
+                    if (result.success) setSelectedAdvanceForReview(null);
+                  });
                   setRejectionNotes('');
                 }}
                 className="px-3 py-1.5 rounded bg-red-600 hover:bg-red-500 text-white font-medium"

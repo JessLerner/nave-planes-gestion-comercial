@@ -75,10 +75,10 @@ interface AppContextType {
   lastSyncTime: string;
 
   // Actions
-  addOperation: (op: Omit<SalesOperation, 'id' | 'status' | 'scoring_status'>) => { success: boolean; message: string };
-  auditScoring: (operationId: string, status: ScoringStatus, notes: string, reasons?: string[]) => { success: boolean; message: string };
-  requestAdvance: (sellerId: string, amount: number, reason: string) => { success: boolean; message: string };
-  reviewAdvance: (advanceId: string, status: 'approved' | 'rejected', notes?: string) => void;
+  addOperation: (op: Omit<SalesOperation, 'id' | 'status' | 'scoring_status'>) => Promise<{ success: boolean; message: string }>;
+  auditScoring: (operationId: string, status: ScoringStatus, notes: string, reasons?: string[]) => Promise<{ success: boolean; message: string }>;
+  requestAdvance: (sellerId: string, amount: number, reason: string) => Promise<{ success: boolean; message: string }>;
+  reviewAdvance: (advanceId: string, status: 'approved' | 'rejected', notes?: string) => Promise<{ success: boolean; message: string }>;
   distributeLeads: (sellerId: string, count: number, source: any) => void;
   updateMonthlyConfig: (config: Partial<MonthlyConfig>) => void;
   updatePriceListItem: (item: PriceListItem) => void;
@@ -185,6 +185,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode; initialUser: Use
               loss_reasons: lead.loss_reasons || {},
             })));
           }
+          if (d.monthly_config) {
+            const config = d.monthly_config;
+            const start = new Date(`${config.start_date}T12:00:00`);
+            setMonthlyConfig({
+              id: config.id,
+              year: start.getFullYear(), month: start.getMonth() + 1,
+              month_name: start.toLocaleDateString('es-AR', { month: 'long' }),
+              start_date: config.start_date, end_date: config.end_date,
+              working_days: calculateWorkingDays(config.start_date, config.end_date).totalWorkingDays,
+              min_sales_for_advance: Number(config.min_sales_for_advance), max_advance_amount: Number(config.max_advance_amount),
+              advance_deadline_day: new Date(`${config.advance_deadline}T12:00:00`).getDate(),
+              default_team_target_per_seller: Number(config.default_team_target_per_seller),
+            });
+          }
+          if (d.price_lists) setPriceLists(d.price_lists.map((item: any) => ({ ...item, cuota_1_value: Number(item.cuota_1_value || 0), factory_quota_value: Number(item.factory_quota_value || 0), car_value: Number(item.car_value || 0), bonus_discount: Number(item.bonus_discount || 0), active: true })));
+          if (d.wage_advances) setWageAdvances(d.wage_advances.map((advance: any) => ({ ...advance, amount: Number(advance.amount), min_sales_required: Number(advance.min_sales_for_advance) })));
           setLastSyncTime(new Date().toLocaleString('es-AR'));
         }
       })
@@ -412,53 +428,59 @@ export const AppProvider: React.FC<{ children: React.ReactNode; initialUser: Use
   };
 
   // Add Operation
-  const addOperation = (opData: Omit<SalesOperation, 'id' | 'status' | 'scoring_status'>) => {
-    const newId = `op-${Date.now().toString().slice(-4)}`;
-    const newOp: SalesOperation = {
-      ...opData,
-      id: newId,
-      status: 'pending_scoring',
-      scoring_status: 'pending',
-      scoring_notes: 'Registrado en sistema. Pendiente de llamado de auditoría por Calidad/RRHH.',
-    };
-
-    setOperations(prev => {
-      const next = [newOp, ...prev];
-      syncToBackend({ operations: next });
-      return next;
-    });
-    return { success: true, message: 'Operación registrada exitosamente. En espera de Scoring de Calidad.' };
+  const addOperation = async (opData: Omit<SalesOperation, 'id' | 'status' | 'scoring_status'>) => {
+    try {
+      const response = await fetch('/api/operations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
+        body: JSON.stringify({ action: 'create', operation_date: opData.date, ...opData }),
+      });
+      const payload = await response.json() as { success?: boolean; message?: string; operation?: Record<string, unknown> };
+      if (!response.ok || !payload.success || !payload.operation) return { success: false, message: payload.message || 'No se pudo guardar la operación.' };
+      const row = payload.operation;
+      const saved: SalesOperation = {
+        ...opData,
+        id: String(row.id),
+        date: String(row.operation_date),
+        status: row.status as OperationStatus,
+        scoring_status: row.scoring_status as ScoringStatus,
+        scoring_notes: String(row.scoring_notes || 'Registrado en sistema. Pendiente de llamado de auditoría por Calidad/RRHH.'),
+        audited_at: row.audited_at ? String(row.audited_at) : undefined,
+      };
+      setOperations(prev => [saved, ...prev]);
+      return { success: true, message: 'Operación registrada y guardada en la base operativa.' };
+    } catch {
+      return { success: false, message: 'No se pudo conectar con la base operativa.' };
+    }
   };
 
   // Audit Scoring
-  const auditScoring = (operationId: string, status: ScoringStatus, notes: string, reasons?: string[]) => {
-    const apto = canPresentToFactory(status);
-    setOperations(prev => {
-      const next = prev.map(op => {
-        if (op.id !== operationId) return op;
-        return {
-          ...op,
-          scoring_status: status,
-          scoring_notes: notes,
-          scoring_rejection_reasons: reasons || [],
-          status: (apto ? 'apto_fabrica' : 'pending_scoring') as OperationStatus,
-          audited_at: new Date().toISOString().replace('T', ' ').slice(0, 16),
-        };
+  const auditScoring = async (operationId: string, status: ScoringStatus, notes: string, reasons?: string[]) => {
+    try {
+      const response = await fetch('/api/operations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
+        body: JSON.stringify({ action: 'audit', operation_id: operationId, status, notes, reasons }),
       });
-      syncToBackend({ operations: next });
-      return next;
-    });
-
-    if (status === 'approved') {
-      return { success: true, message: 'Scoring APROBADO. Contrato habilitado como "Apto Presentación a Fábrica".' };
-    } else if (status === 'rejected') {
-      return { success: false, message: 'Scoring RECHAZADO. Bloqueado para presentación a Fábrica por inconsistencias.' };
+      const payload = await response.json() as { success?: boolean; message?: string; operation?: Record<string, unknown> };
+      if (!response.ok || !payload.success || !payload.operation) return { success: false, message: payload.message || 'No se pudo guardar la auditoría.' };
+      const row = payload.operation;
+      setOperations(prev => prev.map(op => op.id === operationId ? {
+        ...op,
+        scoring_status: row.scoring_status as ScoringStatus,
+        scoring_notes: String(row.scoring_notes || ''),
+        scoring_rejection_reasons: reasons || [],
+        status: row.status as OperationStatus,
+        audited_at: row.audited_at ? String(row.audited_at) : undefined,
+      } : op));
+      return { success: true, message: status === 'approved' ? 'Scoring aprobado y contrato habilitado para fábrica.' : 'Auditoría de scoring guardada.' };
+    } catch {
+      return { success: false, message: 'No se pudo conectar con la base operativa.' };
     }
-    return { success: true, message: 'Estado de scoring actualizado a Pendiente.' };
   };
 
   // Request Wage Advance
-  const requestAdvance = (sellerId: string, amount: number, reason: string) => {
+  const requestAdvance = async (sellerId: string, amount: number, reason: string) => {
     const seller = sellers.find(s => s.id === sellerId);
     if (!seller) return { success: false, message: 'Vendedor no encontrado.' };
     if (currentUser.role !== 'supervisor') {
@@ -487,41 +509,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode; initialUser: Use
       };
     }
 
-    const newAdvance: WageAdvance = {
-      id: `wa-${Date.now().toString().slice(-4)}`,
-      seller_id: sellerId,
-      request_date: new Date().toISOString().slice(0, 10),
-      amount,
-      status: 'pending',
-      seller_sales_count_at_date: sellerSales,
-      min_sales_required: monthlyConfig.min_sales_for_advance,
-      reason,
-    };
-
-    setWageAdvances(prev => {
-      const next = [newAdvance, ...prev];
-      syncToBackend({ wageAdvances: next });
-      return next;
-    });
-    return { success: true, message: `Solicitud de adelanto enviada correctamente para ${seller.name}.` };
+    try {
+      const response = await fetch('/api/wage-advances', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` }, body: JSON.stringify({ action: 'request', seller_id: sellerId, amount, reason }) });
+      const payload = await response.json() as { success?: boolean; message?: string; advance?: WageAdvance; minSalesRequired?: number };
+      if (!response.ok || !payload.success || !payload.advance) return { success: false, message: payload.message || 'No se pudo registrar el adelanto.' };
+      setWageAdvances(prev => [{ ...payload.advance!, amount: Number(payload.advance!.amount), min_sales_required: payload.minSalesRequired || monthlyConfig.min_sales_for_advance }, ...prev]);
+      return { success: true, message: `Solicitud de adelanto registrada para ${seller.name}.` };
+    } catch { return { success: false, message: 'No se pudo conectar con la base operativa.' }; }
   };
 
-  const reviewAdvance = (advanceId: string, status: 'approved' | 'rejected', notes?: string) => {
-    if (currentUser.role !== 'gerente') return;
-    setWageAdvances(prev => {
-      const next = prev.map(wa => {
-        if (wa.id !== advanceId) return wa;
-        return {
-          ...wa,
-          status,
-          rejection_reason: status === 'rejected' ? notes : undefined,
-          reviewed_at: new Date().toISOString().replace('T', ' ').slice(0, 16),
-          reviewed_by: `${currentUser.name} (${currentUser.role.toUpperCase()})`,
-        };
-      });
-      syncToBackend({ wageAdvances: next });
-      return next;
-    });
+  const reviewAdvance = async (advanceId: string, status: 'approved' | 'rejected', notes?: string) => {
+    try {
+      const response = await fetch('/api/wage-advances', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` }, body: JSON.stringify({ action: 'review', id: advanceId, status, notes }) });
+      const payload = await response.json() as { success?: boolean; message?: string; advance?: WageAdvance };
+      if (!response.ok || !payload.success || !payload.advance) return { success: false, message: payload.message || 'No se pudo resolver el adelanto.' };
+      setWageAdvances(prev => prev.map(advance => advance.id === advanceId ? { ...advance, ...payload.advance!, amount: Number(payload.advance!.amount), rejection_reason: status === 'rejected' ? notes : undefined } : advance));
+      return { success: true, message: 'Adelanto actualizado.' };
+    } catch { return { success: false, message: 'No se pudo conectar con la base operativa.' }; }
   };
 
   const distributeLeads = (sellerId: string, count: number, source: any) => {

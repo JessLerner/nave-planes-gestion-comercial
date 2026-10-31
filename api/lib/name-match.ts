@@ -1,4 +1,4 @@
-export type NameCandidate<T> = T & { full_name: string };
+export type NameCandidate = { full_name: string };
 
 export const normalizeName = (value: string | null | undefined) => (value || '')
   .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
@@ -23,7 +23,7 @@ const sameToken = (left: string, right: string) => left === right || left.starts
  * Returns a candidate only when the match is unequivocal: token order,
  * casing, diacritics and an additional middle name do not matter.
  */
-export function confidentNameMatch<T extends NameCandidate<T>>(sourceName: string | null | undefined, candidates: T[]) {
+export function confidentNameMatch<T extends NameCandidate>(sourceName: string | null | undefined, candidates: T[]) {
   const source = [...new Set(normalizeName(sourceName).split(' ').filter((token) => token.length > 1))];
   if (source.length < 2) return undefined;
   const scored = candidates.map((candidate) => {

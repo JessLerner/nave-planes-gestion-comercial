@@ -20,27 +20,69 @@ export default async function handler(request: Request, response: Response) {
   const id = text(request.body?.id); if (!id) return response.status(400).json({ success: false, message: 'Recurso inválido.' });
   const database = await pool.connect();
   try {
-    const profile = await database.query('select role from public.profiles where id=$1', [user]);
-    if (!['admin', 'gerente', 'rrhh'].includes(profile.rows[0]?.role)) return response.status(403).json({ success: false, message: 'No tenés permiso para editar la nómina.' });
+    const profile = await database.query<{ role: string; staff_member_id: string | null }>('select role, staff_member_id from public.profiles where id=$1', [user]);
+    const viewer = profile.rows[0];
+    if (!['admin', 'gerente', 'rrhh'].includes(viewer?.role || '')) return response.status(403).json({ success: false, message: 'No tenés permiso para editar la nómina.' });
+    if (viewer.role === 'gerente') {
+      if (!viewer.staff_member_id) return response.status(403).json({ success: false, message: 'Tu cuenta de gerente no está vinculada a un recurso.' });
+      const inScope = await database.query(`
+        with recursive hierarchy as (
+          select id from public.staff_members where id = $1
+          union
+          select child.id from public.staff_members child join hierarchy parent on child.responsible_staff_id = parent.id
+        )
+        select 1 from public.staff_members where id = $2 and (id in (select id from hierarchy) or effective_manager_staff_id = $1)
+      `, [viewer.staff_member_id, id]);
+      if (!inScope.rowCount) return response.status(403).json({ success: false, message: 'Sólo podés editar recursos de tu estructura.' });
+    }
     const roleId = text(request.body?.role_id); const responsibleId = text(request.body?.responsible_staff_id) || null;
+    const dni = text(request.body?.dni).replace(/\D/g, '');
+    const legajo = text(request.body?.legajo);
+    const employmentType = text(request.body?.employment_type);
+    const specialWithoutLegajo = /COACHING|FREE\s*LANCE|FREELANCE/i.test(employmentType);
+    if (dni.length < 7 || dni.length > 8) return response.status(400).json({ success: false, message: 'El DNI es obligatorio y debe contener entre 7 y 8 dígitos.' });
+    if (!legajo && !specialWithoutLegajo) return response.status(400).json({ success: false, message: 'El legajo es obligatorio salvo para Coaching o Freelance.' });
     const role = await database.query<{ area_id: string }>('select area_id from public.hr_roles where id=$1 and active=true', [roleId]);
     if (!role.rows[0]) return response.status(400).json({ success: false, message: 'Cargo inválido.' });
     if (responsibleId === id) return response.status(400).json({ success: false, message: 'Una persona no puede ser su propio responsable.' });
     await database.query('begin');
-    const parent = responsibleId ? await database.query<{ effective_manager_staff_id: string | null }>('select effective_manager_staff_id from public.staff_members where id=$1 and active=true', [responsibleId]) : { rows: [] };
+    const descendant = responsibleId ? await database.query(`
+      with recursive hierarchy as (
+        select id from public.staff_members where id = $1
+        union
+        select child.id from public.staff_members child join hierarchy parent on child.responsible_staff_id = parent.id
+      ) select 1 from hierarchy where id = $2
+    `, [id, responsibleId]) : { rowCount: 0 };
+    if (descendant.rowCount) throw new Error('No se puede asignar como responsable a una persona de su propia estructura.');
+    const parent = responsibleId ? await database.query<{ id: string; app_role_mapping: 'admin' | 'gerente' | 'supervisor' | null; effective_manager_staff_id: string | null }>(`select staff.id, hr_role.app_role_mapping, staff.effective_manager_staff_id from public.staff_members staff join public.hr_roles hr_role on hr_role.id=staff.role_id where staff.id=$1 and staff.active=true and hr_role.app_role_mapping in ('supervisor'::public.app_role,'gerente'::public.app_role,'admin'::public.app_role)`, [responsibleId]) : { rows: [] };
     if (responsibleId && !parent.rows[0]) throw new Error('El responsable seleccionado no está activo.');
+    const inheritedManager = parent.rows[0]
+      ? (parent.rows[0].effective_manager_staff_id || (['gerente', 'admin'].includes(parent.rows[0].app_role_mapping || '') ? parent.rows[0].id : null))
+      : null;
     const updated = await database.query(
       `update public.staff_members set full_name=$2,dni=$3,legajo=$4,employment_type=$5,
        role_id=$6,area_id=$7,responsible_staff_id=$8,active=$9,
-       effective_manager_staff_id=case when $8::uuid is null then effective_manager_staff_id else $10::uuid end,
-       effective_manager_source=case when $8::uuid is null then effective_manager_source else 'inherited' end,
+       effective_manager_staff_id=$10::uuid,
+       effective_manager_source='inherited',
        updated_at=now() where id=$1
        returning id,full_name`,
-      [id, text(request.body?.full_name).toUpperCase(), text(request.body?.dni) || null, text(request.body?.legajo) || null,
-        text(request.body?.employment_type) || null, roleId, role.rows[0].area_id, responsibleId,
-        Boolean(request.body?.active), parent.rows[0]?.effective_manager_staff_id || null],
+      [id, text(request.body?.full_name).toUpperCase(), dni, legajo || null,
+        employmentType || null, roleId, role.rows[0].area_id, responsibleId,
+        Boolean(request.body?.active), inheritedManager],
     );
     if (!updated.rows[0]) throw new Error('No existe el recurso.');
+    await database.query(`
+      with recursive descendants as (
+        select id from public.staff_members where id = $1
+        union
+        select child.id from public.staff_members child join descendants parent on child.responsible_staff_id = parent.id
+      )
+      update public.staff_members
+         set effective_manager_staff_id = $2::uuid,
+             updated_at = now()
+       where id in (select id from descendants where id <> $1)
+         and effective_manager_source = 'inherited'
+    `, [id, inheritedManager]);
     await database.query('commit');
     return response.status(200).json({ success: true, resource: updated.rows[0] });
   } catch (error) {

@@ -1,5 +1,4 @@
-import { Pool } from 'pg';
-import { databasePoolConfig } from './lib/database';
+import { databasePool } from './lib/database';
 
 type ImportRow = {
   line?: number; name?: string; dni?: string; legajo?: string; nomina?: string;
@@ -11,7 +10,7 @@ type Role = { id: string; name: string; area_id: string; can_supervise_sales_tea
 type Created = { id: string; full_name: string; role: Role; row: Required<ImportRow> };
 
 const rawConnectionString = process.env.POSTGRES_URL || process.env.DATABASE_URL || '';
-const pool = new Pool(databasePoolConfig(rawConnectionString));
+const pool = databasePool(rawConnectionString);
 
 const normalize = (value: unknown) => String(value || '').toUpperCase().normalize('NFD')
   .replace(/[\u0300-\u036f]/g, '').replace(/[^A-Z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();

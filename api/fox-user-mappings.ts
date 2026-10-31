@@ -1,11 +1,11 @@
-import { Pool, type PoolClient } from 'pg';
+import type { PoolClient } from 'pg';
 import { confidentNameMatch } from './lib/name-match';
-import { databasePoolConfig } from './lib/database';
+import { databasePool } from './lib/database';
 
 type VercelRequest = { method?: string; headers?: Record<string, string | string[] | undefined>; body?: unknown };
 type VercelResponse = { status: (code: number) => VercelResponse; json: (body: unknown) => VercelResponse };
 const rawConnectionString = process.env.POSTGRES_URL || process.env.DATABASE_URL || '';
-const pool = new Pool(databasePoolConfig(rawConnectionString));
+const pool = databasePool(rawConnectionString);
 
 async function userIdFromRequest(req: VercelRequest) {
   const header = req.headers?.authorization;

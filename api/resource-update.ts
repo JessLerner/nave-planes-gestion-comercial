@@ -1,10 +1,9 @@
-import { Pool } from 'pg';
-import { databasePoolConfig } from './lib/database';
+import { databasePool } from './lib/database';
 
 type Request = { method?: string; headers?: Record<string, string | string[] | undefined>; body?: Record<string, unknown> };
 type Response = { status: (code: number) => Response; json: (body: unknown) => Response };
 const rawConnectionString = process.env.POSTGRES_URL || process.env.DATABASE_URL || '';
-const pool = new Pool(databasePoolConfig(rawConnectionString));
+const pool = databasePool(rawConnectionString);
 
 async function userId(request: Request) {
   const value = request.headers?.authorization; const authorization = Array.isArray(value) ? value[0] : value;

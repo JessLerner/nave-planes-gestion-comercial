@@ -1,5 +1,4 @@
-import { Pool } from 'pg';
-import { databasePoolConfig } from './lib/database';
+import { databasePool } from './lib/database';
 
 type VercelRequest = { method?: string; headers?: Record<string, string | string[] | undefined> };
 type VercelResponse = {
@@ -10,7 +9,7 @@ type VercelResponse = {
 // This endpoint runs only on Vercel. It keeps the database connection string
 // on the server and deliberately omits DNI, legajo and other HR-only fields.
 const rawConnectionString = process.env.POSTGRES_URL || process.env.DATABASE_URL || '';
-const pool = new Pool(databasePoolConfig(rawConnectionString));
+const pool = databasePool(rawConnectionString);
 
 async function verifySupabaseAccessToken(req: VercelRequest) {
   const header = req.headers?.authorization;

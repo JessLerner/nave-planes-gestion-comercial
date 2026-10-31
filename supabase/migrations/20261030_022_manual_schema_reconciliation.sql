@@ -94,6 +94,12 @@ create table if not exists public.hr_import_rows (
   unique (import_run_id, source_line)
 );
 
+-- These tables contain personal and HR import data. They remain inaccessible
+-- through the public Data API; the Vercel server uses its database connection.
+alter table public.hr_role_source_labels enable row level security;
+alter table public.hr_import_runs enable row level security;
+alter table public.hr_import_rows enable row level security;
+
 alter table public.sellers alter column team_id drop not null;
 alter table public.teams alter column branch drop not null;
 alter table public.sales_operations add column if not exists used_car_details jsonb;

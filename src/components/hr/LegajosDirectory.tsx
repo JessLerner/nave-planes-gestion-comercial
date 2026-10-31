@@ -150,7 +150,11 @@ export const LegajosDirectory: React.FC = () => {
         } : current);
         setPreviewMessage(`Cambios guardados. Gerente responsable: ${payload.resource.effective_manager_name || 'Sin gerente'}.`);
       }
-      setEditing(undefined); await load();
+      setEditing(undefined);
+      // The PATCH response is the authoritative committed record. Reloading
+      // immediately through a separate Worker/Hyperdrive request could return
+      // an older hierarchy read and overwrite the value the user just saved.
+      if (!payload.resource) await load();
     } finally { setSaving(false); }
   };
 

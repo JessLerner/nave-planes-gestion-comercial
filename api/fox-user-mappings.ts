@@ -40,9 +40,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         db.query(`
           select staff.id,staff.full_name,team.id as team_id
           from public.staff_members staff
-          join public.hr_roles role on role.id=staff.role_id
-          left join public.teams team on team.supervisor_staff_id=staff.responsible_staff_id and team.active=true and team.is_sales_team=true
-          where staff.active=true and role.creates_seller_record=true
+          left join public.teams own_team on own_team.supervisor_staff_id=staff.id and own_team.active=true and own_team.is_sales_team=true
+          left join public.teams parent_team on parent_team.supervisor_staff_id=staff.responsible_staff_id and parent_team.active=true and parent_team.is_sales_team=true
+          cross join lateral (select coalesce(own_team.id,parent_team.id) as id) team
+          where staff.active=true
           order by staff.full_name
         `),
       ]);
@@ -50,7 +51,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         ...user,
         suggested_seller_id: confidentNameMatch(user.fox_user_name, resources.rows)?.id || null,
       }));
-      return res.status(200).json({ success: true, unmappedUsers, sellers: resources.rows });
+      return res.status(200).json({ success: true, unmappedUsers, sellers: [
+        ...resources.rows,
+        { id: '__terminated__', full_name: 'RECURSOS CON BAJA — histórico Fox', team_id: null },
+      ] });
     }
     if (req.method !== 'POST') return res.status(405).json({ success: false, message: 'Método no permitido.' });
     const mappings = (req.body as { mappings?: unknown })?.mappings;
@@ -61,24 +65,35 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const foxUserKey = typeof item.foxUserKey === 'string' ? item.foxUserKey.trim() : '';
       const sellerId = typeof item.sellerId === 'string' ? item.sellerId.trim() : '';
       if (!foxUserKey || !sellerId) continue;
-      const resource = await db.query<{ id: string; full_name: string; dni: string | null; legajo: string | null; employment_type: string | null; team_id: string | null }>(`
-        select staff.id,staff.full_name,staff.dni,staff.legajo,staff.employment_type,team.id as team_id
-        from public.staff_members staff
-        join public.hr_roles role on role.id=staff.role_id
-        left join public.teams team on team.supervisor_staff_id=staff.responsible_staff_id and team.active=true and team.is_sales_team=true
-        where staff.id=$1 and staff.active=true and role.creates_seller_record=true
-      `, [sellerId]);
-      if (!resource.rows[0]) continue;
-      const candidate = resource.rows[0];
-      const seller = await db.query<{ id: string }>(`
-        insert into public.sellers(full_name,team_id,active,hire_date,dni,staff_member_id,legajo,employment_type)
-        values($1,$2,true,null,$3,$4,$5,$6)
-        on conflict (staff_member_id) where staff_member_id is not null
-        do update set full_name=excluded.full_name,team_id=excluded.team_id,active=true,dni=excluded.dni,legajo=excluded.legajo,employment_type=excluded.employment_type
-        returning id
-      `, [candidate.full_name, candidate.team_id, candidate.dni, candidate.id, candidate.legajo, candidate.employment_type]);
-      const id = seller.rows[0].id;
-      const { team_id, full_name } = candidate;
+      let id = ''; let team_id: string | null = null; let full_name = '';
+      if (sellerId === '__terminated__') {
+        const retired = await db.query<{ id: string }>(`
+          select id from public.sellers where full_name='RECURSOS CON BAJA — histórico Fox' and staff_member_id is null limit 1
+        `);
+        const bucket = retired.rows[0] || (await db.query<{ id: string }>(`
+          insert into public.sellers(full_name,team_id,active,hire_date,dni,staff_member_id,legajo,employment_type)
+          values('RECURSOS CON BAJA — histórico Fox',null,false,null,null,null,null,'HISTÓRICO FOX') returning id
+        `)).rows[0];
+        id = bucket.id; full_name = 'RECURSOS CON BAJA — histórico Fox';
+      } else {
+        const resource = await db.query<{ id: string; full_name: string; dni: string | null; legajo: string | null; employment_type: string | null; team_id: string | null }>(`
+          select staff.id,staff.full_name,staff.dni,staff.legajo,staff.employment_type,coalesce(own_team.id,parent_team.id) as team_id
+          from public.staff_members staff
+          left join public.teams own_team on own_team.supervisor_staff_id=staff.id and own_team.active=true and own_team.is_sales_team=true
+          left join public.teams parent_team on parent_team.supervisor_staff_id=staff.responsible_staff_id and parent_team.active=true and parent_team.is_sales_team=true
+          where staff.id=$1 and staff.active=true
+        `, [sellerId]);
+        if (!resource.rows[0]) continue;
+        const candidate = resource.rows[0];
+        const seller = await db.query<{ id: string }>(`
+          insert into public.sellers(full_name,team_id,active,hire_date,dni,staff_member_id,legajo,employment_type)
+          values($1,$2,true,null,$3,$4,$5,$6)
+          on conflict (staff_member_id) where staff_member_id is not null
+          do update set full_name=excluded.full_name,team_id=excluded.team_id,active=true,dni=excluded.dni,legajo=excluded.legajo,employment_type=excluded.employment_type
+          returning id
+        `, [candidate.full_name, candidate.team_id, candidate.dni, candidate.id, candidate.legajo, candidate.employment_type]);
+        id = seller.rows[0].id; team_id = candidate.team_id; full_name = candidate.full_name;
+      }
       await db.query(`
         insert into public.fox_user_mappings (fox_user_key, fox_user_name, seller_id, updated_at)
         values ($1, $2, $3, now())

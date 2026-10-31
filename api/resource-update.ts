@@ -71,6 +71,7 @@ export default async function handler(request: Request, response: Response) {
     if (managerId && !selectedManager.rows[0]) throw new Error('El gerente seleccionado no está activo o no tiene un cargo de gerencia habilitado.');
     const effectiveManager = managerId || inheritedManager;
     const managerSource = managerId ? 'manual' : 'inherited';
+    if (!managerId) await database.query(`select set_config('nave.allow_manual_manager_reset', 'true', true)`);
     const updated = await database.query(
       `update public.staff_members set full_name=$2,dni=$3,legajo=$4,employment_type=$5,
        role_id=$6,area_id=$7,responsible_staff_id=$8,active=$9,
@@ -109,7 +110,7 @@ export default async function handler(request: Request, response: Response) {
          do update set full_name=excluded.full_name,team_id=excluded.team_id,active=true,dni=excluded.dni,legajo=excluded.legajo,employment_type=excluded.employment_type`,
         [updated.rows[0].full_name, sellerTeam.rows[0]?.id || null, dni, id, legajo || null, employmentType || null],
       );
-    } else {
+    } else if (!active) {
       await database.query(`update public.sellers set active=false where staff_member_id=$1 and active=true`, [id]);
     }
     await database.query(`

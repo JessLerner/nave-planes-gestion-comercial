@@ -18,3 +18,10 @@ para reconciliar los Supervisores que ya existían.
 
 Para habilitar Históricos y distinguir una baja real de una corrección
 administrativa, ejecutar una vez `20261031_024_staff_exit_history.sql`.
+
+Para conservar excepciones manuales de gerente en cargos no vendedores,
+ejecutar una vez `20261031_025_preserve_manual_manager_override.sql`.
+
+La regla vigente para vendedores es que el gerente se hereda exclusivamente
+del supervisor. Para normalizar los vendedores ya existentes, ejecutar una vez
+`20261031_026_vendor_manager_inheritance.sql` después de la `025`.

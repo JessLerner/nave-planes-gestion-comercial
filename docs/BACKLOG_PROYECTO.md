@@ -7,33 +7,33 @@ automáticas: cada fuente debe verificarse antes de pasar a producción.
 
 - [x] Retirar el módulo de Recursos inestable y vaciar la estructura contaminada,
   conservando un respaldo privado.
-- [ ] Formalizar **ESTRUCTURA RRHH ACTIVA** como fuente de migración y
+- [-] Formalizar **ESTRUCTURA RRHH ACTIVA** como fuente de migración y
   conciliación inicial. Después de la transición, Nave.Plan será la nómina
   maestra y la planilla sólo podrá proponer diferencias para revisión.
-- [ ] Construir un importador de sólo previsualización: normaliza nombres y muestra
+- [x] Construir un importador de sólo previsualización: normaliza nombres y muestra
   errores sin escribir en Supabase.
-- [ ] Definir identificador estable de cada recurso (UUID interno de Nave.Plan;
+- [x] Definir identificador estable de cada recurso (UUID interno de Nave.Plan;
   DNI obligatorio y legajo obligatorio, excepto categorías Coaching/Freelance) y las reglas explícitas de altas,
   bajas y cambios de responsable. Coaching/Freelance sin legajo debe poder
   operar y contabilizarse.
-- [ ] Construir una pantalla nueva, acotada y auditable: búsqueda, ficha, alta,
+- [-] Construir una pantalla nueva, acotada y auditable: búsqueda, ficha, alta,
   baja lógica, responsable directo y jerarquía; sin inferir cargos ni crear equipos.
-- [ ] Construir equipos comerciales sólo después de validar Supervisores y Gerentes
+- [x] Construir equipos comerciales sólo después de validar Supervisores y Gerentes
   de la fuente maestra.
-- [ ] Reemplazar “Legajos” por una grilla operativa paginada y con búsqueda de
+- [x] Reemplazar “Legajos” por una grilla operativa paginada y con búsqueda de
   servidor: nombre y apellido, DNI, legajo o condición Coaching, responsable,
   cargo y estado. No reutilizar la interfaz retirada.
-- [ ] Incluir filtros dinámicos de Legajos: búsqueda única por nombre, apellido,
+- [x] Incluir filtros dinámicos de Legajos: búsqueda única por nombre, apellido,
   DNI o legajo; sector; y equipo de venta. Los sectores se administran como
   configuración de cargos/áreas, no como personas fijadas en código. El filtro
   de equipos se construye exclusivamente con recursos activos cuyo cargo sea
   Supervisor y sus equipos vigentes.
-- [ ] Permitir que Administración, Gerencia y RRHH editen estado y ejecuten una
+- [-] Permitir que Administración, Gerencia y RRHH editen estado y ejecuten una
   desvinculación lógica; conservar el historial y separar inactivos de la vista
   activa.
-- [ ] Modelar vendedores **Freelance**: son vendedores activos sin Supervisor ni
+- [x] Modelar vendedores **Freelance**: son vendedores activos sin Supervisor ni
   equipo obligatorio; nunca deben aparecer como casos de error por esa condición.
-- [ ] Crear una tabla de equivalencias aprobadas con Fox (`recurso` ↔
+- [-] Crear una tabla de equivalencias aprobadas con Fox (`recurso` ↔
   `nombre/ID de Fox`) que admita varios alias por recurso. Las coincidencias
   aproximadas se usan para proponer asociaciones, las ambiguas quedan a
   revisión y una asociación aprobada nunca se reemplaza automáticamente.
@@ -44,7 +44,7 @@ automáticas: cada fuente debe verificarse antes de pasar a producción.
 
 ## Bloque 2 — Datos comerciales y fuentes
 
-- [ ] Terminar la sincronización diaria de métricas Fox CRM por ID de lead, sin
+- [-] Terminar la sincronización diaria de métricas Fox CRM por ID de lead, sin
   almacenar datos personales que no sean necesarios para el reporte.
 - [ ] Integrar App Control Operaciones y revisar pestaña por pestaña qué datos son
   fuente oficial. Parte Diario no se modifica.
@@ -95,3 +95,51 @@ automáticas: cada fuente debe verificarse antes de pasar a producción.
   registro de ejecución y posibilidad de reversión.
 - Los módulos no se habilitan a usuarios finales hasta estar conectados a datos
   reales y sus permisos hayan sido probados.
+
+## Estado al 31/10/2026
+
+**Leyenda:** `[x]` hecho, `[-]` implementado parcialmente o pendiente de
+validación/migración manual, `[ ]` pendiente.
+
+### Recursos y jerarquía
+
+- [x] UUID interno, DNI obligatorio y excepción de legajo para Coaching/Freelance.
+- [x] Legajos con búsqueda de servidor, paginación, sector, equipo, estado,
+  responsable, gerente y ficha editable.
+- [x] Equipos derivados exclusivamente de Supervisores activos y filtro por
+  integrantes reales del equipo.
+- [x] Responsable directo limitado a Supervisión, Gerencia y Administración
+  General.
+- [x] Baja lógica diferenciada entre corrección administrativa y baja real en
+  el código; falta confirmar en producción la migración `024` y su pestaña de
+  Históricos.
+- [-] Regla de gerente: vendedores heredan del supervisor y no pueden editarlo;
+  cargos no vendedores pueden elegir gerente. Falta ejecutar `026` y completar
+  la prueba de actualización de descendientes/equipos al mover un supervisor.
+- [ ] Bitácora individual antes/después de cambios de cargo, responsable,
+  gerente y condición laboral.
+- [ ] Alta nueva por Supervisión con DNI/documentos privados, revisión RRHH y
+  habilitación posterior de cuenta sólo para cargos autorizados.
+
+### Fox / CRM
+
+- [x] Importación de reportes por ID de lead sin PII innecesaria y asociación
+  aproximada propuesta por nombre.
+- [-] Asociación aprobada persistente: la UI ya conserva borradores, incluye
+  perfiles activos de vendedores, supervisión, gerencia, dirección y MKT, y
+  ofrece `RECURSOS CON BAJA — histórico Fox`. Falta probar estas tres rutas en
+  producción y definir soporte formal de múltiples alias por recurso.
+- [ ] Sincronización diaria automática desde Fox; por ahora la carga de reportes
+  es manual/asistida.
+
+### Infraestructura y despliegue
+
+- [x] Worker Cloudflare publicado con frontend, APIs, Hyperdrive y variables
+  runtime de Supabase.
+- [x] Autenticación y consultas/escrituras principales verificadas desde
+  Cloudflare; Vercel permanece como respaldo durante la estabilización.
+- [x] Logs de Cloudflare habilitados para diagnóstico.
+- [ ] Ejecutar una regresión completa en Cloudflare: Legajos (lectura, edición,
+  baja e historial), Fox, Operaciones y Adelantos.
+- [ ] Retirar variables de Build duplicadas en Cloudflare una vez confirmada la
+  regresión; las variables runtime ya son la fuente operativa.

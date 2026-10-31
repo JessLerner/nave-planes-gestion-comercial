@@ -29,7 +29,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     if (!(await assertAdmin(db, userId))) return res.status(403).json({ success: false, message: 'Sólo Administración puede asociar usuarios de Fox.' });
     if (req.method === 'GET') {
-      const [users, resources] = await Promise.all([
+      const [users, historicalMappings, resources] = await Promise.all([
         db.query(`
           with latest as (select max(snapshot_date) as snapshot_date from public.fox_lead_daily_snapshots)
           select s.fox_user_key, max(s.fox_user_name) as fox_user_name,
@@ -39,7 +39,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           group by s.fox_user_key order by lead_count desc, fox_user_name
         `),
         db.query(`
-          select staff.id,staff.full_name,team.id as team_id,responsible.full_name as responsible_name
+          with latest as (select max(snapshot_date) as snapshot_date from public.fox_lead_daily_snapshots)
+          select m.fox_user_key,
+            coalesce(max(s.fox_user_name), m.fox_user_name) as fox_user_name,
+            max(s.fox_supervisor_name) as fox_supervisor_name,
+            count(s.fox_lead_id)::int as lead_count
+          from public.fox_user_mappings m
+          join public.sellers historical on historical.id=m.seller_id
+          left join public.fox_lead_daily_snapshots s on s.fox_user_key=m.fox_user_key
+            and s.snapshot_date=(select snapshot_date from latest)
+          where historical.full_name='RECURSOS CON BAJA — histórico Fox'
+          group by m.fox_user_key,m.fox_user_name
+          order by lead_count desc, fox_user_name
+        `),
+        db.query(`
+          select staff.id,staff.full_name,team.id as team_id,responsible.full_name as responsible_name,
+            not exists(select 1 from public.fox_user_mappings mapping where mapping.staff_member_id=staff.id) as available_for_review
           from public.staff_members staff
           left join public.staff_members responsible on responsible.id=staff.responsible_staff_id
           left join public.teams own_team on own_team.supervisor_staff_id=staff.id and own_team.active=true and own_team.is_sales_team=true
@@ -59,7 +74,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json({ success: true, unmappedUsers, sellers: [
         ...resources.rows,
         { id: '__terminated__', full_name: 'RECURSOS CON BAJA — histórico Fox', team_id: null },
-      ] });
+      ], reviewUsers: historicalMappings.rows });
     }
     if (req.method !== 'POST') return res.status(405).json({ success: false, message: 'Método no permitido.' });
     const mappings = (req.body as { mappings?: unknown })?.mappings;

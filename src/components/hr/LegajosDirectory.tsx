@@ -151,6 +151,7 @@ export const LegajosDirectory: React.FC = () => {
         setPreviewMessage(`Cambios guardados. Gerente responsable: ${payload.resource.effective_manager_name || 'Sin gerente'}.`);
       }
       setEditing(undefined);
+      window.dispatchEvent(new Event('naveplan:roster-updated'));
       // The PATCH response is the authoritative committed record. Reloading
       // immediately through a separate Worker/Hyperdrive request could return
       // an older hierarchy read and overwrite the value the user just saved.

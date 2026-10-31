@@ -207,6 +207,34 @@ export const AppProvider: React.FC<{ children: React.ReactNode; initialUser: Use
       .catch(() => console.log('La conexión operativa todavía no está disponible.'));
   }, [accessToken]);
 
+  // Legajos is the master roster. A committed roster edit emits this event so
+  // every operational screen refreshes its derived view immediately instead
+  // of retaining the teams/sellers captured at application start.
+  useEffect(() => {
+    const refreshRosterProjection = () => {
+      fetch('/api/operational-data', { headers: { Authorization: `Bearer ${accessToken}` } })
+        .then(res => res.json())
+        .then(res => {
+          if (!res.success || !res.data) return;
+          const d = res.data;
+          const nextTeams = (d.teams || []).map((team: any) => ({
+            ...team,
+            supervisor_id: team.supervisor_staff_id || '',
+            supervisor_name: team.supervisor_name || 'Sin asignar',
+            manager_name: team.manager_name || 'Sin asignar',
+            color: '#2563eb',
+          }));
+          setTeams(nextTeams);
+          setSelectedTeamId(current => current === 'all' || nextTeams.some((team: Team) => team.id === current) ? current : 'all');
+          if (d.sellers) setSellers(d.sellers.map((seller: any) => ({ ...seller, name: seller.full_name, phone: '', email: '', dni: '' })));
+          if (d.operations) setOperations(d.operations.map((operation: any) => ({ ...operation, date: operation.operation_date, client_name: 'Cliente protegido', client_dni: '', client_phone: '' })));
+        })
+        .catch(() => undefined);
+    };
+    window.addEventListener('naveplan:roster-updated', refreshRosterProjection);
+    return () => window.removeEventListener('naveplan:roster-updated', refreshRosterProjection);
+  }, [accessToken]);
+
   // Save to backend helper
   const syncToBackend = (partialData: any) => {
     fetch('/api/data', {

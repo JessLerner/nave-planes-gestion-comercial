@@ -20,6 +20,33 @@ export default async function handler(req: Req, res: Res) {
   const viewer = profile.rows[0] as { role?: string; staff_member_id?: string | null; area_name?: string | null; resource_role?: string | null } | undefined;
   const globalAccess = viewer?.role === 'admin' || viewer?.role === 'rrhh' || viewer?.area_name === 'Administración' || viewer?.resource_role === 'Director';
   if (!viewer || (!globalAccess && !['gerente', 'supervisor'].includes(viewer.role || '')) || (!globalAccess && !viewer.staff_member_id)) return res.status(403).json({ success: false, message: 'No tenés acceso a Legajos.' });
+  const view = text(req.query?.view);
+  if (view === 'turnover') {
+    try {
+      const scope = viewer.role === 'supervisor' ? 'and supervisor.id=$1' : viewer.role === 'gerente' ? 'and supervisor.effective_manager_staff_id=$1' : '';
+      const params = scope ? [viewer.staff_member_id] : [];
+      const result = await pool.query(`
+        select supervisor.id as supervisor_id, supervisor.full_name as supervisor_name,
+               coalesce(team.name, supervisor.full_name) as team_name,
+               coalesce(roster.active,0)::int as active, coalesce(exits.terminated,0)::int as terminated
+        from public.staff_members supervisor
+        join public.hr_roles supervisor_role on supervisor_role.id=supervisor.role_id
+        left join public.teams team on team.supervisor_staff_id=supervisor.id and team.is_sales_team=true
+        left join lateral (select count(*) as active from public.staff_members member join public.hr_roles member_role on member_role.id=member.role_id where member.responsible_staff_id=supervisor.id and member.active and member_role.creates_seller_record) roster on true
+        left join lateral (select count(*) as terminated from public.staff_status_events event where event.supervisor_staff_id=supervisor.id and event.event_type='termination' and event.occurred_at >= date_trunc('month', current_date)) exits on true
+        where supervisor.active=true and supervisor_role.app_role_mapping='supervisor'::public.app_role ${scope}
+        order by supervisor.full_name`, params);
+      const rows = result.rows.map((row) => { const active = Number(row.active || 0); const terminated = Number(row.terminated || 0); return { ...row, active, terminated, retentionRate: active + terminated ? Math.round((active / (active + terminated)) * 100) : 100 }; });
+      return res.status(200).json({ success: true, data: rows });
+    } catch { return res.status(500).json({ success: false, message: 'No se pudieron cargar las métricas de rotación.' }); }
+  }
+  if (view === 'history') {
+    try {
+      const scope = viewer.role === 'supervisor' ? 'and exists (select 1 from public.staff_status_events event where event.staff_member_id=staff.id and event.supervisor_staff_id=$1)' : viewer.role === 'gerente' ? 'and exists (select 1 from public.staff_status_events event where event.staff_member_id=staff.id and event.manager_staff_id=$1)' : '';
+      const rows = await pool.query(`select staff.id,staff.full_name,staff.dni,staff.legajo,role.name as role_name,responsible.full_name as supervisor_name,manager.full_name as manager_name,staff.deactivated_at,staff.deactivation_type,staff.deactivation_reason from public.staff_members staff left join public.hr_roles role on role.id=staff.role_id left join public.staff_members responsible on responsible.id=staff.responsible_staff_id left join public.staff_members manager on manager.id=staff.effective_manager_staff_id where staff.active=false ${scope} order by staff.deactivated_at desc nulls last,staff.full_name`, scope ? [viewer.staff_member_id] : []);
+      return res.status(200).json({ success: true, data: rows.rows });
+    } catch { return res.status(500).json({ success: false, message: 'No se pudieron cargar los históricos.' }); }
+  }
   const q = text(req.query?.q); const area = text(req.query?.area); const team = text(req.query?.team); const status = text(req.query?.status) || 'active';
   const page = Math.max(1, Number(text(req.query?.page)) || 1); const size = Math.min(100, Math.max(20, Number(text(req.query?.size)) || 50));
   const where: string[] = []; const values: unknown[] = []; const add = (sql: string, value?: unknown) => { if (value !== undefined) values.push(value); where.push(sql.replace('?', `$${values.length}`)); };

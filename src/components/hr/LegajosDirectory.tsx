@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import * as XLSX from 'xlsx';
 import { FileUp, Pencil, RefreshCw, Search, X } from 'lucide-react';
 import { useAuth } from '../../auth/AuthProvider';
@@ -39,16 +39,22 @@ export const LegajosDirectory: React.FC = () => {
   const [preview, setPreview] = useState<ImportRow[]>([]); const [previewMessage, setPreviewMessage] = useState('');
   const [editing, setEditing] = useState<DirectoryRow>(); const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ full_name: '', dni: '', legajo: '', employment_type: '', role_id: '', responsible_staff_id: '', active: true });
+  const latestLoad = useRef(0);
 
   const load = async () => {
     if (!session) return;
+    const requestId = ++latestLoad.current;
     setLoading(true);
     try {
       const params = new URLSearchParams({ q, area, team, status, page: String(page), size: '50' });
       const response = await fetch(`/api/resources-directory?${params}`, { headers: { Authorization: `Bearer ${session.access_token}` } });
       const payload = await response.json();
+      if (requestId !== latestLoad.current) return;
       if (payload.success) setData(payload.data);
-    } finally { setLoading(false); }
+      else setPreviewMessage(payload.message || 'No se pudo cargar la nómina.');
+    } catch {
+      if (requestId === latestLoad.current) setPreviewMessage('No se pudo cargar la nómina.');
+    } finally { if (requestId === latestLoad.current) setLoading(false); }
   };
 
   useEffect(() => {

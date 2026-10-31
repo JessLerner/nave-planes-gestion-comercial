@@ -29,7 +29,12 @@ export default async function handler(req: Req, res: Res) {
     where.push(viewer!.role === 'gerente' ? `(${hierarchy} or staff.effective_manager_staff_id=$1)` : hierarchy);
   }
   if (status === 'active') where.push('staff.active=true'); else if (status === 'inactive') where.push('staff.active=false');
-  if (q) { values.push(q); const index = values.length; where.push(`(unaccent(lower(staff.full_name)) like '%' || unaccent(lower($${index})) || '%' or staff.dni like '%' || $${index} || '%' or staff.legajo like '%' || $${index} || '%')`); }
+  if (q) {
+    values.push(q); const index = values.length;
+    const normalizedName = `translate(lower(staff.full_name), 'áéíóúüñ', 'aeiouun')`;
+    const normalizedQuery = `translate(lower($${index}), 'áéíóúüñ', 'aeiouun')`;
+    where.push(`(${normalizedName} like '%' || ${normalizedQuery} || '%' or coalesce(staff.dni::text,'') like '%' || $${index} || '%' or coalesce(staff.legajo,'') like '%' || $${index} || '%')`);
+  }
   if (area) add('staff.area_id=?', area);
   if (team) add('team.id=?', team);
   const clause = where.length ? `where ${where.join(' and ')}` : '';

@@ -43,10 +43,15 @@ begin
   ) returning id into v_run_id;
 
   with rows as (
-    select * from jsonb_to_recordset(p_leads) as r(
-      lead_id text, entry_date text, managed_at text, closed_at text,
-      fox_user_name text, fox_user_key text, fox_supervisor_name text, fox_supervisor_key text,
-      lead_status text, lead_source text, channel text, branch text, brand text, close_reason text, sold boolean
+    select
+      r."leadId" as lead_id, r."entryDate" as entry_date, r."managedAt" as managed_at, r."closedAt" as closed_at,
+      r."foxUserName" as fox_user_name, r."foxUserKey" as fox_user_key,
+      r."foxSupervisorName" as fox_supervisor_name, r."foxSupervisorKey" as fox_supervisor_key,
+      r.status as lead_status, r.source as lead_source, r.channel, r.branch, r.brand, r."closeReason" as close_reason, r.sold
+    from jsonb_to_recordset(p_leads) as r(
+      "leadId" text, "entryDate" text, "managedAt" text, "closedAt" text,
+      "foxUserName" text, "foxUserKey" text, "foxSupervisorName" text, "foxSupervisorKey" text,
+      status text, source text, channel text, branch text, brand text, "closeReason" text, sold boolean
     )
   ), resolved as (
     select rows.*, mapping.seller_id, seller.team_id

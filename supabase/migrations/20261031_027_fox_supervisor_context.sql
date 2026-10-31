@@ -15,6 +15,21 @@ alter table public.fox_user_mappings
   add column if not exists fox_supervisor_name text,
   add column if not exists fox_supervisor_key text;
 
+-- Reconcile reports already loaded before this field existed.  Only rows with
+-- the documented separator are parsed; a plain branch name is never guessed.
+update public.fox_lead_daily_snapshots
+set fox_supervisor_name = nullif(trim(split_part(branch, '-', 1)), '')
+where fox_supervisor_name is null
+  and branch like '%-%';
+
+update public.fox_leads current_lead
+set fox_supervisor_name = snapshot.fox_supervisor_name
+from public.fox_lead_daily_snapshots snapshot
+where snapshot.snapshot_date = current_lead.last_snapshot_date
+  and snapshot.fox_lead_id = current_lead.fox_lead_id
+  and current_lead.fox_supervisor_name is null
+  and snapshot.fox_supervisor_name is not null;
+
 -- Backfill the direct resource identity for mappings that were approved before
 -- this column existed. The historical "Recursos con baja" bucket remains null
 -- and can therefore contain several retired Fox identities.

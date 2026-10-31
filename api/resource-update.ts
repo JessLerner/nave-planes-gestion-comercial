@@ -37,12 +37,19 @@ export default async function handler(request: Request, response: Response) {
     }
     const roleId = text(request.body?.role_id); const responsibleId = text(request.body?.responsible_staff_id) || null;
     const managerId = text(request.body?.manager_staff_id) || null;
+    const active = Boolean(request.body?.active);
+    const deactivationType = text(request.body?.deactivation_type) || null;
+    const deactivationReason = text(request.body?.deactivation_reason) || null;
     const dni = text(request.body?.dni).replace(/\D/g, '');
     const legajo = text(request.body?.legajo);
     const employmentType = text(request.body?.employment_type);
     const specialWithoutLegajo = /COACHING|FREE\s*LANCE|FREELANCE/i.test(employmentType);
     if (dni.length < 7 || dni.length > 8) return response.status(400).json({ success: false, message: 'El DNI es obligatorio y debe contener entre 7 y 8 dígitos.' });
     if (!legajo && !specialWithoutLegajo) return response.status(400).json({ success: false, message: 'El legajo es obligatorio salvo para Coaching o Freelance.' });
+    const existing = await database.query<{ active: boolean; responsible_staff_id: string | null; effective_manager_staff_id: string | null }>('select active,responsible_staff_id,effective_manager_staff_id from public.staff_members where id=$1', [id]);
+    if (!existing.rows[0]) return response.status(404).json({ success: false, message: 'No existe el recurso.' });
+    const isNewDeactivation = existing.rows[0].active && !active;
+    if (isNewDeactivation && !['termination', 'administrative_correction'].includes(deactivationType || '')) return response.status(400).json({ success: false, message: 'Indicá si la baja es real o una corrección administrativa.' });
     const role = await database.query<{ area_id: string; app_role_mapping: 'admin' | 'gerente' | 'supervisor' | 'rrhh' | null }>('select area_id,app_role_mapping from public.hr_roles where id=$1 and active=true', [roleId]);
     if (!role.rows[0]) return response.status(400).json({ success: false, message: 'Cargo inválido.' });
     if (responsibleId === id) return response.status(400).json({ success: false, message: 'Una persona no puede ser su propio responsable.' });
@@ -70,14 +77,21 @@ export default async function handler(request: Request, response: Response) {
        role_id=$6,area_id=$7,responsible_staff_id=$8,active=$9,
        effective_manager_staff_id=$10::uuid,
        effective_manager_source=$11::public.manager_assignment_source,
+       deactivated_at=case when $9=false then coalesce(deactivated_at,now()) else deactivated_at end,
+       deactivation_type=case when $9=false then coalesce($12,deactivation_type) else deactivation_type end,
+       deactivation_reason=case when $9=false then coalesce($13,deactivation_reason) else deactivation_reason end,
        updated_at=now() where id=$1
        returning id,full_name`,
       [id, text(request.body?.full_name).toUpperCase(), dni, legajo || null,
         employmentType || null, roleId, role.rows[0].area_id, responsibleId,
-        Boolean(request.body?.active), effectiveManager, managerSource],
+        active, effectiveManager, managerSource, deactivationType, deactivationReason],
     );
     if (!updated.rows[0]) throw new Error('No existe el recurso.');
-    if (role.rows[0].app_role_mapping === 'supervisor' && Boolean(request.body?.active)) {
+    if (isNewDeactivation) {
+      await database.query(`insert into public.staff_status_events(staff_member_id,event_type,reason,supervisor_staff_id,manager_staff_id,created_by) values($1,$2,$3,$4::uuid,$5::uuid,$6)`, [id, deactivationType, deactivationReason, existing.rows[0].responsible_staff_id, existing.rows[0].effective_manager_staff_id, user]);
+      await database.query(`update public.sellers set active=false,termination_date=current_date where staff_member_id=$1 and active=true`, [id]);
+    }
+    if (role.rows[0].app_role_mapping === 'supervisor' && active) {
       const currentTeam = await database.query<{ id: string }>(`update public.teams set name=$2,manager_staff_id=$3::uuid,active=true,is_sales_team=true where supervisor_staff_id=$1 returning id`, [id, updated.rows[0].full_name, effectiveManager]);
       if (!currentTeam.rows[0]) {
         await database.query(`insert into public.teams(name,supervisor_staff_id,manager_staff_id,active,is_sales_team) values($1,$2,$3::uuid,true,true)`, [updated.rows[0].full_name, id, effectiveManager]);

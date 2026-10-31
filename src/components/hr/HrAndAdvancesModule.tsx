@@ -19,6 +19,7 @@ import {
 import { Candidate, WageAdvance, Seller } from '../../types';
 import { formatARS, validateAdvanceEligibility } from '../../utils/businessLogic';
 import { LegajosDirectory } from './LegajosDirectory';
+import { HistoricalResources, TurnoverMetrics } from './TurnoverPanels';
 
 export const HrAndAdvancesModule: React.FC = () => {
   const {
@@ -35,7 +36,7 @@ export const HrAndAdvancesModule: React.FC = () => {
     updateCandidateDocs,
   } = useApp();
 
-  const [activeSubTab, setActiveSubTab] = useState<'advances' | 'recruitment' | 'turnover' | 'legajos'>('advances');
+  const [activeSubTab, setActiveSubTab] = useState<'advances' | 'recruitment' | 'turnover' | 'legajos' | 'historical'>('advances');
 
   // Advance request form state
   const [showRequestModal, setShowRequestModal] = useState(false);
@@ -89,22 +90,6 @@ export const HrAndAdvancesModule: React.FC = () => {
       }, 1400);
     }
   };
-
-  // Team retention calculation
-  const teamRetentionData = teams.map(team => {
-    const teamSellers = sellers.filter(s => s.team_id === team.id);
-    const active = teamSellers.filter(s => s.active).length;
-    const terminated = teamSellers.filter(s => !s.active).length;
-    const retentionRate = teamSellers.length > 0 ? Math.round((active / teamSellers.length) * 100) : 100;
-
-    return {
-      team,
-      total: teamSellers.length,
-      active,
-      terminated,
-      retentionRate,
-    };
-  }).sort((a, b) => b.retentionRate - a.retentionRate);
 
   return (
     <div className="space-y-6">
@@ -173,6 +158,12 @@ export const HrAndAdvancesModule: React.FC = () => {
           }`}
         >
           Métricas de Rotación & Permanencia
+        </button>
+        <button
+          onClick={() => setActiveSubTab('historical')}
+          className={`px-4 py-2 rounded-lg font-medium transition-colors ${activeSubTab === 'historical' ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20' : 'text-slate-400 hover:text-white'}`}
+        >
+          Históricos
         </button>
       </div>
 
@@ -420,59 +411,8 @@ export const HrAndAdvancesModule: React.FC = () => {
         </div>
       )}
 
-      {/* SUB-TAB 3: TURNOVER METRICS */}
-      {activeSubTab === 'turnover' && (
-        <div className="space-y-6">
-          <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
-            <div className="p-4 border-b border-slate-800">
-              <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                <Users className="w-4 h-4 text-blue-400" />
-                <span>Ranking de Retención de Personal & Sostenimiento en Nómina</span>
-              </h3>
-              <p className="text-xs text-slate-400 mt-0.5">
-                Evaluación mensual de estabilidad de vendedores por equipo y supervisor
-              </p>
-            </div>
-
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-slate-950/60 text-slate-400 font-semibold border-b border-slate-800 uppercase tracking-wider text-[10px]">
-                  <tr>
-                    <th className="py-3 px-4">Equipo Comercial</th>
-                    <th className="py-3 px-4">Supervisor</th>
-                    <th className="py-3 px-4 text-center">Vendedores en Nómina</th>
-                    <th className="py-3 px-4 text-center">Bajas Registradas</th>
-                    <th className="py-3 px-4 text-right">Índice de Retención</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-800/80">
-                  {teamRetentionData.map(row => (
-                    <tr key={row.team.id} className="hover:bg-slate-800/40 transition-colors">
-                      <td className="py-3 px-4 font-semibold text-white">
-                        {row.team.name}
-                      </td>
-                      <td className="py-3 px-4 text-slate-300">
-                        {row.team.supervisor_name}
-                      </td>
-                      <td className="py-3 px-4 text-center font-mono font-medium text-emerald-400">
-                        {row.active} activos
-                      </td>
-                      <td className="py-3 px-4 text-center font-mono text-red-400">
-                        {row.terminated} bajas
-                      </td>
-                      <td className="py-3 px-4 text-right">
-                        <span className="font-mono font-bold text-blue-400">
-                          {row.retentionRate}%
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      )}
+      {activeSubTab === 'turnover' && <TurnoverMetrics />}
+      {activeSubTab === 'historical' && <HistoricalResources />}
 
       {/* Modal: Solicitar Adelanto (With strict business rule validation) */}
       {showRequestModal && (

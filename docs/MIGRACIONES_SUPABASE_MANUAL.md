@@ -15,3 +15,6 @@ migración fue un reinicio histórico y elimina nómina, vendedores y equipos.
 Después de cambiar la aplicación para que un Supervisor cree su equipo
 automáticamente, ejecutar una vez `20261030_023_backfill_supervisor_teams.sql`
 para reconciliar los Supervisores que ya existían.
+
+Para habilitar Históricos y distinguir una baja real de una corrección
+administrativa, ejecutar una vez `20261031_024_staff_exit_history.sql`.

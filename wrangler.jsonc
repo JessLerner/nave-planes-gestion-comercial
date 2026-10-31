@@ -11,5 +11,11 @@
     "directory": "./dist",
     "binding": "ASSETS",
     "run_worker_first": ["/api/*"]
-  }
+  },
+  "hyperdrive": [
+    {
+      "binding": "HYPERDRIVE",
+      "id": "7528871f71bd481682da3e8b4be513ee"
+    }
+  ]
 }

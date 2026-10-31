@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "nave-planes-gestion-operativa",
+  "name": "gestioncomercial",
   "main": "cloudflare/worker.ts",
   "compatibility_date": "2026-10-31",
   "compatibility_flags": [

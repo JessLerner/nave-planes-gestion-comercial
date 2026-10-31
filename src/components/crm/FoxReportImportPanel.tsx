@@ -5,6 +5,8 @@ import { parseFoxLeadReport, type FoxLeadReportPreview } from '../../services/fo
 
 const isoToday = () => new Date().toISOString().slice(0, 10);
 const firstDayOfMonth = () => `${isoToday().slice(0, 8)}01`;
+const IMPORT_BATCH_SIZE = 500;
+type ImportResult = { success?: boolean; message?: string; stored?: number; unmappedRows?: number };
 
 export const FoxReportImportPanel: React.FC = () => {
   const { session } = useAuth();
@@ -37,23 +39,36 @@ export const FoxReportImportPanel: React.FC = () => {
     setLoading(true);
     setMessage(null);
     try {
-      const response = await fetch('/api/fox-leads-import', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
-        body: JSON.stringify({
-          snapshotDate,
-          periodStart,
-          periodEnd: snapshotDate,
-          fileName: file.name,
-          fileHash: preview.sha256,
-          // The raw file never leaves the browser. This payload intentionally
-          // contains no customer name, phone, email, DNI, address or notes.
-          leads: preview.rows,
-        }),
-      });
-      const result = await response.json() as { success?: boolean; message?: string; stored?: number; unmappedRows?: number };
-      if (!response.ok || !result.success) throw new Error(result.message || 'La importación fue rechazada.');
-      setMessage(`Reporte registrado: ${result.stored} IDs actualizados. ${result.unmappedRows ?? 0} filas aún no tienen vendedor asociado.`);
+      let stored = 0;
+      let unmappedRows = 0;
+      const batches = Math.ceil(preview.rows.length / IMPORT_BATCH_SIZE);
+      for (let index = 0; index < batches; index += 1) {
+        setMessage(`Registrando corte Fox: lote ${index + 1} de ${batches}…`);
+        const response = await fetch('/api/fox-leads-import', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+          body: JSON.stringify({
+            snapshotDate,
+            periodStart,
+            periodEnd: snapshotDate,
+            fileName: file.name,
+            fileHash: preview.sha256,
+            // The raw file never leaves the browser. This payload intentionally
+            // contains no customer name, phone, email, DNI, address or notes.
+            leads: preview.rows.slice(index * IMPORT_BATCH_SIZE, (index + 1) * IMPORT_BATCH_SIZE),
+          }),
+        });
+        const raw = await response.text();
+        let result: ImportResult | null = null;
+        try { result = JSON.parse(raw) as ImportResult; } catch { /* Response was intercepted before the API. */ }
+        if (!response.ok || !result?.success) {
+          const detail = result?.message || `El servidor respondió HTTP ${response.status}${raw.startsWith('<') ? ' antes de llegar a la API.' : '.'}`;
+          throw new Error(detail);
+        }
+        stored += result.stored || 0;
+        unmappedRows += result.unmappedRows || 0;
+      }
+      setMessage(`Reporte registrado: ${stored} IDs actualizados. ${unmappedRows} filas aún no tienen vendedor asociado.`);
       setFile(null);
       setPreview(null);
     } catch (error) {

@@ -41,3 +41,7 @@ confirma la propuesta y realiza el cambio efectivo.
 
 Para reconstruir los equipos exclusivamente desde Legajos y sus cargos activos,
 ejecutar `20261031_030_reconcile_supervisor_team_projection.sql`.
+
+Para limpiar proyecciones desalineadas (equipos, vendedores y gerentes
+heredados) sin borrar Legajos ni historial, ejecutar
+`20261031_031_rebuild_roster_projections_from_legajos.sql`.

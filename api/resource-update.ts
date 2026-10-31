@@ -126,6 +126,7 @@ export default async function handler(request: Request, response: Response) {
        where id in (select id from descendants where id <> $1)
          and effective_manager_source = 'inherited'
     `, [id, effectiveManager]);
+    await database.query(`select public.rebuild_roster_projections_from_legajos()`);
     await database.query('commit');
     const saved = await database.query<{ id: string; effective_manager_staff_id: string | null; effective_manager_name: string | null; effective_manager_source: string }>(
       `select staff.id,staff.effective_manager_staff_id,staff.effective_manager_source,manager.full_name as effective_manager_name

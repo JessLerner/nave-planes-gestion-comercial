@@ -94,7 +94,7 @@ Adaptadores iniciales:
 - Renault (Excel).
 - Citroën / Peugeot.
 - Fiat / Jeep / RAM.
-- MG.
+- MG (parser PDF textual preparado; falta conectarlo a la carga y conversión a ARS).
 - Leapmotor, cuando exista una circular real para validar el formato.
 
 ## Implementación

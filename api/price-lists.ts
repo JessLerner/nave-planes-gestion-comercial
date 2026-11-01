@@ -94,7 +94,7 @@ export default async function handler(request: Request, response: Response) {
     const body = request.body as { action?: unknown; version_id?: unknown; surcharges?: unknown };
     const action = typeof body?.action === 'string' ? body.action : '';
     const versionId = body?.version_id;
-    if (!isUuid(versionId)) return response.status(400).json({ success: false, message: 'Lista inválida.' });
+    if (action !== 'create_renault_draft' && !isUuid(versionId)) return response.status(400).json({ success: false, message: 'Lista inválida.' });
 
     await db.query('begin');
     await db.query(`select set_config('request.jwt.claim.sub', $1, true)`, [userId]);

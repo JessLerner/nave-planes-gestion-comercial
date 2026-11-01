@@ -118,6 +118,26 @@ export default async function handler(request: Request, response: Response) {
           await db.query(`insert into public.price_list_installment_segments(price_list_item_id,installment_from,installment_to,quota_value,sort_order) values($1,$2,$3,$4,$5)`, [saved.rows[0].id, segment.from, segment.to, segment.quotaValue, segmentOrder]);
         }
       }
+    } else if (action === 'archive') {
+      if (!profile.can_manage_price_lists) throw new Error('No tenés permiso para retirar listas de precios.');
+      const archived = await db.query(`update public.price_list_versions set status='archived',archived_at=now() where id=$1 and status <> 'archived' returning id`, [versionId]);
+      if (!archived.rowCount) throw new Error('La lista ya fue retirada o no existe.');
+    } else if (action === 'save_official_values') {
+      if (!profile.can_manage_price_lists) throw new Error('No tenés permiso para editar listas de precios.');
+      const updates = (body as { items?: unknown }).items;
+      if (!Array.isArray(updates) || updates.length === 0 || updates.length > 300) throw new Error('Los valores de la lista no tienen un formato válido.');
+      for (const entry of updates as Array<{ item_id?: unknown; basic_value?: unknown; pure_installment?: unknown; cuota_1_value?: unknown; upfront_stamp_value?: unknown; delivery_terms?: unknown; segments?: Array<{ id?: unknown; quota_value?: unknown }> }>) {
+        const values = [entry.basic_value, entry.pure_installment, entry.cuota_1_value, entry.upfront_stamp_value].map(numberValue);
+        if (!isUuid(entry.item_id) || values.some(value => value === null || value < 0) || !Array.isArray(entry.segments)) throw new Error('Hay un modelo con valores inválidos.');
+        const saved = await db.query(`update public.price_list_items set basic_value=$1,pure_installment=$2,cuota_1_value=$3,upfront_stamp_value=$4,delivery_terms=$5 where id=$6 and price_list_version_id=$7 returning id`, [...values, typeof entry.delivery_terms === 'string' ? entry.delivery_terms || null : null, entry.item_id, versionId]);
+        if (!saved.rowCount) throw new Error('Uno de los modelos no pertenece a esta lista.');
+        for (const segment of entry.segments) {
+          const quota = numberValue(segment.quota_value);
+          if (!isUuid(segment.id) || quota === null || quota < 0) throw new Error('Hay una cuota inválida.');
+          const updated = await db.query(`update public.price_list_installment_segments set quota_value=$1 where id=$2 and price_list_item_id=$3`, [quota, segment.id, entry.item_id]);
+          if (!updated.rowCount) throw new Error('Uno de los tramos no pertenece al modelo.');
+        }
+      }
     } else if (action === 'publish') {
       if (!profile.can_manage_price_lists) throw new Error('No tenés permiso para publicar listas de precios.');
       await db.query('select public.publish_price_list_to_managers($1::uuid)', [versionId]);
@@ -127,7 +147,7 @@ export default async function handler(request: Request, response: Response) {
         select confirmation.id from public.price_list_structure_confirmations confirmation
         join public.price_list_versions version on version.id=confirmation.price_list_version_id
         where confirmation.price_list_version_id=$1 and confirmation.manager_staff_id=$2
-          and confirmation.status='pending' and version.status='published_to_managers'
+          and confirmation.status in ('pending','confirmed') and version.status='published_to_managers'
       `, [versionId, profile.staff_member_id]);
       if (!confirmation.rows[0]) throw new Error('No hay una lista pendiente para tu estructura.');
 
@@ -140,6 +160,7 @@ export default async function handler(request: Request, response: Response) {
                set surcharge_amount=$1,carried_from_previous=false,updated_by=$2
               from public.price_list_items item
              where surcharge.confirmation_id=$3 and surcharge.price_list_item_id=$4 and item.id=surcharge.price_list_item_id
+               and $1 >= surcharge.surcharge_amount and $1 >= item.base_surcharge
              returning surcharge.id
           `, [entry.surcharge_amount, userId, confirmation.rows[0].id, entry.item_id]);
           if (!saved.rowCount) throw new Error('Uno de los modelos no pertenece a tu lista pendiente.');

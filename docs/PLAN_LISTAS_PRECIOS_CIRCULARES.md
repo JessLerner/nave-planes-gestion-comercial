@@ -113,9 +113,11 @@ Adaptadores iniciales:
 - [x] Implementar confirmación por estructura.
 - [x] Implementar vista restringida de Supervisión.
 - [x] Implementar importador Excel de Renault, con adicional transitorio de $15.000 por cuota y sellado Renault como Cuota 0.
+- [x] Permitir edición posterior de importes oficiales por Administración/Dirección y aumentos posteriores de sobrepauta por Gerencia.
+- [x] Permitir retirar del circuito comercial listas erróneas o anteriores, preservando su historial administrativo.
 - [ ] Implementar carga asistida universal.
 - [ ] Implementar adaptadores PDF iniciales.
-- [ ] Implementar exportación Excel y PDF A4 apaisado.
+- [x] Implementar exportación XLSX y PDF imprimible A4 apaisado para Administración/Dirección, Gerencia y Supervisión.
 - [x] Agregar pruebas unitarias de cálculos y agrupamiento.
 - [ ] Agregar pruebas de autorización, visibilidad y regresión por rol.
 - [ ] Validar con circulares reales y usuarios de prueba antes de despliegue.

@@ -33,6 +33,7 @@ export type PriceListItemView = {
 };
 
 export type PriceListSegmentView = {
+  id?: string;
   price_list_item_id: string;
   installment_from: number;
   installment_to: number;
@@ -65,3 +66,5 @@ export const publishPriceList = (token: string, versionId: string) => request<Pr
 export const saveSurcharges = (token: string, versionId: string, surcharges: Array<{ item_id: string; surcharge_amount: number }>) => request<PriceListsResponse>(token, { method: 'POST', body: JSON.stringify({ action: 'save_surcharges', version_id: versionId, surcharges }) });
 export const confirmPriceList = (token: string, versionId: string) => request<PriceListsResponse>(token, { method: 'POST', body: JSON.stringify({ action: 'confirm', version_id: versionId }) });
 export const createRenaultDraft = (token: string, draft: Record<string, unknown>) => request<PriceListsResponse>(token, { method: 'POST', body: JSON.stringify({ action: 'create_renault_draft', ...draft }) });
+export const archivePriceList = (token: string, versionId: string) => request<PriceListsResponse>(token, { method: 'POST', body: JSON.stringify({ action: 'archive', version_id: versionId }) });
+export const saveOfficialValues = (token: string, versionId: string, items: unknown[]) => request<PriceListsResponse>(token, { method: 'POST', body: JSON.stringify({ action: 'save_official_values', version_id: versionId, items }) });

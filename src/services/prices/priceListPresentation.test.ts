@@ -1,16 +1,17 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { displayInstallmentSegments, installmentColumns } from './priceListPresentation';
+import { installmentBucketValues, installmentColumns } from './priceListPresentation';
 
-test('splits a broad 120-installment range into three readable periods', () => {
-  const result = displayInstallmentSegments([{ from: 19, to: 120, quotaValue: 309_823 }], 120);
-  assert.deepEqual(result.map(segment => [segment.from, segment.to]), [[19, 52], [53, 86], [87, 120]]);
+test('uses a stable maximum of four installment columns', () => {
+  const columns = installmentColumns([{ totalInstallments: 84, segments: [] }, { totalInstallments: 120, segments: [] }]);
+  assert.deepEqual(columns.map(column => column.label), ['Cuotas 2 a 12', 'Cuotas 13 a 44', 'Cuotas 45 a 84', 'Cuotas 85 a 120']);
 });
 
-test('uses separate columns for each visible installment range', () => {
-  const columns = installmentColumns([
-    { totalInstallments: 84, segments: [{ from: 2, to: 12, quotaValue: 1 }, { from: 13, to: 18, quotaValue: 2 }, { from: 19, to: 84, quotaValue: 3 }] },
-    { totalInstallments: 120, segments: [{ from: 2, to: 12, quotaValue: 1 }, { from: 13, to: 120, quotaValue: 2 }] },
-  ]);
-  assert.deepEqual(columns.map(column => column.label), ['Cuotas 2 a 12', 'Cuotas 13 a 48', 'Cuotas 49 a 84', 'Cuotas 85 a 120']);
+test('uses the highest source value that overlaps each commercial bucket', () => {
+  const values = installmentBucketValues([
+    { from: 2, to: 12, quotaValue: 300_000 }, { from: 13, to: 19, quotaValue: 429_614 },
+    { from: 20, to: 59, quotaValue: 481_752 }, { from: 60, to: 84, quotaValue: 429_614 },
+    { from: 85, to: 120, quotaValue: 440_000 },
+  ], 120);
+  assert.deepEqual([...values.entries()], [['2-12', 300_000], ['13-44', 481_752], ['45-84', 481_752], ['85-120', 440_000]]);
 });

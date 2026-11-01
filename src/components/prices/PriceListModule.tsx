@@ -3,7 +3,7 @@ import { Archive, CheckCircle2, Download, FileText, FileUp, Pencil, Printer, Ref
 import { useAuth } from '../../auth/AuthProvider';
 import { getSupabaseClient } from '../../auth/supabase';
 import { formatARS } from '../../utils/businessLogic';
-import { displayInstallmentSegments, installmentColumns } from '../../services/prices/priceListPresentation';
+import { installmentBucketValues, installmentColumns } from '../../services/prices/priceListPresentation';
 import { parseRenaultWorkbook } from '../../services/prices/renaultWorkbook';
 import { archivePriceList, confirmPriceList, createRenaultDraft, getPriceLists, publishPriceList, saveOfficialValues, saveSurcharges, type PriceListConfirmation, type PriceListItemView, type PriceListScope, type PriceListSegmentView, type PriceListVersion } from '../../services/prices/priceListsApi';
 import { exportPriceListXlsx, printPriceListPdf } from '../../services/prices/priceListExport';
@@ -32,6 +32,8 @@ export const PriceListModule: React.FC = () => {
   const [baseSurcharge, setBaseSurcharge] = useState('');
   const [editingOfficialValues, setEditingOfficialValues] = useState(false);
   const [officialValues, setOfficialValues] = useState<Record<string, string>>({});
+  const [showHistory, setShowHistory] = useState(false);
+  const [historyMonth, setHistoryMonth] = useState('');
 
   const load = useCallback(async () => {
     if (!session) return;
@@ -42,7 +44,7 @@ export const PriceListModule: React.FC = () => {
         scope: response.scope || 'supervisor', versions: response.versions || [], confirmations: response.confirmations || [],
         items: response.items || [], segments: response.segments || [],
       };
-      const options = next.scope === 'manage' ? next.versions : next.confirmations;
+      const options = next.scope === 'manage' ? next.versions.filter(version => version.status !== 'archived') : next.confirmations;
       setData(next);
       setSelectedVersionId(current => options.some(option => optionVersionId(option) === current)
         ? current : (options[0] ? optionVersionId(options[0]) : ''));
@@ -59,7 +61,7 @@ export const PriceListModule: React.FC = () => {
   useEffect(() => { void load(); }, [load]);
 
   const selectedItems = useMemo(() => data?.items.filter(item => item.price_list_version_id === selectedVersionId) || [], [data, selectedVersionId]);
-  const displaySegments = useMemo(() => new Map(selectedItems.map(item => [item.id, displayInstallmentSegments(
+  const displaySegments = useMemo(() => new Map(selectedItems.map(item => [item.id, installmentBucketValues(
     (data?.segments || []).filter(segment => segment.price_list_item_id === item.id).map(segment => ({
       from: segment.installment_from, to: segment.installment_to, quotaValue: Number(segment.total_value),
     })), item.total_installments,
@@ -95,7 +97,8 @@ export const PriceListModule: React.FC = () => {
   if (loading) return <div className="py-16 text-center text-sm text-slate-400">Cargando listas de precios…</div>;
   if (!data) return <div className="py-16 text-center text-sm text-rose-300">{message || 'No se pudo cargar el módulo.'}</div>;
 
-  const options = data.scope === 'manage' ? data.versions : data.confirmations;
+  const options = data.scope === 'manage' ? data.versions.filter(version => version.status !== 'archived') : data.confirmations;
+  const historyVersions = data.scope === 'manage' ? data.versions.filter(version => version.status === 'archived' && (!historyMonth || version.effective_date.startsWith(historyMonth))) : [];
   const isManage = data.scope === 'manage';
   const selectedConfirmation = data.confirmations.find(item => item.price_list_version_id === selectedVersionId);
   const managerPending = data.scope === 'manager' && selectedConfirmation?.status === 'pending';
@@ -132,6 +135,7 @@ export const PriceListModule: React.FC = () => {
         const versionId = optionVersionId(option);
         return <button key={option.id} onClick={() => setSelectedVersionId(versionId)} className={`whitespace-nowrap rounded-lg border px-3 py-2 text-xs font-semibold ${selectedVersionId === versionId ? 'border-blue-500 bg-blue-600 text-white' : 'border-slate-700 bg-slate-900 text-slate-300 hover:bg-slate-800'}`}>{option.brand} · {option.effective_date}</button>;
       })}</div>
+      {isManage && <section className="rounded-xl border border-slate-800 bg-slate-900/70 p-3"><div className="flex flex-wrap items-center justify-between gap-3"><div><div className="text-sm font-semibold text-slate-200">Historial de listas</div><p className="text-xs text-slate-400">Listas retiradas del circuito comercial.</p></div><div className="flex items-center gap-2"><input type="month" value={historyMonth} onChange={event => setHistoryMonth(event.target.value)} className="rounded border border-slate-700 bg-slate-950 px-2 py-1.5 text-xs text-white" /><button onClick={() => setShowHistory(current => !current)} className="rounded border border-slate-700 px-3 py-1.5 text-xs font-semibold text-slate-200 hover:bg-slate-800">{showHistory ? 'Ocultar' : 'Ver historial'}</button></div></div>{showHistory && <div className="mt-3 flex flex-wrap gap-2">{historyVersions.length ? historyVersions.map(version => <button key={version.id} onClick={() => setSelectedVersionId(version.id)} className={`rounded border px-3 py-2 text-xs ${selectedVersionId === version.id ? 'border-amber-500 bg-amber-500/15 text-amber-100' : 'border-slate-700 text-slate-300 hover:bg-slate-800'}`}>{version.brand} · {version.effective_date}</button>) : <span className="text-xs text-slate-500">No hay listas retiradas para ese período.</span>}</div>}</section>}
 
       <div className="flex flex-wrap justify-end gap-2">
         {exportOptions && <><button onClick={() => exportPriceListXlsx(exportOptions)} className="inline-flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-xs font-semibold text-slate-100 hover:bg-slate-700"><Download className="h-3.5 w-3.5" />Exportar XLSX</button><button onClick={() => printPriceListPdf(exportOptions)} className="inline-flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-xs font-semibold text-slate-100 hover:bg-slate-700"><Printer className="h-3.5 w-3.5" />Exportar PDF</button></>}
@@ -153,14 +157,14 @@ export const PriceListModule: React.FC = () => {
           {installmentHeaders.map(header => <th key={header.key} className="whitespace-nowrap px-4 py-3 text-right">{header.label}</th>)}<th className="px-4 py-3">Entregas pactadas</th>
         </tr></thead>
         <tbody className="divide-y divide-slate-800/80">{selectedItems.map(item => {
-          const itemSegments = displaySegments.get(item.id) || [];
-          const valuesByColumn = new Map(itemSegments.map(segment => [`${segment.from}-${segment.to}`, segment.displayValue]));
+          const itemSegments = displaySegments.get(item.id) || new Map<string, number | null>();
+          const valuesByColumn = itemSegments;
           const subscription = Number(item.subscription_value) || Number(item.cuota_1_value || 0) + Number(item.surcharge_amount ?? item.base_surcharge ?? 0);
           return <tr key={item.id} className="hover:bg-slate-800/40"><td className="px-4 py-3 font-semibold text-white">{item.model}</td><td className="px-4 py-3 text-slate-300">{item.plan_type}</td><td className="px-4 py-3 text-center font-mono text-slate-300">{item.total_installments}</td><td className="px-4 py-3 text-right font-mono text-slate-200">{formatARS(Number(item.basic_value))}</td><td className="px-4 py-3 text-right font-mono text-slate-200">{formatARS(Number(item.pure_installment))}</td>{isRenault && <td className="px-4 py-3 text-right font-mono font-semibold text-amber-200">{formatARS(Number(item.upfront_stamp_value || 0))}</td>}
             {data.scope !== 'supervisor' && <td className="px-4 py-3 text-right font-mono text-slate-200">{formatARS(Number(item.cuota_1_value))}</td>}
             {data.scope !== 'supervisor' && <td className="px-4 py-3 text-right">{managerCanEdit ? <input type="number" min={Math.max(Number(item.base_surcharge || 0), Number(item.surcharge_amount || 0))} value={surcharges[item.id] ?? ''} onChange={event => setSurcharges(current => ({ ...current, [item.id]: event.target.value }))} className="w-28 rounded border border-slate-700 bg-slate-950 px-2 py-1 text-right font-mono text-slate-100 focus:border-blue-500 focus:outline-none" /> : <span className="font-mono text-emerald-300">{formatARS(Number(item.surcharge_amount ?? item.base_surcharge))}</span>}</td>}
-            <td className="px-4 py-3 text-right font-mono font-bold text-blue-300">{formatARS(subscription)}</td>
-            {installmentHeaders.map(header => <td key={header.key} className="px-4 py-3 text-right font-mono text-slate-200">{valuesByColumn.has(header.key) ? formatARS(valuesByColumn.get(header.key)!) : '—'}</td>)}
+            <td className="bg-yellow-300 px-4 py-3 text-right font-mono font-bold text-slate-950">{formatARS(subscription)}</td>
+            {installmentHeaders.map(header => <td key={header.key} className="px-4 py-3 text-right font-mono text-slate-200">{valuesByColumn.get(header.key) !== null && valuesByColumn.get(header.key) !== undefined ? formatARS(valuesByColumn.get(header.key)!) : '—'}</td>)}
             <td className="max-w-56 px-4 py-3 text-slate-300">{item.delivery_terms || '—'}</td></tr>;
         })}</tbody>
       </table></section>

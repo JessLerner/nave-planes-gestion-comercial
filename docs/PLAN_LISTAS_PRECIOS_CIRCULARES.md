@@ -122,7 +122,7 @@ Adaptadores iniciales:
 - [x] Incorporar OCR mecánico local para las circulares visuales de Stellantis.
 - [ ] Mapear y validar la plantilla Peugeot/Citroën sobre el texto OCR extraído.
 - [ ] Mapear y validar la plantilla Fiat/Jeep/RAM sobre el texto OCR extraído.
-- [ ] Añadir revisión obligatoria por página para circulares OCR: ningún valor OCR se publica sin contraste con la ficha visual fuente.
+- [-] Añadir revisión obligatoria por página para circulares OCR: Peugeot ya permite corregir cada ficha con su página y texto fuente antes de crear el borrador; falta bloquear la publicación cuando queden tramos comerciales sin revisar.
 - [x] Implementar exportación XLSX y PDF imprimible A4 apaisado para Administración/Dirección, Gerencia y Supervisión.
 - [x] Agregar pruebas unitarias de cálculos y agrupamiento.
 - [ ] Agregar pruebas de autorización, visibilidad y regresión por rol.
@@ -136,10 +136,10 @@ En curso: el parser Renault ya fue contrastado contra la planilla de septiembre 
 
 ## Peugeot / Citroën: implementación por ficha
 
-- [ ] Procesar todas las páginas como fichas individuales, incluyendo Peugeot Partner Rapid.
-- [ ] Extraer y guardar modelo, plan, valor, financiación, cuotas, suscripción, diferimientos, recuperos y entregas pactadas.
-- [ ] Crear borrador automático sin permitir publicación hasta completar revisión.
-- [ ] Agregar revisión de Administración/Dirección por ficha, con página fuente, edición y alertas de obligatorios.
+- [-] Procesar todas las páginas como fichas individuales, incluyendo Peugeot Partner Rapid. El OCR recorre todas las páginas; falta validar la plantilla final con la circular real.
+- [-] Extraer y guardar modelo, plan, valor, financiación, cuotas, suscripción, diferimientos, recuperos y entregas pactadas. Los campos se extraen y quedan editables; falta contrastar los resultados de cada ficha.
+- [x] Crear borrador Peugeot desde las fichas revisadas, sin publicación automática.
+- [x] Agregar revisión de Administración/Dirección por ficha, con página fuente, edición y alertas de obligatorios.
 - [ ] Habilitar publicación al circuito comercial sólo cuando todas las fichas estén revisadas.
 - [ ] Reutilizar el flujo para Fiat y Jeep/RAM con sus propios mapeos.
 

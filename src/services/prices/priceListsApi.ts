@@ -67,6 +67,7 @@ export const saveSurcharges = (token: string, versionId: string, surcharges: Arr
 export const confirmPriceList = (token: string, versionId: string) => request<PriceListsResponse>(token, { method: 'POST', body: JSON.stringify({ action: 'confirm', version_id: versionId }) });
 export const createRenaultDraft = (token: string, draft: Record<string, unknown>) => request<PriceListsResponse>(token, { method: 'POST', body: JSON.stringify({ action: 'create_renault_draft', ...draft }) });
 export const createMgDraft = (token: string, draft: Record<string, unknown>) => request<PriceListsResponse>(token, { method: 'POST', body: JSON.stringify({ action: 'create_mg_draft', ...draft }) });
+export const createPeugeotDraft = (token: string, draft: Record<string, unknown>) => request<PriceListsResponse>(token, { method: 'POST', body: JSON.stringify({ action: 'create_peugeot_draft', ...draft }) });
 export const getBnaRate = (token: string) => request<{ success: boolean; exchange_rate: number; exchange_rate_source: string }>(token, { method: 'POST', body: JSON.stringify({ action: 'get_bna_rate' }) });
 export const archivePriceList = (token: string, versionId: string) => request<PriceListsResponse>(token, { method: 'POST', body: JSON.stringify({ action: 'archive', version_id: versionId }) });
 export const saveOfficialValues = (token: string, versionId: string, items: unknown[]) => request<PriceListsResponse>(token, { method: 'POST', body: JSON.stringify({ action: 'save_official_values', version_id: versionId, items }) });

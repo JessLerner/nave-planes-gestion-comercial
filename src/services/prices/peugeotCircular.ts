@@ -19,8 +19,8 @@ const money = (value?: string) => value ? Number(value.replace(/[.]/g, '').repla
 const between = (text: string, start: RegExp, end: RegExp) => text.match(start)?.[1]?.replace(end, '').trim() || null;
 
 /** Strict page-card extraction. Missing/ambiguous fields remain null for human review. */
-export async function extractPeugeotReviewCards(buffer: ArrayBuffer): Promise<PeugeotReviewCard[]> {
-  const pages = await extractStellantisCircularPages(buffer);
+export async function extractPeugeotReviewCards(buffer: ArrayBuffer, onProgress?: (progress: number) => void): Promise<PeugeotReviewCard[]> {
+  const pages = await extractStellantisCircularPages(buffer, onProgress);
   return pages.map(({ pageNumber, text }) => {
     const normalized = text.replace(/\s+/g, ' ').toUpperCase();
     const model = between(normalized, /MODELO\s+(.+?)(?=PRECIO)/, /\s+$/);

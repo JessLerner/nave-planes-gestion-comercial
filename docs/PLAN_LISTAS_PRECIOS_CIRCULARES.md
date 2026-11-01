@@ -119,7 +119,9 @@ Adaptadores iniciales:
 - [x] Separar las listas retiradas de la vista activa y permitir consultarlas en Historial de listas por mes/año.
 - [ ] Implementar carga asistida universal.
 - [ ] Implementar adaptadores PDF iniciales.
-- [~] Incorporar OCR mecánico local para las circulares visuales de Stellantis; faltan los mapeos de Peugeot/Citroën y Fiat/Jeep/RAM.
+- [x] Incorporar OCR mecánico local para las circulares visuales de Stellantis.
+- [ ] Mapear y validar la plantilla Peugeot/Citroën sobre el texto OCR extraído.
+- [ ] Mapear y validar la plantilla Fiat/Jeep/RAM sobre el texto OCR extraído.
 - [x] Implementar exportación XLSX y PDF imprimible A4 apaisado para Administración/Dirección, Gerencia y Supervisión.
 - [x] Agregar pruebas unitarias de cálculos y agrupamiento.
 - [ ] Agregar pruebas de autorización, visibilidad y regresión por rol.

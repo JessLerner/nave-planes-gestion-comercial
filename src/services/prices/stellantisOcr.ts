@@ -13,7 +13,7 @@ export async function extractStellantisCircularPages(buffer: ArrayBuffer, onProg
     const pages: OcrCircularPage[] = [];
     for (let index = 1; index <= pdf.numPages; index += 1) {
       const page = await pdf.getPage(index);
-      const viewport = page.getViewport({ scale: 3 });
+      const viewport = page.getViewport({ scale: 2 });
       const canvas = document.createElement('canvas');
       canvas.width = Math.ceil(viewport.width); canvas.height = Math.ceil(viewport.height);
       await page.render({ canvas, canvasContext: canvas.getContext('2d')!, viewport }).promise;

@@ -134,6 +134,15 @@ En curso: el parser Renault ya fue contrastado contra la planilla de septiembre 
 
 - Renault: contrastar los importes comerciales generados contra la lista final aprobada por Administración, especialmente la regla transitoria de $15.000 por cuota y la selección del mayor valor en cada bloque comercial. No se modifica hasta disponer de esa validación.
 
+## Peugeot / Citroën: implementación por ficha
+
+- [ ] Procesar todas las páginas como fichas individuales, incluyendo Peugeot Partner Rapid.
+- [ ] Extraer y guardar modelo, plan, valor, financiación, cuotas, suscripción, diferimientos, recuperos y entregas pactadas.
+- [ ] Crear borrador automático sin permitir publicación hasta completar revisión.
+- [ ] Agregar revisión de Administración/Dirección por ficha, con página fuente, edición y alertas de obligatorios.
+- [ ] Habilitar publicación al circuito comercial sólo cuando todas las fichas estén revisadas.
+- [ ] Reutilizar el flujo para Fiat y Jeep/RAM con sus propios mapeos.
+
 ## Criterios de aceptación
 
 - No se publica una lista comercial con una sobrepauta vacía o igual a cero.

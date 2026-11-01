@@ -126,6 +126,10 @@ Adaptadores iniciales:
 
 En curso: el parser Renault ya fue contrastado contra la planilla de septiembre de 2026 y recupera 10 planes con sus tramos. Falta conectarlo a la carga de archivos, revisión y creación del borrador.
 
+## Pendiente de validación con Administración
+
+- Renault: contrastar los importes comerciales generados contra la lista final aprobada por Administración, especialmente la regla transitoria de $15.000 por cuota y la selección del mayor valor en cada bloque comercial. No se modifica hasta disponer de esa validación.
+
 ## Criterios de aceptación
 
 - No se publica una lista comercial con una sobrepauta vacía o igual a cero.

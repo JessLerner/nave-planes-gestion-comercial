@@ -55,7 +55,7 @@ export const PriceListModule: React.FC = () => {
       const options = next.scope === 'manage' ? next.versions.filter(version => version.status !== 'archived') : next.confirmations;
       setData(next);
       setSelectedVersionId(current => options.some(option => optionVersionId(option) === current)
-        ? current : (options[0] ? optionVersionId(options[0]) : ''));
+        ? current : (options.find(option => option.brand === selectedBrand) ? optionVersionId(options.find(option => option.brand === selectedBrand)!) : (options[0] ? optionVersionId(options[0]) : '')));
       setSurcharges(Object.fromEntries(next.items.map(item => [item.id, String(item.surcharge_amount ?? '')])));
       setOfficialValues(Object.fromEntries(next.items.flatMap(item => [
         [`${item.id}:basic`, String(item.basic_value)], [`${item.id}:pure`, String(item.pure_installment)], [`${item.id}:c0`, String(item.upfront_stamp_value ?? 0)], [`${item.id}:c1`, String(item.cuota_1_value ?? 0)], [`${item.id}:delivery`, item.delivery_terms || ''],
@@ -64,7 +64,7 @@ export const PriceListModule: React.FC = () => {
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'No se pudieron cargar las listas.');
     } finally { setLoading(false); }
-  }, [session]);
+  }, [selectedBrand, session]);
 
   useEffect(() => { void load(); }, [load]);
 

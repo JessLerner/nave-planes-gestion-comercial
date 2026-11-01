@@ -15,7 +15,8 @@ Incorporar en Nave un módulo de listas de precios de planes de ahorro, a partir
 - Una lista puede asociar varias circulares de una misma marca/período: precios, cuotas, adjudicación asegurada y condiciones comerciales.
 - La marca se detecta cuando sea posible, pero Administración/Dirección siempre puede confirmarla o corregirla.
 - La lista se publica por marca, vigencia y versión. Las versiones anteriores conservan su historial.
-- El sellado se calcula siempre para Provincia de Buenos Aires y se suma exclusivamente a las cuotas/rangos indicados por la circular.
+- El sellado se calcula siempre para Provincia de Buenos Aires y se suma exclusivamente a las cuotas/rangos indicados por la circular. Renault es la excepción operativa: se muestra y cobra como **Cuota 0 · Sellado**, antes de la cuota 1.
+- Mientras se valida su circular de origen, el importador Renault adiciona $15.000 a cada cuota publicada para aproximar la lista comercial utilizada por vendedores y supervisores. El adicional queda centralizado y es revisable.
 - MG se muestra en pesos. Al publicar se toma dólar vendedor Banco Nación, se guarda fecha, fuente y cotización aplicada, y Administración/Dirección puede corregirlo manualmente dejando auditoría.
 
 ## Circuito de publicación
@@ -111,7 +112,7 @@ Adaptadores iniciales:
 - [x] Implementar revisión de sobrepautas, copia del período anterior, aplicación masiva y edición por modelo para Gerencia.
 - [x] Implementar confirmación por estructura.
 - [x] Implementar vista restringida de Supervisión.
-- [ ] Implementar importador Excel de Renault.
+- [x] Implementar importador Excel de Renault, con adicional transitorio de $15.000 por cuota y sellado Renault como Cuota 0.
 - [ ] Implementar carga asistida universal.
 - [ ] Implementar adaptadores PDF iniciales.
 - [ ] Implementar exportación Excel y PDF A4 apaisado.

@@ -38,7 +38,7 @@ export default async function handler(request: Request, response: Response) {
       if (profile.can_manage_price_lists) {
         const [versions, items, segments, sources] = await Promise.all([
           db.query(`select id,brand,name,effective_date,version_number,status,source_currency,display_currency,exchange_rate,exchange_rate_source,exchange_rate_overridden,published_for_managers_at from public.price_list_versions order by effective_date desc,brand,version_number desc`),
-          db.query(`select id,price_list_version_id,source_key,model,plan_type,total_installments,basic_value,pure_installment,cuota_1_value,base_surcharge,delivery_terms,sort_order from public.price_list_items order by sort_order,model`),
+          db.query(`select id,price_list_version_id,source_key,model,plan_type,total_installments,basic_value,pure_installment,cuota_1_value,upfront_stamp_value,base_surcharge,delivery_terms,sort_order from public.price_list_items order by sort_order,model`),
           db.query(`select id,price_list_item_id,installment_from,installment_to,quota_value,stamp_value,total_value,source_label,sort_order from public.price_list_installment_segments order by installment_from`),
           db.query(`select source.price_list_version_id,document.id,document.original_filename,document.document_type,document.effective_date from public.price_list_sources source join public.commercial_documents document on document.id=source.commercial_document_id order by source.source_order`),
         ]);
@@ -68,14 +68,14 @@ export default async function handler(request: Request, response: Response) {
       if (!confirmationIds.length) return response.status(200).json({ success: true, scope: managerScope ? 'manager' : 'supervisor', confirmations: [], items: [], segments: [] });
 
       const items = await db.query(managerScope ? `
-        select item.id,item.price_list_version_id,item.model,item.plan_type,item.total_installments,item.basic_value,item.pure_installment,
+        select item.id,item.price_list_version_id,item.model,item.plan_type,item.total_installments,item.basic_value,item.pure_installment,item.upfront_stamp_value,
                item.cuota_1_value,item.delivery_terms,surcharge.surcharge_amount,(item.cuota_1_value+surcharge.surcharge_amount) as subscription_value
           from public.price_list_item_surcharges surcharge
           join public.price_list_items item on item.id=surcharge.price_list_item_id
          where surcharge.confirmation_id=any($1::uuid[])
          order by item.sort_order,item.model
       ` : `
-        select item.id,item.price_list_version_id,item.model,item.plan_type,item.total_installments,item.basic_value,item.pure_installment,
+        select item.id,item.price_list_version_id,item.model,item.plan_type,item.total_installments,item.basic_value,item.pure_installment,item.upfront_stamp_value,
                item.delivery_terms,(item.cuota_1_value+surcharge.surcharge_amount) as subscription_value
           from public.price_list_item_surcharges surcharge
           join public.price_list_items item on item.id=surcharge.price_list_item_id
@@ -100,7 +100,7 @@ export default async function handler(request: Request, response: Response) {
     await db.query(`select set_config('request.jwt.claim.sub', $1, true)`, [userId]);
     if (action === 'create_renault_draft') {
       if (!profile.can_manage_price_lists) throw new Error('No tenés permiso para crear borradores.');
-      const draft = body as { name?: unknown; effective_date?: unknown; base_surcharge?: unknown; document?: { filename?: unknown; path?: unknown; mime_type?: unknown; byte_size?: unknown }; items?: Array<{ sourceKey?: string; model?: string; planType?: string; totalInstallments?: number; basicValue?: number; pureInstallment?: number; cuota1Value?: number; segments?: Array<{ from?: number; to?: number; quotaValue?: number }> }> };
+      const draft = body as { name?: unknown; effective_date?: unknown; base_surcharge?: unknown; document?: { filename?: unknown; path?: unknown; mime_type?: unknown; byte_size?: unknown }; items?: Array<{ sourceKey?: string; model?: string; planType?: string; totalInstallments?: number; basicValue?: number; pureInstallment?: number; cuota1Value?: number; upfrontStampValue?: number; segments?: Array<{ from?: number; to?: number; quotaValue?: number }> }> };
       const base = numberValue(draft.base_surcharge);
       if (!draft.document || !Array.isArray(draft.items) || !draft.items.length || !base || base <= 0 || typeof draft.effective_date !== 'string') throw new Error('Completá vigencia, sobrepauta base y datos del archivo.');
       const document = draft.document;
@@ -110,7 +110,9 @@ export default async function handler(request: Request, response: Response) {
       await db.query(`insert into public.price_list_sources(price_list_version_id,commercial_document_id) values($1,$2)`, [version.rows[0].id, storedDocument.rows[0].id]);
       for (const [sortOrder, item] of draft.items.entries()) {
         if (!item.sourceKey || !item.model || !item.planType || !numberValue(item.totalInstallments) || !numberValue(item.basicValue) || !numberValue(item.pureInstallment) || !numberValue(item.cuota1Value) || !item.segments?.length) throw new Error('El Excel contiene un plan incompleto.');
-        const saved = await db.query<{ id: string }>(`insert into public.price_list_items(price_list_version_id,source_key,model,plan_type,total_installments,basic_value,pure_installment,cuota_1_value,base_surcharge,sort_order) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) returning id`, [version.rows[0].id, item.sourceKey, item.model, item.planType, item.totalInstallments, item.basicValue, item.pureInstallment, item.cuota1Value, base, sortOrder]);
+        const upfrontStamp = numberValue(item.upfrontStampValue);
+        if (upfrontStamp === null || upfrontStamp < 0) throw new Error('El Excel contiene un sellado Renault inválido.');
+        const saved = await db.query<{ id: string }>(`insert into public.price_list_items(price_list_version_id,source_key,model,plan_type,total_installments,basic_value,pure_installment,cuota_1_value,upfront_stamp_value,base_surcharge,sort_order) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) returning id`, [version.rows[0].id, item.sourceKey, item.model, item.planType, item.totalInstallments, item.basicValue, item.pureInstallment, item.cuota1Value, upfrontStamp, base, sortOrder]);
         for (const [segmentOrder, segment] of item.segments.entries()) {
           if (!numberValue(segment.from) || !numberValue(segment.to) || numberValue(segment.quotaValue) === null) throw new Error('El Excel contiene un tramo inválido.');
           await db.query(`insert into public.price_list_installment_segments(price_list_item_id,installment_from,installment_to,quota_value,sort_order) values($1,$2,$3,$4,$5)`, [saved.rows[0].id, segment.from, segment.to, segment.quotaValue, segmentOrder]);

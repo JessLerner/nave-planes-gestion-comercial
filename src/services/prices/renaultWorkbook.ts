@@ -8,9 +8,13 @@ export type ImportedPriceItem = {
   basicValue: number;
   pureInstallment: number;
   cuota1Value: number;
+  upfrontStampValue: number;
   deliveryTerms: string | null;
   segments: Array<{ from: number; to: number; quotaValue: number }>;
 };
+
+export const RENAULT_QUOTA_ADJUSTMENT = 15_000;
+export const RENAULT_BA_STAMP_RATE = 0.0152;
 
 type Cell = string | number | boolean | Date | null | undefined;
 const text = (value: Cell) => String(value ?? '').replace(/\s+/g, ' ').trim();
@@ -48,9 +52,9 @@ export function parseRenaultWorkbook(buffer: ArrayBuffer): ImportedPriceItem[] {
     const headersInRow = row.slice(7).map(range);
     const totals = totalRow?.slice(7).map(number) || [];
     const segments = headersInRow.flatMap((period, position) => period && totals[position] !== null
-      ? [{ ...period, quotaValue: totals[position] as number }]
+      ? [{ ...period, quotaValue: (totals[position] as number) + RENAULT_QUOTA_ADJUSTMENT }]
       : []);
-    const cuota1 = totals[0] || 0;
+    const cuota1 = totals[0] ? totals[0] + RENAULT_QUOTA_ADJUSTMENT : 0;
     const basicValue = rightNumber(find('Precio público') || []);
     const pureInstallment = rightNumber(find('Cuota Pura') || []);
     if (!previousModel || !totalInstallments || !basicValue || !pureInstallment || !cuota1 || !segments.length) {
@@ -64,6 +68,7 @@ export function parseRenaultWorkbook(buffer: ArrayBuffer): ImportedPriceItem[] {
       basicValue,
       pureInstallment,
       cuota1Value: cuota1,
+      upfrontStampValue: Math.round(basicValue * RENAULT_BA_STAMP_RATE * 100) / 100,
       deliveryTerms: null,
       segments,
     };

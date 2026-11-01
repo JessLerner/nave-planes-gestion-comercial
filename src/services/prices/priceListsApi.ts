@@ -24,6 +24,7 @@ export type PriceListItemView = {
   total_installments: number;
   basic_value: number;
   pure_installment: number;
+  upfront_stamp_value?: number;
   delivery_terms: string | null;
   cuota_1_value?: number;
   base_surcharge?: number;

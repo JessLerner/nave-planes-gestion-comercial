@@ -29,6 +29,10 @@ const peugeotPureInstallment = (card: PeugeotReviewCard) => {
   const percentage = Number(card.planType?.match(/^(\d{2,3})\s*\//)?.[1] || 100) / 100;
   return card.basicValue && card.totalInstallments ? Math.round(card.basicValue * percentage / card.totalInstallments) : 0;
 };
+const peugeotDraftSegments = (totalInstallments: number, subscriptionValue: number) => [
+  { from: 1, to: 1, quotaValue: subscriptionValue },
+  ...[[2, 12], [13, 44], [45, 84], [85, 120]].filter(([from]) => from <= totalInstallments).map(([from, to]) => ({ from, to: Math.min(to, totalInstallments), quotaValue: 0 })),
+];
 
 export const PriceListModule: React.FC = () => {
   const { session } = useAuth();
@@ -134,7 +138,7 @@ export const PriceListModule: React.FC = () => {
       await createPeugeotDraft(session.access_token, {
         name: `Lista Peugeot ${effectiveDate}`, effective_date: effectiveDate, base_surcharge: Number(moneyDigits(baseSurcharge)),
         document: { filename: peugeotFile.name, path, mime_type: 'application/pdf', byte_size: peugeotFile.size },
-        items: peugeotCards.map(card => ({ sourceKey: `peugeot-page-${card.pageNumber}`, model: card.model, planType: card.planType, totalInstallments: card.totalInstallments, basicValue: card.basicValue, pureInstallment: peugeotPureInstallment(card), cuota1Value: card.subscriptionValue, deliveryTerms: [card.deliveryTerms, card.deferral && `Diferimiento: ${card.deferral}`, card.recovery && `Recupero: ${card.recovery}`].filter(Boolean).join(' · '), segments: [{ from: 1, to: 1, quotaValue: card.subscriptionValue }] })),
+        items: peugeotCards.map(card => ({ sourceKey: `peugeot-page-${card.pageNumber}`, model: card.model, planType: card.planType, totalInstallments: card.totalInstallments, basicValue: card.basicValue, pureInstallment: peugeotPureInstallment(card), cuota1Value: card.subscriptionValue, deliveryTerms: [card.deliveryTerms, card.deferral && `Diferimiento: ${card.deferral}`, card.recovery && `Recupero: ${card.recovery}`].filter(Boolean).join(' · '), segments: peugeotDraftSegments(card.totalInstallments!, card.subscriptionValue!) })),
       });
       setPeugeotFile(null); setPeugeotCards([]); setBaseSurcharge(''); setMessage('Borrador Peugeot creado. Completá los tramos de cuotas antes de publicarlo.'); await load();
     } catch (error) { setMessage(error instanceof Error ? error.message : 'No se pudo crear el borrador Peugeot.'); }

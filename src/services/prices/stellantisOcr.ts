@@ -4,7 +4,8 @@ import { getDocument, GlobalWorkerOptions } from 'pdfjs-dist/legacy/build/pdf.mj
 GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/legacy/build/pdf.worker.mjs', import.meta.url).toString();
 
 /** Mechanical OCR for image-based Stellantis circulars. Parsing remains brand/template-specific. */
-export type OcrCircularPage = { pageNumber: number; text: string };
+export type OcrWord = { text: string; x0: number; y0: number; x1: number; y1: number };
+export type OcrCircularPage = { pageNumber: number; text: string; words: OcrWord[] };
 
 export async function extractStellantisCircularPages(buffer: ArrayBuffer, onProgress?: (progress: number) => void): Promise<OcrCircularPage[]> {
   const pdf = await getDocument({ data: new Uint8Array(buffer) }).promise;
@@ -17,7 +18,8 @@ export async function extractStellantisCircularPages(buffer: ArrayBuffer, onProg
       const canvas = document.createElement('canvas');
       canvas.width = Math.ceil(viewport.width); canvas.height = Math.ceil(viewport.height);
       await page.render({ canvas, canvasContext: canvas.getContext('2d')!, viewport }).promise;
-      pages.push({ pageNumber: index, text: (await worker.recognize(canvas)).data.text });
+      const recognized = (await worker.recognize(canvas)).data;
+      pages.push({ pageNumber: index, text: recognized.text, words: (recognized.blocks || []).flatMap(block => block.paragraphs.flatMap(paragraph => paragraph.lines.flatMap(line => line.words.map(word => ({ text: word.text, ...word.bbox })))) ) });
     }
     return pages;
   } finally { await worker.terminate(); }

@@ -16,7 +16,7 @@ export async function extractStellantisCircularPages(buffer: ArrayBuffer, onProg
       const viewport = page.getViewport({ scale: 2 });
       const canvas = document.createElement('canvas');
       canvas.width = Math.ceil(viewport.width); canvas.height = Math.ceil(viewport.height);
-      await page.render({ canvasContext: canvas.getContext('2d')!, viewport }).promise;
+      await page.render({ canvas, canvasContext: canvas.getContext('2d')!, viewport }).promise;
       pages.push({ pageNumber: index, text: (await worker.recognize(canvas)).data.text });
     }
     return pages;

@@ -54,7 +54,8 @@ Entre `Suscripción` y `Entregas Pactadas`, se agregan columnas de cuotas dinám
 
 - Cuotas 2 a 12: se preservan con el mayor detalle disponible en la circular.
 - Desde cuota 13: se agrupan tramos consecutivos cuando la diferencia de cuota total sea de hasta $30.000.
-- El nombre de la columna conserva el rango real, por ejemplo `13 a 19`, `20 a 44`, `45` o `46 a 84`.
+- Cada tramo visible ocupa su propia columna y conserva su rango real, por ejemplo `13 a 19`, `20 a 44`, `45` o `46 a 84`; nunca se concatenan varios tramos dentro de una única celda.
+- Para evitar rangos ambiguos, los planes de 84 cuotas muestran como mínimo dos períodos posteriores a la cuota 12 y los de 120, como mínimo tres.
 - Pantalla, Excel y PDF usan la misma función de agrupamiento.
 - La impresión se prepara para A4 apaisado. Si no entra con legibilidad, continúa en otra hoja A4.
 

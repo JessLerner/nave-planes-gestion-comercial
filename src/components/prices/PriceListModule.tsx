@@ -3,7 +3,7 @@ import { Archive, CheckCircle2, Download, FileText, FileUp, Pencil, Printer, Ref
 import { useAuth } from '../../auth/AuthProvider';
 import { getSupabaseClient } from '../../auth/supabase';
 import { formatARS } from '../../utils/businessLogic';
-import { groupInstallmentSegments } from '../../services/prices/priceListDomain';
+import { displayInstallmentSegments, installmentColumns } from '../../services/prices/priceListPresentation';
 import { parseRenaultWorkbook } from '../../services/prices/renaultWorkbook';
 import { archivePriceList, confirmPriceList, createRenaultDraft, getPriceLists, publishPriceList, saveOfficialValues, saveSurcharges, type PriceListConfirmation, type PriceListItemView, type PriceListScope, type PriceListSegmentView, type PriceListVersion } from '../../services/prices/priceListsApi';
 import { exportPriceListXlsx, printPriceListPdf } from '../../services/prices/priceListExport';
@@ -59,11 +59,15 @@ export const PriceListModule: React.FC = () => {
   useEffect(() => { void load(); }, [load]);
 
   const selectedItems = useMemo(() => data?.items.filter(item => item.price_list_version_id === selectedVersionId) || [], [data, selectedVersionId]);
-  const displaySegments = useMemo(() => new Map(selectedItems.map(item => [item.id, groupInstallmentSegments(
+  const displaySegments = useMemo(() => new Map(selectedItems.map(item => [item.id, displayInstallmentSegments(
     (data?.segments || []).filter(segment => segment.price_list_item_id === item.id).map(segment => ({
       from: segment.installment_from, to: segment.installment_to, quotaValue: Number(segment.total_value),
-    })),
+    })), item.total_installments,
   )])), [data?.segments, selectedItems]);
+  const installmentHeaders = useMemo(() => installmentColumns(selectedItems.map(item => ({
+    totalInstallments: item.total_installments,
+    segments: (data?.segments || []).filter(segment => segment.price_list_item_id === item.id).map(segment => ({ from: segment.installment_from, to: segment.installment_to, quotaValue: Number(segment.total_value) })),
+  }))), [data?.segments, selectedItems]);
 
   const runAction = async (action: () => Promise<unknown>, success: string) => {
     setSaving(true);
@@ -146,19 +150,17 @@ export const PriceListModule: React.FC = () => {
         <thead className="border-b border-slate-800 bg-slate-950/70 text-[10px] font-semibold uppercase tracking-wider text-slate-400"><tr>
           <th className="px-4 py-3">Modelo</th><th className="px-4 py-3">Plan</th><th className="px-4 py-3 text-center">Cuotas</th><th className="px-4 py-3 text-right">Valor básico</th><th className="px-4 py-3 text-right">Cuota pura</th>{isRenault && <th className="px-4 py-3 text-right">Cuota 0 · Sellado</th>}
           {data.scope !== 'supervisor' && <th className="px-4 py-3 text-right">Cuota 1</th>}{data.scope !== 'supervisor' && <th className="px-4 py-3 text-right">Sobrepauta</th>}<th className="px-4 py-3 text-right">Suscripción</th>
-          <th className="whitespace-nowrap px-4 py-3 text-right">Cuotas 2 a 12</th><th className="whitespace-nowrap px-4 py-3">Cuotas 13 en adelante</th><th className="px-4 py-3">Entregas pactadas</th>
+          {installmentHeaders.map(header => <th key={header.key} className="whitespace-nowrap px-4 py-3 text-right">{header.label}</th>)}<th className="px-4 py-3">Entregas pactadas</th>
         </tr></thead>
         <tbody className="divide-y divide-slate-800/80">{selectedItems.map(item => {
           const itemSegments = displaySegments.get(item.id) || [];
-          const earlySegments = itemSegments.filter(segment => segment.from >= 2 && segment.to <= 12);
-          const laterSegments = itemSegments.filter(segment => segment.from >= 13);
+          const valuesByColumn = new Map(itemSegments.map(segment => [`${segment.from}-${segment.to}`, segment.displayValue]));
           const subscription = Number(item.subscription_value) || Number(item.cuota_1_value || 0) + Number(item.surcharge_amount ?? item.base_surcharge ?? 0);
           return <tr key={item.id} className="hover:bg-slate-800/40"><td className="px-4 py-3 font-semibold text-white">{item.model}</td><td className="px-4 py-3 text-slate-300">{item.plan_type}</td><td className="px-4 py-3 text-center font-mono text-slate-300">{item.total_installments}</td><td className="px-4 py-3 text-right font-mono text-slate-200">{formatARS(Number(item.basic_value))}</td><td className="px-4 py-3 text-right font-mono text-slate-200">{formatARS(Number(item.pure_installment))}</td>{isRenault && <td className="px-4 py-3 text-right font-mono font-semibold text-amber-200">{formatARS(Number(item.upfront_stamp_value || 0))}</td>}
             {data.scope !== 'supervisor' && <td className="px-4 py-3 text-right font-mono text-slate-200">{formatARS(Number(item.cuota_1_value))}</td>}
             {data.scope !== 'supervisor' && <td className="px-4 py-3 text-right">{managerCanEdit ? <input type="number" min={Math.max(Number(item.base_surcharge || 0), Number(item.surcharge_amount || 0))} value={surcharges[item.id] ?? ''} onChange={event => setSurcharges(current => ({ ...current, [item.id]: event.target.value }))} className="w-28 rounded border border-slate-700 bg-slate-950 px-2 py-1 text-right font-mono text-slate-100 focus:border-blue-500 focus:outline-none" /> : <span className="font-mono text-emerald-300">{formatARS(Number(item.surcharge_amount ?? item.base_surcharge))}</span>}</td>}
             <td className="px-4 py-3 text-right font-mono font-bold text-blue-300">{formatARS(subscription)}</td>
-            <td className="px-4 py-3 text-right font-mono text-slate-200">{earlySegments.length ? earlySegments.map(segment => <div key={`${segment.from}-${segment.to}`}>{rangeLabel(segment.from, segment.to)}: {formatARS(segment.displayValue)}</div>) : '—'}</td>
-            <td className="px-4 py-3 font-mono text-slate-200">{laterSegments.length ? laterSegments.map(segment => <div key={`${segment.from}-${segment.to}`}>{rangeLabel(segment.from, segment.to)}: {formatARS(segment.displayValue)}</div>) : '—'}</td>
+            {installmentHeaders.map(header => <td key={header.key} className="px-4 py-3 text-right font-mono text-slate-200">{valuesByColumn.has(header.key) ? formatARS(valuesByColumn.get(header.key)!) : '—'}</td>)}
             <td className="max-w-56 px-4 py-3 text-slate-300">{item.delivery_terms || '—'}</td></tr>;
         })}</tbody>
       </table></section>

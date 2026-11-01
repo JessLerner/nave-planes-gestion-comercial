@@ -1,8 +1,9 @@
-import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
+import { getDocument, GlobalWorkerOptions } from 'pdfjs-dist/legacy/build/pdf.mjs';
 import type { ImportedPriceItem } from './renaultWorkbook';
 
 const usd = (value: string) => Number(value.replace(/[.]/g, '').replace(',', '.'));
 const amounts = (text: string, label: string) => [...(text.match(new RegExp(`${label}\\s+USD\\s*([\\d.,]+)\\s+USD\\s*([\\d.,]+)`, 'i'))?.slice(1) || [])].map(usd);
+GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/legacy/build/pdf.worker.mjs', import.meta.url).toString();
 
 /** Reads MG's textual circular layout. Values remain in USD until publication converts them to ARS. */
 export async function parseMgCircular(buffer: ArrayBuffer): Promise<ImportedPriceItem[]> {
@@ -12,7 +13,7 @@ export async function parseMgCircular(buffer: ArrayBuffer): Promise<ImportedPric
   const basic = amounts(text, 'Valor Móvil');
   const pure = amounts(text, 'Cuota pura mensual');
   const total = amounts(text, 'Cuota mensual total');
-  const models = text.match(/PRODUCTOS Y CONDICIONES DEL PLAN\s+(.+?)\s+Valor Móvil/i)?.[1]?.trim().split(/\s{2,}|(?=MG\s*ZS)/) || [];
+  const models = text.match(/PRODUCTOS Y CONDICIONES DEL PLAN\s+(.+?)\s+Valor Móvil/i)?.[1]?.trim().split(/\s{2,}|(?=MG\s*ZS)/).filter(Boolean) || [];
   if (basic.length !== 2 || pure.length !== 2 || total.length !== 2 || models.length < 2) throw new Error('La circular MG no contiene la tabla de productos esperada.');
   return [0, 1].map(index => ({
     sourceKey: `mg-${models[index].replace(/\W+/g, '-').toLowerCase()}-84`, model: models[index].trim(), planType: '70%', totalInstallments: 84,

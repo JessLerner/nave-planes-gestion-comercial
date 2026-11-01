@@ -20,6 +20,8 @@ type LoadedData = {
 const rangeLabel = (from: number, to: number) => from === to ? `Cuota ${from}` : `Cuotas ${from} a ${to}`;
 const optionVersionId = (option: PriceListVersion | PriceListConfirmation) => 'price_list_version_id' in option ? option.price_list_version_id : option.id;
 const PRICE_LIST_BRANDS = ['Renault', 'Peugeot', 'Citroën', 'Fiat', 'Jeep/RAM', 'MG', 'Leapmotor'];
+const moneyInput = (value: string) => value ? `$ ${Number(value.replace(/\D/g, '') || 0).toLocaleString('es-AR')}` : '';
+const moneyDigits = (value: string) => value.replace(/\D/g, '');
 
 export const PriceListModule: React.FC = () => {
   const { session } = useAuth();
@@ -85,7 +87,7 @@ export const PriceListModule: React.FC = () => {
   };
 
   const importRenault = async () => {
-    if (!session || !renaultFile || !effectiveDate || Number(baseSurcharge) <= 0) return setMessage('Seleccioná el Excel, su vigencia y una sobrepauta base mayor que cero.');
+    if (!session || !renaultFile || !effectiveDate || Number(moneyDigits(baseSurcharge)) <= 0) return setMessage('Seleccioná el Excel, su vigencia y una sobrepauta base mayor que cero.');
     setSaving(true);
     try {
       const items = parseRenaultWorkbook(await renaultFile.arrayBuffer());
@@ -94,14 +96,14 @@ export const PriceListModule: React.FC = () => {
       const path = `price-lists/renault/${Date.now()}-${renaultFile.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
       const upload = await supabase.storage.from('commercial-documents').upload(path, renaultFile, { contentType: renaultFile.type || 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', upsert: false });
       if (upload.error) throw upload.error;
-      await createRenaultDraft(session.access_token, { name: `Lista Renault ${effectiveDate}`, effective_date: effectiveDate, base_surcharge: Number(baseSurcharge), document: { filename: renaultFile.name, path, mime_type: renaultFile.type || 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', byte_size: renaultFile.size }, items });
+      await createRenaultDraft(session.access_token, { name: `Lista Renault ${effectiveDate}`, effective_date: effectiveDate, base_surcharge: Number(moneyDigits(baseSurcharge)), document: { filename: renaultFile.name, path, mime_type: renaultFile.type || 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', byte_size: renaultFile.size }, items });
       setRenaultFile(null); setBaseSurcharge(''); setMessage('Borrador Renault creado para revisión.'); await load();
     } catch (error) { setMessage(error instanceof Error ? error.message : 'No se pudo importar el Excel Renault.'); }
     finally { setSaving(false); }
   };
   const importMg = async () => {
-    if (!session || !mgFiles.length || !effectiveDate || Number(baseSurcharge) <= 0 || Number(mgRate) <= 0) return setMessage('Seleccioná los PDFs MG, vigencia, sobrepauta y cotización.');
-    setSaving(true); try { const parsed = await Promise.all(mgFiles.map(async file => ({ file, items: await parseMgCircular(await file.arrayBuffer()).catch(() => null) }))); const source = parsed.find(candidate => candidate.items); if (!source?.items) throw new Error('No se encontró la circular MG con la tabla de valores.'); const supabase = await getSupabaseClient(); if (!supabase) throw new Error('No se pudo conectar al almacenamiento seguro.'); const documents = await Promise.all(mgFiles.map(async file => { const path = `price-lists/mg/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`; const upload = await supabase.storage.from('commercial-documents').upload(path, file, { contentType: 'application/pdf', upsert: false }); if (upload.error) throw upload.error; return { filename: file.name, path, mime_type: 'application/pdf', byte_size: file.size }; })); await createMgDraft(session.access_token, { name: `Lista MG ${effectiveDate}`, effective_date: effectiveDate, base_surcharge: Number(baseSurcharge), exchange_rate: Number(mgRate), exchange_rate_source: mgRateSource, document: documents[0], documents, items: source.items }); setMessage('Borrador MG creado en pesos para revisión.'); await load(); } catch (error) { setMessage(error instanceof Error ? error.message : 'No se pudo importar MG.'); } finally { setSaving(false); }
+    if (!session || !mgFiles.length || !effectiveDate || Number(moneyDigits(baseSurcharge)) <= 0 || Number(mgRate) <= 0) return setMessage('Seleccioná los PDFs MG, vigencia, sobrepauta y cotización.');
+    setSaving(true); try { const parsed = await Promise.all(mgFiles.map(async file => ({ file, items: await parseMgCircular(await file.arrayBuffer()).catch(() => null) }))); const source = parsed.find(candidate => candidate.items); if (!source?.items) throw new Error('No se encontró la circular MG con la tabla de valores.'); const supabase = await getSupabaseClient(); if (!supabase) throw new Error('No se pudo conectar al almacenamiento seguro.'); const documents = await Promise.all(mgFiles.map(async file => { const path = `price-lists/mg/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`; const upload = await supabase.storage.from('commercial-documents').upload(path, file, { contentType: 'application/pdf', upsert: false }); if (upload.error) throw upload.error; return { filename: file.name, path, mime_type: 'application/pdf', byte_size: file.size }; })); await createMgDraft(session.access_token, { name: `Lista MG ${effectiveDate}`, effective_date: effectiveDate, base_surcharge: Number(moneyDigits(baseSurcharge)), exchange_rate: Number(mgRate), exchange_rate_source: mgRateSource, document: documents[0], documents, items: source.items }); setMessage('Borrador MG creado en pesos para revisión.'); await load(); } catch (error) { setMessage(error instanceof Error ? error.message : 'No se pudo importar MG.'); } finally { setSaving(false); }
   };
 
   if (loading) return <div className="py-16 text-center text-sm text-slate-400">Cargando listas de precios…</div>;

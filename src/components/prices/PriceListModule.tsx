@@ -18,6 +18,7 @@ type LoadedData = {
 
 const rangeLabel = (from: number, to: number) => from === to ? `Cuota ${from}` : `Cuotas ${from} a ${to}`;
 const optionVersionId = (option: PriceListVersion | PriceListConfirmation) => 'price_list_version_id' in option ? option.price_list_version_id : option.id;
+const PRICE_LIST_BRANDS = ['Renault', 'Peugeot', 'Citroën', 'Fiat', 'Jeep/RAM', 'MG', 'Leapmotor'];
 
 export const PriceListModule: React.FC = () => {
   const { session } = useAuth();
@@ -34,6 +35,7 @@ export const PriceListModule: React.FC = () => {
   const [officialValues, setOfficialValues] = useState<Record<string, string>>({});
   const [showHistory, setShowHistory] = useState(false);
   const [historyMonth, setHistoryMonth] = useState('');
+  const [selectedBrand, setSelectedBrand] = useState('Renault');
 
   const load = useCallback(async () => {
     if (!session) return;
@@ -98,7 +100,8 @@ export const PriceListModule: React.FC = () => {
   if (!data) return <div className="py-16 text-center text-sm text-rose-300">{message || 'No se pudo cargar el módulo.'}</div>;
 
   const options = data.scope === 'manage' ? data.versions.filter(version => version.status !== 'archived') : data.confirmations;
-  const historyVersions = data.scope === 'manage' ? data.versions.filter(version => version.status === 'archived' && (!historyMonth || version.effective_date.startsWith(historyMonth))) : [];
+  const visibleOptions = options.filter(option => option.brand === selectedBrand);
+  const historyVersions = data.scope === 'manage' ? data.versions.filter(version => version.brand === selectedBrand && version.status === 'archived' && (!historyMonth || version.effective_date.startsWith(historyMonth))) : [];
   const isManage = data.scope === 'manage';
   const selectedConfirmation = data.confirmations.find(item => item.price_list_version_id === selectedVersionId);
   const managerPending = data.scope === 'manager' && selectedConfirmation?.status === 'pending';
@@ -124,14 +127,16 @@ export const PriceListModule: React.FC = () => {
 
     {message && <div className={`rounded-lg border px-4 py-3 text-sm ${/guardad|confirmad|publicad/i.test(message) ? 'border-emerald-700/60 bg-emerald-950/40 text-emerald-200' : 'border-amber-700/60 bg-amber-950/40 text-amber-200'}`}>{message}</div>}
 
-    {isManage && <section className="rounded-xl border border-blue-700/50 bg-gradient-to-br from-blue-950/50 to-slate-900 p-5"><div className="flex items-start gap-3"><div className="rounded-lg bg-blue-500/15 p-2 text-blue-300"><FileUp className="h-5 w-5" /></div><div><h3 className="font-semibold text-slate-100">Nueva lista Renault</h3><p className="mt-1 text-xs text-slate-400">Subí la circular Excel, elegí vigencia y definí la sobrepauta base para generar un borrador revisable.</p></div></div><div className="mt-4 grid gap-3 md:grid-cols-[minmax(0,1fr)_auto_auto_auto]"><label className="flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border border-dashed border-blue-400/70 bg-blue-500/10 px-3 text-xs font-semibold text-blue-100 hover:bg-blue-500/20"><FileUp className="h-4 w-4" /><span className="truncate">{renaultFile?.name || 'Seleccionar archivo Excel (.xlsx)'}</span><input type="file" accept=".xlsx" onChange={event => setRenaultFile(event.target.files?.[0] || null)} className="sr-only" /></label><input type="date" value={effectiveDate} onChange={event => setEffectiveDate(event.target.value)} aria-label="Vigencia" className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-white" /><input type="number" min="1" placeholder="Sobrepauta base" value={baseSurcharge} onChange={event => setBaseSurcharge(event.target.value)} className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-white" /><button disabled={saving} onClick={() => void importRenault()} className="rounded-lg bg-blue-600 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-500 disabled:opacity-50">Crear borrador</button></div></section>}
+    {isManage && selectedBrand === 'Renault' && <section className="rounded-xl border border-blue-700/50 bg-gradient-to-br from-blue-950/50 to-slate-900 p-5"><div className="flex items-start gap-3"><div className="rounded-lg bg-blue-500/15 p-2 text-blue-300"><FileUp className="h-5 w-5" /></div><div><h3 className="font-semibold text-slate-100">Nueva lista Renault</h3><p className="mt-1 text-xs text-slate-400">Subí la circular Excel, elegí vigencia y definí la sobrepauta base para generar un borrador revisable.</p></div></div><div className="mt-4 grid gap-3 md:grid-cols-[minmax(0,1fr)_auto_auto_auto]"><label className="flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border border-dashed border-blue-400/70 bg-blue-500/10 px-3 text-xs font-semibold text-blue-100 hover:bg-blue-500/20"><FileUp className="h-4 w-4" /><span className="truncate">{renaultFile?.name || 'Seleccionar archivo Excel (.xlsx)'}</span><input type="file" accept=".xlsx" onChange={event => setRenaultFile(event.target.files?.[0] || null)} className="sr-only" /></label><input type="date" value={effectiveDate} onChange={event => setEffectiveDate(event.target.value)} aria-label="Vigencia" className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-white" /><input type="number" min="1" placeholder="Sobrepauta base" value={baseSurcharge} onChange={event => setBaseSurcharge(event.target.value)} className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-white" /><button disabled={saving} onClick={() => void importRenault()} className="rounded-lg bg-blue-600 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-500 disabled:opacity-50">Crear borrador</button></div></section>}
 
-    {!options.length ? <section className="rounded-xl border border-dashed border-slate-700 bg-slate-900/60 px-6 py-16 text-center">
+    <section className="rounded-xl border border-slate-800 bg-slate-900 p-3"><div className="mb-2 px-1 text-[10px] font-semibold uppercase tracking-wider text-slate-500">Elegí una marca</div><div className="flex gap-2 overflow-x-auto pb-1">{PRICE_LIST_BRANDS.map(brand => <button key={brand} onClick={() => { setSelectedBrand(brand); const first = options.find(option => option.brand === brand); setSelectedVersionId(first ? optionVersionId(first) : ''); }} className={`whitespace-nowrap rounded-lg border px-3 py-2 text-xs font-semibold ${selectedBrand === brand ? 'border-blue-500 bg-blue-600 text-white' : 'border-slate-700 bg-slate-950 text-slate-300 hover:bg-slate-800'}`}>{brand}</button>)}</div></section>
+
+    {!visibleOptions.length ? <section className="rounded-xl border border-dashed border-slate-700 bg-slate-900/60 px-6 py-16 text-center">
       <FileText className="mx-auto mb-3 h-9 w-9 text-slate-600" />
-      <h3 className="font-semibold text-slate-200">{isManage ? 'No hay circulares cargadas' : 'No hay listas disponibles para tu estructura'}</h3>
-      <p className="mx-auto mt-2 max-w-lg text-sm text-slate-400">{isManage ? 'La carga de circulares se incorpora en el siguiente paso del módulo.' : 'La lista aparecerá cuando Gerencia confirme la publicación para tu estructura.'}</p>
+      <h3 className="font-semibold text-slate-200">{isManage ? `No hay circulares ${selectedBrand} cargadas` : `No hay listas ${selectedBrand} disponibles para tu estructura`}</h3>
+      <p className="mx-auto mt-2 max-w-lg text-sm text-slate-400">{isManage ? 'Elegí otra marca o cargá una nueva circular cuando su importador esté disponible.' : 'La lista aparecerá cuando Gerencia confirme la publicación para tu estructura.'}</p>
     </section> : <>
-      <div className="flex gap-2 overflow-x-auto pb-1">{options.map(option => {
+      <div className="flex gap-2 overflow-x-auto pb-1">{visibleOptions.map(option => {
         const versionId = optionVersionId(option);
         return <button key={option.id} onClick={() => setSelectedVersionId(versionId)} className={`whitespace-nowrap rounded-lg border px-3 py-2 text-xs font-semibold ${selectedVersionId === versionId ? 'border-blue-500 bg-blue-600 text-white' : 'border-slate-700 bg-slate-900 text-slate-300 hover:bg-slate-800'}`}>{option.brand} · {option.effective_date}</button>;
       })}</div>

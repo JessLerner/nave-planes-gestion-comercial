@@ -58,7 +58,6 @@ export const PriceListModule: React.FC = () => {
       from: segment.installment_from, to: segment.installment_to, quotaValue: Number(segment.total_value),
     })),
   )])), [data?.segments, selectedItems]);
-  const columns = useMemo(() => [...new Map([...displaySegments.values()].flat().map(segment => [`${segment.from}-${segment.to}`, segment])).values()], [displaySegments]);
 
   const runAction = async (action: () => Promise<unknown>, success: string) => {
     setSaving(true);
@@ -129,15 +128,19 @@ export const PriceListModule: React.FC = () => {
         <thead className="border-b border-slate-800 bg-slate-950/70 text-[10px] font-semibold uppercase tracking-wider text-slate-400"><tr>
           <th className="px-4 py-3">Modelo</th><th className="px-4 py-3">Plan</th><th className="px-4 py-3 text-center">Cuotas</th><th className="px-4 py-3 text-right">Valor básico</th><th className="px-4 py-3 text-right">Cuota pura</th>
           {data.scope !== 'supervisor' && <th className="px-4 py-3 text-right">Cuota 1</th>}{data.scope !== 'supervisor' && <th className="px-4 py-3 text-right">Sobrepauta</th>}<th className="px-4 py-3 text-right">Suscripción</th>
-          {columns.map(column => <th key={`${column.from}-${column.to}`} className="whitespace-nowrap px-4 py-3 text-right">{rangeLabel(column.from, column.to)}</th>)}<th className="px-4 py-3">Entregas pactadas</th>
+          <th className="whitespace-nowrap px-4 py-3 text-right">Cuotas 2 a 12</th><th className="whitespace-nowrap px-4 py-3">Cuotas 13 en adelante</th><th className="px-4 py-3">Entregas pactadas</th>
         </tr></thead>
         <tbody className="divide-y divide-slate-800/80">{selectedItems.map(item => {
           const itemSegments = displaySegments.get(item.id) || [];
+          const earlySegments = itemSegments.filter(segment => segment.from >= 2 && segment.to <= 12);
+          const laterSegments = itemSegments.filter(segment => segment.from >= 13);
+          const subscription = Number(item.subscription_value) || Number(item.cuota_1_value || 0) + Number(item.surcharge_amount ?? item.base_surcharge ?? 0);
           return <tr key={item.id} className="hover:bg-slate-800/40"><td className="px-4 py-3 font-semibold text-white">{item.model}</td><td className="px-4 py-3 text-slate-300">{item.plan_type}</td><td className="px-4 py-3 text-center font-mono text-slate-300">{item.total_installments}</td><td className="px-4 py-3 text-right font-mono text-slate-200">{formatARS(Number(item.basic_value))}</td><td className="px-4 py-3 text-right font-mono text-slate-200">{formatARS(Number(item.pure_installment))}</td>
             {data.scope !== 'supervisor' && <td className="px-4 py-3 text-right font-mono text-slate-200">{formatARS(Number(item.cuota_1_value))}</td>}
             {data.scope !== 'supervisor' && <td className="px-4 py-3 text-right">{managerPending ? <input type="number" min={item.base_surcharge} value={surcharges[item.id] ?? ''} onChange={event => setSurcharges(current => ({ ...current, [item.id]: event.target.value }))} className="w-28 rounded border border-slate-700 bg-slate-950 px-2 py-1 text-right font-mono text-slate-100 focus:border-blue-500 focus:outline-none" /> : <span className="font-mono text-emerald-300">{formatARS(Number(item.surcharge_amount ?? item.base_surcharge))}</span>}</td>}
-            <td className="px-4 py-3 text-right font-mono font-bold text-blue-300">{formatARS(Number(item.subscription_value))}</td>
-            {columns.map(column => { const segment = itemSegments.find(entry => entry.from <= column.from && entry.to >= column.to); return <td key={`${item.id}-${column.from}`} className="px-4 py-3 text-right font-mono text-slate-200">{segment ? formatARS(segment.displayValue) : '—'}</td>; })}
+            <td className="px-4 py-3 text-right font-mono font-bold text-blue-300">{formatARS(subscription)}</td>
+            <td className="px-4 py-3 text-right font-mono text-slate-200">{earlySegments.length ? earlySegments.map(segment => <div key={`${segment.from}-${segment.to}`}>{rangeLabel(segment.from, segment.to)}: {formatARS(segment.displayValue)}</div>) : '—'}</td>
+            <td className="px-4 py-3 font-mono text-slate-200">{laterSegments.length ? laterSegments.map(segment => <div key={`${segment.from}-${segment.to}`}>{rangeLabel(segment.from, segment.to)}: {formatARS(segment.displayValue)}</div>) : '—'}</td>
             <td className="max-w-56 px-4 py-3 text-slate-300">{item.delivery_terms || '—'}</td></tr>;
         })}</tbody>
       </table></section>

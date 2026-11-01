@@ -5,7 +5,8 @@ import { getSupabaseClient } from '../../auth/supabase';
 import { formatARS } from '../../utils/businessLogic';
 import { installmentBucketValues, installmentColumns } from '../../services/prices/priceListPresentation';
 import { parseRenaultWorkbook } from '../../services/prices/renaultWorkbook';
-import { archivePriceList, confirmPriceList, createRenaultDraft, getPriceLists, publishPriceList, saveOfficialValues, saveSurcharges, type PriceListConfirmation, type PriceListItemView, type PriceListScope, type PriceListSegmentView, type PriceListVersion } from '../../services/prices/priceListsApi';
+import { parseMgCircular } from '../../services/prices/mgCircular';
+import { archivePriceList, confirmPriceList, createMgDraft, createRenaultDraft, getBnaRate, getPriceLists, publishPriceList, saveOfficialValues, saveSurcharges, type PriceListConfirmation, type PriceListItemView, type PriceListScope, type PriceListSegmentView, type PriceListVersion } from '../../services/prices/priceListsApi';
 import { exportPriceListXlsx, printPriceListPdf } from '../../services/prices/priceListExport';
 
 type LoadedData = {
@@ -36,6 +37,9 @@ export const PriceListModule: React.FC = () => {
   const [showHistory, setShowHistory] = useState(false);
   const [historyMonth, setHistoryMonth] = useState('');
   const [selectedBrand, setSelectedBrand] = useState('Renault');
+  const [mgFile, setMgFile] = useState<File | null>(null);
+  const [mgRate, setMgRate] = useState('');
+  const [mgRateSource, setMgRateSource] = useState('Manual');
 
   const load = useCallback(async () => {
     if (!session) return;
@@ -95,6 +99,10 @@ export const PriceListModule: React.FC = () => {
     } catch (error) { setMessage(error instanceof Error ? error.message : 'No se pudo importar el Excel Renault.'); }
     finally { setSaving(false); }
   };
+  const importMg = async () => {
+    if (!session || !mgFile || !effectiveDate || Number(baseSurcharge) <= 0 || Number(mgRate) <= 0) return setMessage('Seleccioná el PDF MG, vigencia, sobrepauta y cotización.');
+    setSaving(true); try { const items = await parseMgCircular(await mgFile.arrayBuffer()); const supabase = await getSupabaseClient(); if (!supabase) throw new Error('No se pudo conectar al almacenamiento seguro.'); const path = `price-lists/mg/${Date.now()}-${mgFile.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`; const upload = await supabase.storage.from('commercial-documents').upload(path, mgFile, { contentType: 'application/pdf', upsert: false }); if (upload.error) throw upload.error; await createMgDraft(session.access_token, { name: `Lista MG ${effectiveDate}`, effective_date: effectiveDate, base_surcharge: Number(baseSurcharge), exchange_rate: Number(mgRate), exchange_rate_source: mgRateSource, document: { filename: mgFile.name, path, mime_type: 'application/pdf', byte_size: mgFile.size }, items }); setMessage('Borrador MG creado en pesos para revisión.'); await load(); } catch (error) { setMessage(error instanceof Error ? error.message : 'No se pudo importar MG.'); } finally { setSaving(false); }
+  };
 
   if (loading) return <div className="py-16 text-center text-sm text-slate-400">Cargando listas de precios…</div>;
   if (!data) return <div className="py-16 text-center text-sm text-rose-300">{message || 'No se pudo cargar el módulo.'}</div>;
@@ -128,6 +136,7 @@ export const PriceListModule: React.FC = () => {
     {message && <div className={`rounded-lg border px-4 py-3 text-sm ${/guardad|confirmad|publicad/i.test(message) ? 'border-emerald-700/60 bg-emerald-950/40 text-emerald-200' : 'border-amber-700/60 bg-amber-950/40 text-amber-200'}`}>{message}</div>}
 
     {isManage && selectedBrand === 'Renault' && <section className="rounded-xl border border-blue-700/50 bg-gradient-to-br from-blue-950/50 to-slate-900 p-5"><div className="flex items-start gap-3"><div className="rounded-lg bg-blue-500/15 p-2 text-blue-300"><FileUp className="h-5 w-5" /></div><div><h3 className="font-semibold text-slate-100">Nueva lista Renault</h3><p className="mt-1 text-xs text-slate-400">Subí la circular Excel, elegí vigencia y definí la sobrepauta base para generar un borrador revisable.</p></div></div><div className="mt-4 grid gap-3 md:grid-cols-[minmax(0,1fr)_auto_auto_auto]"><label className="flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border border-dashed border-blue-400/70 bg-blue-500/10 px-3 text-xs font-semibold text-blue-100 hover:bg-blue-500/20"><FileUp className="h-4 w-4" /><span className="truncate">{renaultFile?.name || 'Seleccionar archivo Excel (.xlsx)'}</span><input type="file" accept=".xlsx" onChange={event => setRenaultFile(event.target.files?.[0] || null)} className="sr-only" /></label><input type="date" value={effectiveDate} onChange={event => setEffectiveDate(event.target.value)} aria-label="Vigencia" className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-white" /><input type="number" min="1" placeholder="Sobrepauta base" value={baseSurcharge} onChange={event => setBaseSurcharge(event.target.value)} className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-white" /><button disabled={saving} onClick={() => void importRenault()} className="rounded-lg bg-blue-600 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-500 disabled:opacity-50">Crear borrador</button></div></section>}
+    {isManage && selectedBrand === 'MG' && <section className="rounded-xl border border-blue-700/50 bg-gradient-to-br from-blue-950/50 to-slate-900 p-5"><h3 className="font-semibold text-slate-100">Nueva lista MG</h3><div className="mt-4 grid gap-3 md:grid-cols-5"><input type="file" accept=".pdf" onChange={event => setMgFile(event.target.files?.[0] || null)} className="text-xs text-slate-200"/><input type="date" value={effectiveDate} onChange={event => setEffectiveDate(event.target.value)} className="rounded bg-slate-950 px-3 py-2 text-xs text-white"/><input type="number" value={mgRate} placeholder="Dólar vendedor" onChange={event=>{setMgRate(event.target.value);setMgRateSource('Manual')}} className="rounded bg-slate-950 px-3 py-2 text-xs text-white"/><button onClick={() => void runAction(async()=>{const rate=await getBnaRate(session!.access_token);setMgRate(String(rate.exchange_rate));setMgRateSource(rate.exchange_rate_source);},'Cotización BNA cargada.')} className="rounded border border-blue-700 px-3 py-2 text-xs text-blue-100">Traer BNA</button><button disabled={saving} onClick={()=>void importMg()} className="rounded bg-blue-600 px-3 py-2 text-xs font-semibold text-white">Crear borrador MG</button></div></section>}
 
     <section className="rounded-xl border border-slate-800 bg-slate-900 p-3"><div className="mb-2 px-1 text-[10px] font-semibold uppercase tracking-wider text-slate-500">Elegí una marca</div><div className="flex gap-2 overflow-x-auto pb-1">{PRICE_LIST_BRANDS.map(brand => <button key={brand} onClick={() => { setSelectedBrand(brand); const first = options.find(option => option.brand === brand); setSelectedVersionId(first ? optionVersionId(first) : ''); }} className={`whitespace-nowrap rounded-lg border px-3 py-2 text-xs font-semibold ${selectedBrand === brand ? 'border-blue-500 bg-blue-600 text-white' : 'border-slate-700 bg-slate-950 text-slate-300 hover:bg-slate-800'}`}>{brand}</button>)}</div></section>
 

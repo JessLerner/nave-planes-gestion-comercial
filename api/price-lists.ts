@@ -94,28 +94,42 @@ export default async function handler(request: Request, response: Response) {
     const body = request.body as { action?: unknown; version_id?: unknown; surcharges?: unknown };
     const action = typeof body?.action === 'string' ? body.action : '';
     const versionId = body?.version_id;
-    if (action !== 'create_renault_draft' && !isUuid(versionId)) return response.status(400).json({ success: false, message: 'Lista inválida.' });
+    if (!['create_renault_draft', 'get_bna_rate', 'create_mg_draft'].includes(action) && !isUuid(versionId)) return response.status(400).json({ success: false, message: 'Lista inválida.' });
 
     await db.query('begin');
     await db.query(`select set_config('request.jwt.claim.sub', $1, true)`, [userId]);
-    if (action === 'create_renault_draft') {
+    if (action === 'get_bna_rate') {
+      const bna = await fetch('https://www.bna.com.ar/Personas');
+      const page = await bna.text();
+      const match = page.match(/Dolar U\.S\.A[\s\S]{0,300}?<td[^>]*>\s*([\d.,]+)\s*<\/td>/i);
+      const sale = page.match(/Dolar U\.S\.A[\s\S]{0,500}?Venta[\s\S]{0,500}?([\d.,]+)/i);
+      const value = Number((sale?.[1] || match?.[1] || '').replace(/\./g, '').replace(',', '.'));
+      if (!bna.ok || !Number.isFinite(value) || value <= 0) throw new Error('No se pudo obtener el dólar vendedor de Banco Nación. Ingresalo manualmente.');
+      await db.query('commit');
+      return response.status(200).json({ success: true, exchange_rate: value, exchange_rate_source: 'Banco Nación · dólar billete vendedor' });
+    }
+    if (action === 'create_renault_draft' || action === 'create_mg_draft') {
       if (!profile.can_manage_price_lists) throw new Error('No tenés permiso para crear borradores.');
-      const draft = body as { name?: unknown; effective_date?: unknown; base_surcharge?: unknown; document?: { filename?: unknown; path?: unknown; mime_type?: unknown; byte_size?: unknown }; items?: Array<{ sourceKey?: string; model?: string; planType?: string; totalInstallments?: number; basicValue?: number; pureInstallment?: number; cuota1Value?: number; upfrontStampValue?: number; segments?: Array<{ from?: number; to?: number; quotaValue?: number }> }> };
+      const draft = body as { name?: unknown; effective_date?: unknown; base_surcharge?: unknown; exchange_rate?: unknown; exchange_rate_source?: unknown; document?: { filename?: unknown; path?: unknown; mime_type?: unknown; byte_size?: unknown }; items?: Array<{ sourceKey?: string; model?: string; planType?: string; totalInstallments?: number; basicValue?: number; pureInstallment?: number; cuota1Value?: number; upfrontStampValue?: number; segments?: Array<{ from?: number; to?: number; quotaValue?: number }> }> };
       const base = numberValue(draft.base_surcharge);
       if (!draft.document || !Array.isArray(draft.items) || !draft.items.length || !base || base <= 0 || typeof draft.effective_date !== 'string') throw new Error('Completá vigencia, sobrepauta base y datos del archivo.');
       const document = draft.document;
       if (typeof document.filename !== 'string' || typeof document.path !== 'string' || typeof document.mime_type !== 'string' || !numberValue(document.byte_size)) throw new Error('El archivo no se subió correctamente.');
-      const version = await db.query<{ id: string }>(`insert into public.price_list_versions(brand,name,effective_date,created_by) values('Renault',$1,$2,$3) returning id`, [typeof draft.name === 'string' ? draft.name : `Lista Renault ${draft.effective_date}`, draft.effective_date, userId]);
-      const storedDocument = await db.query<{ id: string }>(`insert into public.commercial_documents(original_filename,storage_path,mime_type,byte_size,confirmed_brand,effective_date,document_type,uploaded_by) values($1,$2,$3,$4,'Renault',$5,'price_list',$6) returning id`, [document.filename, document.path, document.mime_type, document.byte_size, draft.effective_date, userId]);
+      const brand = action === 'create_mg_draft' ? 'MG' : 'Renault';
+      const rate = action === 'create_mg_draft' ? numberValue(draft.exchange_rate) : null;
+      if (action === 'create_mg_draft' && (!rate || rate <= 0)) throw new Error('Ingresá una cotización válida de dólar vendedor.');
+      const version = await db.query<{ id: string }>(`insert into public.price_list_versions(brand,name,effective_date,source_currency,exchange_rate,exchange_rate_source,exchange_rate_overridden,created_by) values($1,$2,$3,$4,$5,$6,$7,$8) returning id`, [brand, typeof draft.name === 'string' ? draft.name : `Lista ${brand} ${draft.effective_date}`, draft.effective_date, rate ? 'USD' : 'ARS', rate, rate ? (typeof draft.exchange_rate_source === 'string' ? draft.exchange_rate_source : 'Manual') : null, rate ? !String(draft.exchange_rate_source || '').includes('Banco Nación') : false, userId]);
+      const storedDocument = await db.query<{ id: string }>(`insert into public.commercial_documents(original_filename,storage_path,mime_type,byte_size,confirmed_brand,effective_date,document_type,uploaded_by) values($1,$2,$3,$4,$5,'price_list',$6) returning id`, [document.filename, document.path, document.mime_type, document.byte_size, brand, draft.effective_date, userId]);
       await db.query(`insert into public.price_list_sources(price_list_version_id,commercial_document_id) values($1,$2)`, [version.rows[0].id, storedDocument.rows[0].id]);
       for (const [sortOrder, item] of draft.items.entries()) {
         if (!item.sourceKey || !item.model || !item.planType || !numberValue(item.totalInstallments) || !numberValue(item.basicValue) || !numberValue(item.pureInstallment) || !numberValue(item.cuota1Value) || !item.segments?.length) throw new Error('El Excel contiene un plan incompleto.');
-        const upfrontStamp = numberValue(item.upfrontStampValue);
+        const multiplier = rate || 1; const basicValue = Number(item.basicValue) * multiplier; const pureValue = Number(item.pureInstallment) * multiplier; const cuota1Value = Number(item.cuota1Value) * multiplier;
+        const upfrontStamp = numberValue(item.upfrontStampValue) || 0;
         if (upfrontStamp === null || upfrontStamp < 0) throw new Error('El Excel contiene un sellado Renault inválido.');
-        const saved = await db.query<{ id: string }>(`insert into public.price_list_items(price_list_version_id,source_key,model,plan_type,total_installments,basic_value,pure_installment,cuota_1_value,upfront_stamp_value,base_surcharge,sort_order) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) returning id`, [version.rows[0].id, item.sourceKey, item.model, item.planType, item.totalInstallments, item.basicValue, item.pureInstallment, item.cuota1Value, upfrontStamp, base, sortOrder]);
+        const saved = await db.query<{ id: string }>(`insert into public.price_list_items(price_list_version_id,source_key,model,plan_type,total_installments,basic_value,pure_installment,cuota_1_value,upfront_stamp_value,base_surcharge,sort_order) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) returning id`, [version.rows[0].id, item.sourceKey, item.model, item.planType, item.totalInstallments, basicValue, pureValue, cuota1Value, upfrontStamp * multiplier, base, sortOrder]);
         for (const [segmentOrder, segment] of item.segments.entries()) {
           if (!numberValue(segment.from) || !numberValue(segment.to) || numberValue(segment.quotaValue) === null) throw new Error('El Excel contiene un tramo inválido.');
-          await db.query(`insert into public.price_list_installment_segments(price_list_item_id,installment_from,installment_to,quota_value,sort_order) values($1,$2,$3,$4,$5)`, [saved.rows[0].id, segment.from, segment.to, segment.quotaValue, segmentOrder]);
+          await db.query(`insert into public.price_list_installment_segments(price_list_item_id,installment_from,installment_to,quota_value,sort_order) values($1,$2,$3,$4,$5)`, [saved.rows[0].id, segment.from, segment.to, Number(segment.quotaValue) * multiplier, segmentOrder]);
         }
       }
     } else if (action === 'archive') {

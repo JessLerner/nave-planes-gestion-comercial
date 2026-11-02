@@ -45,3 +45,8 @@ ejecutar `20261031_030_reconcile_supervisor_team_projection.sql`.
 Para limpiar proyecciones desalineadas (equipos, vendedores y gerentes
 heredados) sin borrar Legajos ni historial, ejecutar
 `20261031_031_rebuild_roster_projections_from_legajos.sql`.
+
+Para que cada alta, cambio de cargo, responsable, gerente, condición o baja en
+Legajos reconstruya esas proyecciones y el alcance de perfiles dentro de la
+misma transacción, ejecutar después
+`20261031_032_legajos_atomic_roster_sync.sql`.

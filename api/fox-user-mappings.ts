@@ -124,23 +124,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         `)).rows[0];
         id = bucket.id; full_name = 'RECURSOS CON BAJA — histórico Fox';
       } else {
-        const resource = await db.query<{ id: string; full_name: string; dni: string | null; legajo: string | null; employment_type: string | null; team_id: string | null }>(`
-          select staff.id,staff.full_name,staff.dni,staff.legajo,staff.employment_type,coalesce(own_team.id,parent_team.id) as team_id
+        const resource = await db.query<{ id: string; full_name: string; team_id: string | null; seller_id: string | null }>(`
+          select staff.id,staff.full_name,coalesce(own_team.id,parent_team.id) as team_id,seller.id as seller_id
           from public.staff_members staff
+          left join public.sellers seller on seller.staff_member_id=staff.id and seller.active=true
           left join public.teams own_team on own_team.supervisor_staff_id=staff.id and own_team.active=true and own_team.is_sales_team=true
           left join public.teams parent_team on parent_team.supervisor_staff_id=staff.responsible_staff_id and parent_team.active=true and parent_team.is_sales_team=true
           where staff.id=$1 and staff.active=true
         `, [sellerId]);
         if (!resource.rows[0]) continue;
         const candidate = resource.rows[0];
-        const seller = await db.query<{ id: string }>(`
-          insert into public.sellers(full_name,team_id,active,hire_date,dni,staff_member_id,legajo,employment_type)
-          values($1,$2,true,null,$3,$4,$5,$6)
-          on conflict (staff_member_id) where staff_member_id is not null
-          do update set full_name=excluded.full_name,team_id=excluded.team_id,active=true,dni=excluded.dni,legajo=excluded.legajo,employment_type=excluded.employment_type
-          returning id
-        `, [candidate.full_name, candidate.team_id, candidate.dni, candidate.id, candidate.legajo, candidate.employment_type]);
-        id = seller.rows[0].id; team_id = candidate.team_id; full_name = candidate.full_name; staff_member_id = candidate.id;
+        if (!candidate.seller_id) throw new Error(`El recurso ${candidate.full_name} no es un vendedor activo derivado de Legajos.`);
+        id = candidate.seller_id; team_id = candidate.team_id; full_name = candidate.full_name; staff_member_id = candidate.id;
         const occupied = await db.query<{ fox_user_key: string }>(`
           select fox_user_key from public.fox_user_mappings
           where staff_member_id=$1 and fox_user_key<>$2 limit 1

@@ -1,0 +1,369 @@
+{
+  "generatedAt": "2026-11-02T04:20:00.689Z",
+  "generator": "scripts/generate-local-supabase-migrations.mjs",
+  "sourceOfTruth": "supabase/migrations",
+  "purpose": "Bootstrap local only. Never use this derived tree with supabase link, db push, or remote environments.",
+  "migrations": [
+    {
+      "order": 1,
+      "originalFile": "supabase/migrations/20261024_001_nave_planes_schema.sql",
+      "localFile": ".local-supabase/supabase/migrations/20261024000001_001_nave_planes_schema.sql",
+      "localVersion": "20261024000001",
+      "sha256": "027356c383ee412c4b60e0cac50646d4dc083f6a897514479640cc011e7668bc",
+      "dependencies": []
+    },
+    {
+      "order": 2,
+      "originalFile": "supabase/migrations/20261024_002_allow_unknown_roster_history.sql",
+      "localFile": ".local-supabase/supabase/migrations/20261024000002_002_allow_unknown_roster_history.sql",
+      "localVersion": "20261024000002",
+      "sha256": "7e75ef22e39c2f74ef4d4821d5b5b69342eda679063d0f17f9d7fbaef0a0526d",
+      "dependencies": [
+        "001: teams, sellers"
+      ]
+    },
+    {
+      "order": 3,
+      "originalFile": "supabase/migrations/20261024_003_scoring_landing_zone.sql",
+      "localFile": ".local-supabase/supabase/migrations/20261024000003_003_scoring_landing_zone.sql",
+      "localVersion": "20261024000003",
+      "sha256": "2ef8c9ab6f9d73de056336ee68b99c1f18a695968c55f5cc08f95d6fecb12b16",
+      "dependencies": [
+        "001: pgcrypto extension"
+      ]
+    },
+    {
+      "order": 4,
+      "originalFile": "supabase/migrations/20261025_004_access_and_notifications.sql",
+      "localFile": ".local-supabase/supabase/migrations/20261025000004_004_access_and_notifications.sql",
+      "localVersion": "20261025000004",
+      "sha256": "57b8a6bb9d43ad571e89e86e615a898720083556416e2b0c69f88647fc7b3df8",
+      "dependencies": [
+        "001: profiles, teams, sellers, wage_advances, price_lists"
+      ]
+    },
+    {
+      "order": 5,
+      "originalFile": "supabase/migrations/20261025_005_staff_directory.sql",
+      "localFile": ".local-supabase/supabase/migrations/20261025000005_005_staff_directory.sql",
+      "localVersion": "20261025000005",
+      "sha256": "9a15e1b0bce279aa88d24fdf4f5d5af7010eea9dee947d45b2441ca8d440d6fd",
+      "dependencies": [
+        "001: profiles, teams, sellers, app_role"
+      ]
+    },
+    {
+      "order": 6,
+      "originalFile": "supabase/migrations/20261027_006_recruitment_and_private_documents.sql",
+      "localFile": ".local-supabase/supabase/migrations/20261027000006_006_recruitment_and_private_documents.sql",
+      "localVersion": "20261027000006",
+      "sha256": "8d16af3577141f4506a1e813b75184b08ec0eacce73ea7ffe055508ef1a0b61c",
+      "dependencies": [
+        "001: profiles, teams",
+        "005: staff_members"
+      ]
+    },
+    {
+      "order": 7,
+      "originalFile": "supabase/migrations/20261027_007_fox_lead_snapshots.sql",
+      "localFile": ".local-supabase/supabase/migrations/20261027000007_007_fox_lead_snapshots.sql",
+      "localVersion": "20261027000007",
+      "sha256": "1a51e83f74367ee3a6bb141a2aa30b39e50137844c8da998baaeae1517007782",
+      "dependencies": [
+        "001: sellers, teams"
+      ]
+    },
+    {
+      "order": 8,
+      "originalFile": "supabase/migrations/20261027_008_roster_management.sql",
+      "localFile": ".local-supabase/supabase/migrations/20261027000008_008_roster_management.sql",
+      "localVersion": "20261027000008",
+      "sha256": "2d8d79e487f184b41aed0f5bb4ab682d612261fad29c8904ff460e1cc19be08d",
+      "dependencies": [
+        "001: auth.users",
+        "005: staff_members"
+      ]
+    },
+    {
+      "order": 9,
+      "originalFile": "supabase/migrations/20261027_009_expand_staff_roles.sql",
+      "localFile": ".local-supabase/supabase/migrations/20261027000009_009_expand_staff_roles.sql",
+      "localVersion": "20261027000009",
+      "sha256": "d6a8eada08ac2717abbdb6756f3424224fe52cc7e969271c2e5ae0fcf5f024d3",
+      "dependencies": [
+        "005: staff_role"
+      ]
+    },
+    {
+      "order": 10,
+      "originalFile": "supabase/migrations/20261027_010_staff_reporting_lines.sql",
+      "localFile": ".local-supabase/supabase/migrations/20261027000010_010_staff_reporting_lines.sql",
+      "localVersion": "20261027000010",
+      "sha256": "4647efc67ec12d0d5bb1d09c12f85dd23e9dd5884ac2300a3080f941479fd84d",
+      "dependencies": [
+        "005: staff_members"
+      ]
+    },
+    {
+      "order": 11,
+      "originalFile": "supabase/migrations/20261030_011_team_operational_visibility.sql",
+      "localFile": ".local-supabase/supabase/migrations/20261030000011_011_team_operational_visibility.sql",
+      "localVersion": "20261030000011",
+      "sha256": "5740ce5ec3a4caa37e3ec6d897b97f1918bf6c2a21777acff2b48e5e09ceba0d",
+      "dependencies": [
+        "001: teams"
+      ]
+    },
+    {
+      "order": 12,
+      "originalFile": "supabase/migrations/20261030_012_reset_roster_foundation.sql",
+      "localFile": ".local-supabase/supabase/migrations/20261030000012_012_reset_roster_foundation.sql",
+      "localVersion": "20261030000012",
+      "sha256": "774177d89733978573a016db420aa5737e17df74cd1d358b2779b9de8f93491b",
+      "dependencies": [
+        "001/004/005/008: roster tables and current_app_role()"
+      ]
+    },
+    {
+      "order": 13,
+      "originalFile": "supabase/migrations/20261030_013_resources_rebuild_foundation.sql",
+      "localFile": ".local-supabase/supabase/migrations/20261030000013_013_resources_rebuild_foundation.sql",
+      "localVersion": "20261030000013",
+      "sha256": "de10404dd98f052565da5d4413fc929f58d9beacd2f3ca6f0ae40f3c41d5e537",
+      "dependencies": [
+        "001: teams, sellers",
+        "005: staff_members"
+      ]
+    },
+    {
+      "order": 14,
+      "originalFile": "supabase/migrations/20261030_014_resource_normalization_rules.sql",
+      "localFile": ".local-supabase/supabase/migrations/20261030000014_014_resource_normalization_rules.sql",
+      "localVersion": "20261030000014",
+      "sha256": "742801f50ca506117897aa77ce18385d6166413b0ed6415839e4c3ce6be0a4ca",
+      "dependencies": [
+        "013: hr_areas/hr_roles foundation"
+      ]
+    },
+    {
+      "order": 15,
+      "originalFile": "supabase/migrations/20261030_015_effective_manager_hierarchy.sql",
+      "localFile": ".local-supabase/supabase/migrations/20261030000015_015_effective_manager_hierarchy.sql",
+      "localVersion": "20261030000015",
+      "sha256": "00745f0884dafb86a245f0cea444d10b41f4e5d2f1e618eb4515a12a8cce4d63",
+      "dependencies": [
+        "013: staff role catalog and hierarchy columns"
+      ]
+    },
+    {
+      "order": 16,
+      "originalFile": "supabase/migrations/20261030_016_hr_import_staging.sql",
+      "localFile": ".local-supabase/supabase/migrations/20261030000016_016_hr_import_staging.sql",
+      "localVersion": "20261030000016",
+      "sha256": "bc5a6104b2dca7922a3b171b233b18ac3ffa9526ce036aa0666084dc156c52c8",
+      "dependencies": [
+        "013: hr_import_runs"
+      ]
+    },
+    {
+      "order": 17,
+      "originalFile": "supabase/migrations/20261030_017_hr_import_operational_roster.sql",
+      "localFile": ".local-supabase/supabase/migrations/20261030000017_017_hr_import_operational_roster.sql",
+      "localVersion": "20261030000017",
+      "sha256": "47a21c395a02261bb08c5369aa9b6e2f6cfe7e62a8e491de392cbf9702210441",
+      "dependencies": [
+        "013: hr_roles, teams, sellers"
+      ]
+    },
+    {
+      "order": 18,
+      "originalFile": "supabase/migrations/20261030_018_hr_import_permissions.sql",
+      "localFile": ".local-supabase/supabase/migrations/20261030000018_018_hr_import_permissions.sql",
+      "localVersion": "20261030000018",
+      "sha256": "7d5874d2593e017a2b7d24c4df26f7fda020939bd26025ab8b75fd89152ffbc9",
+      "dependencies": [
+        "015: effective_manager_staff_id"
+      ]
+    },
+    {
+      "order": 19,
+      "originalFile": "supabase/migrations/20261030_019_hr_role_import_mappings.sql",
+      "localFile": ".local-supabase/supabase/migrations/20261030000019_019_hr_role_import_mappings.sql",
+      "localVersion": "20261030000019",
+      "sha256": "f71a3662b92331c83eb2b26824a1c0ec5de4e3a3164afb052d63090c21300d19",
+      "dependencies": [
+        "013/017: hr_roles and areas"
+      ]
+    },
+    {
+      "order": 20,
+      "originalFile": "supabase/migrations/20261030_020_sales_operations_persistence.sql",
+      "localFile": ".local-supabase/supabase/migrations/20261030000020_020_sales_operations_persistence.sql",
+      "localVersion": "20261030000020",
+      "sha256": "190184eb06b4a62f1128ade417ace27fa0fbdde8497946dc5b5354ed0379ec2a",
+      "dependencies": [
+        "001: sales_operations"
+      ]
+    },
+    {
+      "order": 21,
+      "originalFile": "supabase/migrations/20261030_021_wage_advance_review_notes.sql",
+      "localFile": ".local-supabase/supabase/migrations/20261030000021_021_wage_advance_review_notes.sql",
+      "localVersion": "20261030000021",
+      "sha256": "38354540ac5bcd25ef900aae743500a083049e755229d5e2a86950a42c3e55dc",
+      "dependencies": [
+        "001: wage_advances"
+      ]
+    },
+    {
+      "order": 22,
+      "originalFile": "supabase/migrations/20261030_022_manual_schema_reconciliation.sql",
+      "localFile": ".local-supabase/supabase/migrations/20261030000022_022_manual_schema_reconciliation.sql",
+      "localVersion": "20261030000022",
+      "sha256": "1fa8273e477a04b22077178138989cef2e56a082bd2c8964671a06eb3742f1a8",
+      "dependencies": [
+        "001/005/013/015/016/017/019: reconciliation of existing schema"
+      ]
+    },
+    {
+      "order": 23,
+      "originalFile": "supabase/migrations/20261030_023_backfill_supervisor_teams.sql",
+      "localFile": ".local-supabase/supabase/migrations/20261030000023_023_backfill_supervisor_teams.sql",
+      "localVersion": "20261030000023",
+      "sha256": "2e5ec7b26c0db695a11bd89482c51f7f79949ecd23b3134c2004ffa881a99944",
+      "dependencies": [
+        "013/015/017/022: derived supervisor teams"
+      ]
+    },
+    {
+      "order": 24,
+      "originalFile": "supabase/migrations/20261031_024_staff_exit_history.sql",
+      "localFile": ".local-supabase/supabase/migrations/20261031000024_024_staff_exit_history.sql",
+      "localVersion": "20261031000024",
+      "sha256": "2cbb23f290e9efbb2aebcd65d2329158d69ed462e7c3e696347a145302e2b488",
+      "dependencies": [
+        "005: staff_members"
+      ]
+    },
+    {
+      "order": 25,
+      "originalFile": "supabase/migrations/20261031_025_preserve_manual_manager_override.sql",
+      "localFile": ".local-supabase/supabase/migrations/20261031000025_025_preserve_manual_manager_override.sql",
+      "localVersion": "20261031000025",
+      "sha256": "521c301c64db40a4ce2a0b6193a95c42e9582f94978d0879cb545c0a7ac307e6",
+      "dependencies": [
+        "015: manager_assignment_source"
+      ]
+    },
+    {
+      "order": 26,
+      "originalFile": "supabase/migrations/20261031_026_vendor_manager_inheritance.sql",
+      "localFile": ".local-supabase/supabase/migrations/20261031000026_026_vendor_manager_inheritance.sql",
+      "localVersion": "20261031000026",
+      "sha256": "fc1f006d2c41ccc581d5b19eea2094825ae93ebacfe262d1db98c6a99bd29be2",
+      "dependencies": [
+        "025: manual override trigger"
+      ]
+    },
+    {
+      "order": 27,
+      "originalFile": "supabase/migrations/20261031_027_fox_supervisor_context.sql",
+      "localFile": ".local-supabase/supabase/migrations/20261031000027_027_fox_supervisor_context.sql",
+      "localVersion": "20261031000027",
+      "sha256": "2e150543835f0b06a78143c84f1fb469c49fa6f87ae527fd344d06d3b107fa70",
+      "dependencies": [
+        "007/013/023: Fox mappings and roster hierarchy"
+      ]
+    },
+    {
+      "order": 28,
+      "originalFile": "supabase/migrations/20261031_028_fox_import_rpc.sql",
+      "localFile": ".local-supabase/supabase/migrations/20261031000028_028_fox_import_rpc.sql",
+      "localVersion": "20261031000028",
+      "sha256": "213a5d772e31fd024ea1ceb88b9296f7adbd971103eda854bac48f41e01fc1c0",
+      "dependencies": [
+        "007/027: Fox import tables and supervisor context"
+      ]
+    },
+    {
+      "order": 29,
+      "originalFile": "supabase/migrations/20261031_029_fox_mapping_suggestions.sql",
+      "localFile": ".local-supabase/supabase/migrations/20261031000029_029_fox_mapping_suggestions.sql",
+      "localVersion": "20261031000029",
+      "sha256": "4be80019188e2bdb1f4f52c47ef0624599fd2b073bc458df4353bf36c2a6f385",
+      "dependencies": [
+        "007/027: fox_user_mappings and staff_members"
+      ]
+    },
+    {
+      "order": 30,
+      "originalFile": "supabase/migrations/20261031_030_reconcile_supervisor_team_projection.sql",
+      "localFile": ".local-supabase/supabase/migrations/20261031000030_030_reconcile_supervisor_team_projection.sql",
+      "localVersion": "20261031000030",
+      "sha256": "227e5cb48c2216af56a78eb1203f5966192e1cf37f71fdb6b35301f5d596fe9a",
+      "dependencies": [
+        "013/015/017/022/023: Legajos team projection"
+      ]
+    },
+    {
+      "order": 31,
+      "originalFile": "supabase/migrations/20261031_031_rebuild_roster_projections_from_legajos.sql",
+      "localFile": ".local-supabase/supabase/migrations/20261031000031_031_rebuild_roster_projections_from_legajos.sql",
+      "localVersion": "20261031000031",
+      "sha256": "9d9692477e0c3488646beace9d17ecb58e2e8ff1b767958a73a9fcd9b0eb26d7",
+      "dependencies": [
+        "013/015/017/022/030: Legajos-derived projections"
+      ]
+    },
+    {
+      "order": 32,
+      "originalFile": "supabase/migrations/20261031_032_legajos_atomic_roster_sync.sql",
+      "localFile": ".local-supabase/supabase/migrations/20261031000032_032_legajos_atomic_roster_sync.sql",
+      "localVersion": "20261031000032",
+      "sha256": "118da14130069264abcd18154d3dc20140c6a0eca4d6b9c69532f06c909c3914",
+      "dependencies": [
+        "031: rebuild function; 025/026: manager inheritance"
+      ]
+    },
+    {
+      "order": 33,
+      "originalFile": "supabase/migrations/20261031_033_price_lists_circulars.sql",
+      "localFile": ".local-supabase/supabase/migrations/20261031000033_033_price_lists_circulars.sql",
+      "localVersion": "20261031000033",
+      "sha256": "fbb49f47c2aa2458cee3130c4e12296cffc38a39b2bd7ea2f8465203a5f8bf5e",
+      "dependencies": [
+        "001/004/013/015/022: profiles, roles and teams"
+      ]
+    },
+    {
+      "order": 34,
+      "originalFile": "supabase/migrations/20261101_034_renault_upfront_stamp.sql",
+      "localFile": ".local-supabase/supabase/migrations/20261101000034_034_renault_upfront_stamp.sql",
+      "localVersion": "20261101000034",
+      "sha256": "c06d5241703782e4d5cb96aec3c442d75f6b72d9a97a68aa2fffbc0e14750d3f",
+      "dependencies": [
+        "033: price_list_items"
+      ]
+    },
+    {
+      "order": 35,
+      "originalFile": "supabase/migrations/20261101_035_backfill_renault_upfront_stamp.sql",
+      "localFile": ".local-supabase/supabase/migrations/20261101000035_035_backfill_renault_upfront_stamp.sql",
+      "localVersion": "20261101000035",
+      "sha256": "5ae629bbc66879fd5e1f319461e747f5b684769da41ababe9136d4957377d048",
+      "dependencies": [
+        "034: upfront_stamp_value"
+      ]
+    },
+    {
+      "order": 36,
+      "originalFile": "supabase/migrations/20261101_036_require_complete_price_list_segments.sql",
+      "localFile": ".local-supabase/supabase/migrations/20261101000036_036_require_complete_price_list_segments.sql",
+      "localVersion": "20261101000036",
+      "sha256": "3ba6d4150eb63fc3d3ab734a301557796d04998d6d688bcfe74208ebea9baa39",
+      "dependencies": [
+        "033/034/035: price list publishing and segments"
+      ]
+    }
+  ]
+}

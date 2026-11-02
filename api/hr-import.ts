@@ -92,6 +92,10 @@ export default async function handler(request: Request, response: Response) {
     if ((existing.rows[0]?.total || 0) > 0) return response.status(409).json({ success: false, message: 'Ya existe una nómina. No se reemplaza automáticamente.' });
 
     await database.query('begin');
+    // Rows are inserted and linked in phases.  Suppress the statement trigger
+    // during those intermediate phases and materialize the sole Legajos
+    // projection once, before this transaction becomes visible.
+    await database.query(`select set_config('nave.roster_rebuild_deferred', 'true', true)`);
     const run = await database.query(
       `insert into public.hr_import_runs(source_name,status,received_rows,summary,created_by)
        values($1,'applied',$2,$3,$4) returning id`,
@@ -160,30 +164,18 @@ export default async function handler(request: Request, response: Response) {
       );
     }
 
-    const teamBySupervisor = new Map<string, string>();
-    for (const supervisor of created.filter((item) => item.role.can_supervise_sales_team)) {
-      const team = await database.query<{ id: string }>(
-        `insert into public.teams(name,supervisor_staff_id,manager_staff_id,active,is_sales_team)
-         select $1,$2,effective_manager_staff_id,true,true from public.staff_members where id=$2
-         returning id`,
-        [supervisor.full_name, supervisor.id],
-      );
-      teamBySupervisor.set(supervisor.id, team.rows[0].id);
-    }
-
-    for (const seller of created.filter((item) => item.role.creates_seller_record)) {
-      const supervisor = bestMatch(seller.row.supervisor, created, seller.full_name);
-      const teamId = supervisor && supervisor.score >= 0.75 ? teamBySupervisor.get(supervisor.candidate.id) || null : null;
-      await database.query(
-        `insert into public.sellers(full_name,team_id,active,hire_date,dni,staff_member_id,legajo,employment_type)
-         values($1,$2,true,null,$3,$4,$5,$6)`,
-        [seller.full_name, teamId, seller.row.dni.replace(/\D/g, ''), seller.id,
-          (seller.row.category.includes('COACHING') || ['freelance', 'free lance'].includes(seller.row.decision)) ? null : seller.row.legajo, seller.row.nomina || null],
-      );
-    }
+    await database.query(`select public.rebuild_roster_projections_from_legajos()`);
+    const teamCount = await database.query<{ total: number }>(`
+      select count(*)::int as total
+      from public.teams team
+      join public.staff_members supervisor on supervisor.id = team.supervisor_staff_id
+      join public.hr_roles role on role.id = supervisor.role_id
+      where team.active and team.is_sales_team and supervisor.active
+        and role.app_role_mapping = 'supervisor'::public.app_role
+    `);
 
     await database.query('commit');
-    return response.status(200).json({ success: true, runId, created: created.length, teams: teamBySupervisor.size, duplicateSourceRows: duplicates.length });
+    return response.status(200).json({ success: true, runId, created: created.length, teams: teamCount.rows[0]?.total || 0, duplicateSourceRows: duplicates.length });
   } catch (error) {
     await database.query('rollback');
     return response.status(400).json({ success: false, message: error instanceof Error ? error.message : 'No se pudo aplicar la estructura.' });

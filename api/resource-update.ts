@@ -39,6 +39,7 @@ export default async function handler(request: Request, response: Response) {
     const active = Boolean(request.body?.active);
     const deactivationType = text(request.body?.deactivation_type) || null;
     const deactivationReason = text(request.body?.deactivation_reason) || null;
+    const transferReason = text(request.body?.transfer_reason).slice(0, 2_000) || null;
     const dni = text(request.body?.dni).replace(/\D/g, '');
     const legajo = text(request.body?.legajo);
     const employmentType = text(request.body?.employment_type);
@@ -51,6 +52,10 @@ export default async function handler(request: Request, response: Response) {
     if (isNewDeactivation && !['termination', 'administrative_correction'].includes(deactivationType || '')) return response.status(400).json({ success: false, message: 'Indicá si la baja es real o una corrección administrativa.' });
     const role = await database.query<{ area_id: string; creates_seller_record: boolean; app_role_mapping: 'admin' | 'gerente' | 'supervisor' | 'rrhh' | null }>('select area_id,creates_seller_record,app_role_mapping from public.hr_roles where id=$1 and active=true', [roleId]);
     if (!role.rows[0]) return response.status(400).json({ success: false, message: 'Cargo inválido.' });
+    const linkedProfile = await database.query<{ id: string }>('select id from public.profiles where staff_member_id=$1 limit 1', [id]);
+    if (linkedProfile.rowCount && (!active || !role.rows[0].app_role_mapping)) {
+      return response.status(400).json({ success: false, message: 'Este recurso tiene una cuenta de acceso. Primero revocá o reasigná su acceso antes de dejarlo inactivo o asignarle un cargo sin permisos.' });
+    }
     if (responsibleId === id) return response.status(400).json({ success: false, message: 'Una persona no puede ser su propio responsable.' });
     if (managerId === id) return response.status(400).json({ success: false, message: 'Una persona no puede ser su propio gerente.' });
     await database.query('begin');
@@ -64,6 +69,22 @@ export default async function handler(request: Request, response: Response) {
     if (descendant.rowCount) throw new Error('No se puede asignar como responsable a una persona de su propia estructura.');
     const parent = responsibleId ? await database.query<{ id: string; app_role_mapping: 'admin' | 'gerente' | 'supervisor' | null; effective_manager_staff_id: string | null }>(`select staff.id, hr_role.app_role_mapping, staff.effective_manager_staff_id from public.staff_members staff join public.hr_roles hr_role on hr_role.id=staff.role_id where staff.id=$1 and staff.active=true and hr_role.app_role_mapping in ('supervisor'::public.app_role,'gerente'::public.app_role,'admin'::public.app_role)`, [responsibleId]) : { rows: [] };
     if (responsibleId && !parent.rows[0]) throw new Error('El responsable seleccionado no está activo.');
+    if (role.rows[0].creates_seller_record && active && !responsibleId) throw new Error('Un vendedor activo debe tener un supervisor asignado.');
+    if (role.rows[0].creates_seller_record && responsibleId && parent.rows[0]?.app_role_mapping !== 'supervisor') throw new Error('El responsable de un vendedor debe ser un supervisor activo.');
+    if (viewer.role === 'gerente' && responsibleId) {
+      const destinationInScope = await database.query(`
+        with recursive hierarchy as (
+          select id from public.staff_members where id=$1
+          union
+          select child.id from public.staff_members child join hierarchy parent on child.responsible_staff_id=parent.id
+        )
+        select 1 from public.staff_members where id=$2 and (id in (select id from hierarchy) or effective_manager_staff_id=$1)
+      `, [viewer.staff_member_id, responsibleId]);
+      if (!destinationInScope.rowCount) {
+        await database.query('rollback');
+        return response.status(403).json({ success: false, message: 'Sólo podés trasladar vendedores hacia supervisores de tu estructura.' });
+      }
+    }
     const inheritedManager = parent.rows[0]
       ? (parent.rows[0].effective_manager_staff_id || (['gerente', 'admin'].includes(parent.rows[0].app_role_mapping || '') ? parent.rows[0].id : null))
       : null;
@@ -88,56 +109,34 @@ export default async function handler(request: Request, response: Response) {
         active, effectiveManager, managerSource, deactivationType, deactivationReason],
     );
     if (!updated.rows[0]) throw new Error('No existe el recurso.');
+    const isSellerTransfer = role.rows[0].creates_seller_record && active && existing.rows[0].responsible_staff_id !== responsibleId;
+    if (isSellerTransfer) {
+      const [previousTeam, destinationTeam] = await Promise.all([
+        database.query<{ id: string | null }>('select id from public.teams where supervisor_staff_id=$1 order by created_at,id limit 1', [existing.rows[0].responsible_staff_id]),
+        database.query<{ id: string | null }>('select id from public.teams where supervisor_staff_id=$1 and active and is_sales_team order by created_at,id limit 1', [responsibleId]),
+      ]);
+      await database.query(`
+        insert into public.roster_change_log(entity_type,entity_id,action,before_value,after_value,changed_by)
+        values('staff_member',$1,'updated',$2::jsonb,$3::jsonb,$4)
+      `, [id,
+        JSON.stringify({ event: 'seller_transfer', supervisor_staff_id: existing.rows[0].responsible_staff_id, team_id: previousTeam.rows[0]?.id || null }),
+        JSON.stringify({ event: 'seller_transfer', supervisor_staff_id: responsibleId, team_id: destinationTeam.rows[0]?.id || null, reason: transferReason }),
+        user,
+      ]);
+    }
     if (isNewDeactivation) {
       await database.query(`insert into public.staff_status_events(staff_member_id,event_type,reason,supervisor_staff_id,manager_staff_id,created_by) values($1,$2,$3,$4::uuid,$5::uuid,$6)`, [id, deactivationType, deactivationReason, existing.rows[0].responsible_staff_id, existing.rows[0].effective_manager_staff_id, user]);
-      await database.query(`update public.sellers set active=false,termination_date=current_date where staff_member_id=$1 and active=true`, [id]);
     }
-    if (role.rows[0].app_role_mapping === 'supervisor' && active) {
-      const currentTeam = await database.query<{ id: string }>(`update public.teams set name=$2,manager_staff_id=$3::uuid,active=true,is_sales_team=true where supervisor_staff_id=$1 returning id`, [id, updated.rows[0].full_name, effectiveManager]);
-      if (!currentTeam.rows[0]) {
-        await database.query(`insert into public.teams(name,supervisor_staff_id,manager_staff_id,active,is_sales_team) values($1,$2,$3::uuid,true,true)`, [updated.rows[0].full_name, id, effectiveManager]);
-      }
-    } else {
-      await database.query(`update public.teams set active=false,is_sales_team=false where supervisor_staff_id=$1`, [id]);
-    }
-    if (role.rows[0].creates_seller_record && active) {
-      const sellerTeam = responsibleId
-        ? await database.query<{ id: string }>(`select id from public.teams where supervisor_staff_id=$1 and active=true and is_sales_team=true limit 1`, [responsibleId])
-        : { rows: [] };
-      await database.query(
-        `insert into public.sellers(full_name,team_id,active,hire_date,dni,staff_member_id,legajo,employment_type)
-         values($1,$2,true,null,$3,$4,$5,$6)
-         on conflict (staff_member_id) where staff_member_id is not null
-         do update set full_name=excluded.full_name,team_id=excluded.team_id,active=true,dni=excluded.dni,legajo=excluded.legajo,employment_type=excluded.employment_type`,
-        [updated.rows[0].full_name, sellerTeam.rows[0]?.id || null, dni, id, legajo || null, employmentType || null],
-      );
-    } else if (!active) {
-      await database.query(`update public.sellers set active=false where staff_member_id=$1 and active=true`, [id]);
-    }
-    await database.query(`
-      with recursive descendants as (
-        select id from public.staff_members where id = $1
-        union
-        select child.id from public.staff_members child join descendants parent on child.responsible_staff_id = parent.id
-      )
-      update public.staff_members
-         set effective_manager_staff_id = $2::uuid,
-             updated_at = now()
-       where id in (select id from descendants where id <> $1)
-         and effective_manager_source = 'inherited'
-    `, [id, effectiveManager]);
-    await database.query(`select public.rebuild_roster_projections_from_legajos()`);
     await database.query('commit');
-    const saved = await database.query<{ id: string; effective_manager_staff_id: string | null; effective_manager_name: string | null; effective_manager_source: string }>(
-      `select staff.id,staff.effective_manager_staff_id,staff.effective_manager_source,manager.full_name as effective_manager_name
-       from public.staff_members staff left join public.staff_members manager on manager.id=staff.effective_manager_staff_id where staff.id=$1`, [id],
+    const saved = await database.query<{ id: string; effective_manager_staff_id: string | null; effective_manager_name: string | null; effective_manager_source: string; responsible_staff_id: string | null; responsible_name: string | null; team_id: string | null; team_name: string | null }>(
+      `select staff.id,staff.effective_manager_staff_id,staff.effective_manager_source,manager.full_name as effective_manager_name,
+              staff.responsible_staff_id,responsible.full_name as responsible_name,team.id as team_id,team.name as team_name
+       from public.staff_members staff
+       left join public.staff_members manager on manager.id=staff.effective_manager_staff_id
+       left join public.staff_members responsible on responsible.id=staff.responsible_staff_id
+       left join public.teams team on team.supervisor_staff_id=staff.responsible_staff_id and team.active and team.is_sales_team
+       where staff.id=$1`, [id],
     );
-    console.info('Resource manager assignment saved', {
-      staffId: id,
-      requestedManagerId: managerId || null,
-      persistedManagerId: saved.rows[0]?.effective_manager_staff_id || null,
-      persistedSource: saved.rows[0]?.effective_manager_source || null,
-    });
     return response.status(200).json({ success: true, resource: saved.rows[0] || updated.rows[0] });
   } catch (error) {
     await database.query('rollback');

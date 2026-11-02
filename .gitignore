@@ -8,8 +8,11 @@ coverage/
 .env*
 !.env.example
 .dev.vars
+.local-wrangler.jsonc
+.wrangler/
 .concesionaria_db.json
 .extractor_db.json
 .data/
 *.zip
 .aistudio/
+/.local-supabase/

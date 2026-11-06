@@ -47,7 +47,7 @@ export default async function handler(req: Req, res: Res) {
       return res.status(200).json({ success: true, data: rows.rows });
     } catch { return res.status(500).json({ success: false, message: 'No se pudieron cargar los históricos.' }); }
   }
-  const q = text(req.query?.q); const area = text(req.query?.area); const team = text(req.query?.team); const status = text(req.query?.status) || 'active';
+  const q = text(req.query?.q); const area = text(req.query?.area); const team = text(req.query?.team); const status = text(req.query?.status) || 'active'; const administrativeStatus = text(req.query?.administrative_status);
   const page = Math.max(1, Number(text(req.query?.page)) || 1); const size = Math.min(100, Math.max(20, Number(text(req.query?.size)) || 50));
   const where: string[] = []; const values: unknown[] = []; const add = (sql: string, value?: unknown) => { if (value !== undefined) values.push(value); where.push(sql.replace('?', `$${values.length}`)); };
   if (!globalAccess) {
@@ -56,6 +56,8 @@ export default async function handler(req: Req, res: Res) {
     where.push(viewer!.role === 'gerente' ? `(${hierarchy} or staff.effective_manager_staff_id=$1)` : hierarchy);
   }
   if (status === 'active') where.push('staff.active=true'); else if (status === 'inactive') where.push('staff.active=false');
+  if (administrativeStatus === 'coaching' || administrativeStatus === 'alta_definitiva') add('staff.administrative_status=?::public.administrative_status', administrativeStatus);
+  if (administrativeStatus === 'pending_classification') where.push('staff.administrative_status is null');
   if (q) {
     values.push(q); const index = values.length;
     const normalizedName = `translate(lower(staff.full_name), 'áéíóúüñ', 'aeiouun')`;
@@ -74,7 +76,7 @@ export default async function handler(req: Req, res: Res) {
   try {
     const count = await pool.query(`select count(*)::int as total from public.staff_members staff left join public.teams team on team.supervisor_staff_id=staff.responsible_staff_id ${clause}`, values);
     values.push(size, (page - 1) * size);
-    const rows = await pool.query(`select staff.id, staff.full_name, staff.dni, staff.legajo, staff.employment_type, staff.role_id, staff.responsible_staff_id, staff.effective_manager_staff_id, staff.effective_manager_source, staff.is_coaching, staff.is_freelance, staff.active, area.name as area_name, role.name as role_name, responsible.full_name as responsible_name, manager.full_name as effective_manager_name, team.id as team_id, team.name as team_name from public.staff_members staff left join public.hr_areas area on area.id=staff.area_id left join public.hr_roles role on role.id=staff.role_id left join public.staff_members responsible on responsible.id=staff.responsible_staff_id left join public.staff_members manager on manager.id=staff.effective_manager_staff_id left join public.teams team on team.supervisor_staff_id=staff.responsible_staff_id ${clause} order by staff.full_name limit $${values.length-1} offset $${values.length}`, values);
+    const rows = await pool.query(`select staff.id, staff.full_name, staff.dni, staff.legajo, staff.employment_type, staff.role_id, staff.responsible_staff_id, staff.effective_manager_staff_id, staff.effective_manager_source, staff.administrative_status, staff.is_coaching, staff.is_freelance, staff.active, area.name as area_name, role.name as role_name, responsible.full_name as responsible_name, manager.full_name as effective_manager_name, team.id as team_id, team.name as team_name from public.staff_members staff left join public.hr_areas area on area.id=staff.area_id left join public.hr_roles role on role.id=staff.role_id left join public.staff_members responsible on responsible.id=staff.responsible_staff_id left join public.staff_members manager on manager.id=staff.effective_manager_staff_id left join public.teams team on team.supervisor_staff_id=staff.responsible_staff_id ${clause} order by staff.full_name limit $${values.length-1} offset $${values.length}`, values);
     const responsibleScope = viewer!.role === 'gerente'
       ? `and (staff.id in (with recursive hierarchy as (select id from public.staff_members where id=$1 union select child.id from public.staff_members child join hierarchy parent on child.responsible_staff_id=parent.id) select id from hierarchy) or staff.effective_manager_staff_id=$1)`
       : '';

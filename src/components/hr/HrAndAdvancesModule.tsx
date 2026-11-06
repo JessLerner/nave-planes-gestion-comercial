@@ -20,6 +20,10 @@ import { Candidate, WageAdvance, Seller } from '../../types';
 import { formatARS, validateAdvanceEligibility } from '../../utils/businessLogic';
 import { LegajosDirectory } from './LegajosDirectory';
 import { HistoricalResources, TurnoverMetrics } from './TurnoverPanels';
+import { IncorporationPanel } from './IncorporationPanel';
+import { DepartureNoticesPanel } from './DepartureNoticesPanel';
+import { HrDirectIncorporation } from './HrDirectIncorporation';
+import { HrDirectDeparture } from './HrDirectDeparture';
 
 export const HrAndAdvancesModule: React.FC = () => {
   const {
@@ -36,7 +40,7 @@ export const HrAndAdvancesModule: React.FC = () => {
     updateCandidateDocs,
   } = useApp();
 
-  const [activeSubTab, setActiveSubTab] = useState<'advances' | 'recruitment' | 'turnover' | 'legajos' | 'historical'>('advances');
+  const [activeSubTab, setActiveSubTab] = useState<'advances' | 'recruitment' | 'turnover' | 'legajos' | 'historical' | 'incorporations' | 'departures'>('advances');
 
   // Advance request form state
   const [showRequestModal, setShowRequestModal] = useState(false);
@@ -91,6 +95,10 @@ export const HrAndAdvancesModule: React.FC = () => {
     }
   };
 
+  // Supervisión sólo ingresa al circuito de incorporación; el resto de RRHH
+  // conserva sus permisos y pantallas existentes para los roles autorizados.
+  if (isSupervisor) return <div className="space-y-6"><div className="rounded-xl border border-slate-800 bg-slate-900 p-5"><h2 className="text-xl font-bold text-white">Gestión de personal</h2><p className="mt-1 text-xs text-slate-400">Solicitudes de incorporación, avisos de baja y adelantos de tu equipo.</p></div><div className="flex gap-2 border-b border-slate-800 pb-2 text-xs"><button onClick={()=>setActiveSubTab('incorporations')} className={`rounded-lg px-4 py-2 ${activeSubTab==='incorporations'?'bg-blue-600 text-white':'text-slate-400'}`}>Incorporaciones</button><button onClick={()=>setActiveSubTab('departures')} className={`rounded-lg px-4 py-2 ${activeSubTab==='departures'?'bg-amber-600 text-white':'text-slate-400'}`}>Avisos de baja</button><button onClick={()=>setActiveSubTab('advances')} className={`rounded-lg px-4 py-2 ${activeSubTab==='advances'?'bg-blue-600 text-white':'text-slate-400'}`}>Adelantos</button></div>{activeSubTab==='departures'?<DepartureNoticesPanel/>:activeSubTab==='advances'?<div className="rounded-xl border border-slate-800 bg-slate-900 p-4"><h3 className="font-bold text-white">Solicitud de adelanto</h3><form onSubmit={handleAdvanceSubmit} className="mt-3 grid gap-3 md:grid-cols-2"><select value={targetSellerId} onChange={event=>setTargetSellerId(event.target.value)} className="rounded border border-slate-700 bg-slate-950 p-2 text-sm">{visibleSellers.map(seller=><option key={seller.id} value={seller.id}>{seller.name}</option>)}</select><input type="number" value={requestAmount} onChange={event=>setRequestAmount(Number(event.target.value))} className="rounded border border-slate-700 bg-slate-950 p-2 text-sm"/><textarea value={requestReason} onChange={event=>setRequestReason(event.target.value)} placeholder="Motivo" className="rounded border border-slate-700 bg-slate-950 p-2 text-sm md:col-span-2"/><button className="rounded bg-blue-600 px-4 py-2 text-sm font-semibold text-white">Solicitar adelanto</button>{requestFeedback&&<p className={requestFeedback.success?'text-emerald-300':'text-amber-300'}>{requestFeedback.msg}</p>}</form></div>:<IncorporationPanel/>}</div>;
+
   return (
     <div className="space-y-6">
       {/* 1. Header Banner */}
@@ -122,6 +130,12 @@ export const HrAndAdvancesModule: React.FC = () => {
       {/* 2. Sub-tab Navigation */}
       <div className="flex items-center gap-2 border-b border-slate-800 pb-2 text-xs">
         <button
+          onClick={() => setActiveSubTab('incorporations')}
+          className={`px-4 py-2 rounded-lg font-medium transition-colors ${activeSubTab === 'incorporations' ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20' : 'text-slate-400 hover:text-white'}`}
+        >Incorporaciones</button><button
+          onClick={() => setActiveSubTab('departures')}
+          className={`px-4 py-2 rounded-lg font-medium transition-colors ${activeSubTab === 'departures' ? 'bg-amber-600 text-white shadow-md shadow-amber-600/20' : 'text-slate-400 hover:text-white'}`}
+        >Avisos de baja</button><button
           onClick={() => setActiveSubTab('advances')}
           className={`px-4 py-2 rounded-lg font-medium transition-colors ${
             activeSubTab === 'advances'
@@ -168,6 +182,8 @@ export const HrAndAdvancesModule: React.FC = () => {
       </div>
 
       {activeSubTab === 'legajos' && <LegajosDirectory />}
+      {activeSubTab === 'incorporations' && <><HrDirectIncorporation onCompleted={() => undefined} /><IncorporationPanel /></>}
+      {activeSubTab === 'departures' && <><HrDirectDeparture /><DepartureNoticesPanel /></>}
 
       {/* SUB-TAB 1: WAGE ADVANCES */}
       {activeSubTab === 'advances' && (

@@ -47,6 +47,11 @@ const dependencyNotes = {
   '20261101_034_renault_upfront_stamp.sql': ['033: price_list_items'],
   '20261101_035_backfill_renault_upfront_stamp.sql': ['034: upfront_stamp_value'],
   '20261101_036_require_complete_price_list_segments.sql': ['033/034/035: price list publishing and segments'],
+  '20261103_034_incorporation_requests_coaching.sql': ['032: Legajos roster projections; 006: private rrhh-legajos bucket'],
+  '20261103_035_incorporation_access_hardening.sql': ['034: incorporation requests and private documents'],
+  '20261103_036_staff_departure_notices.sql': ['024: staff exit history; 006: private rrhh-legajos bucket'],
+  '20261103_037_incorporation_partial_drafts.sql': ['034/035: incorporation workflow and access'],
+  '20261105_038_incorporation_private_drafts_and_hr_direct.sql': ['034/035/037: incorporation workflow, private storage and drafts'],
 };
 
 const sourceFiles = (await readdir(sourceDir))

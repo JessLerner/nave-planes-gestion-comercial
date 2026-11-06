@@ -1,0 +1,3 @@
+import assert from 'node:assert/strict';import test from 'node:test';import{extractDniSuggestion}from'./dniOcr';
+test('extrae sugerencias sólo cuando el texto sintético contiene datos verificables',()=>{const result=extractDniSuggestion('APELLIDO: Muñoz\nNOMBRES: María José\nDNI: 12.345.678\nFECHA DE NACIMIENTO: 03/08/1990');assert.equal(result.surname,'MUÑOZ');assert.equal(result.givenNames,'MARIA JOSE');assert.equal(result.dni,'12345678');assert.equal(result.birthDate,'1990-08-03');});
+test('no inventa datos ausentes',()=>{const result=extractDniSuggestion('texto ilegible sin datos personales');assert.equal(result.dni,undefined);assert.equal(result.surname,undefined);});

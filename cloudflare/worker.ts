@@ -27,6 +27,14 @@ const handlers: Record<string, () => Promise<{ default: unknown }>> = {
   '/api/fox-leads-metrics': () => import('../api/fox-leads-metrics'),
   '/api/fox-user-mappings': () => import('../api/fox-user-mappings'),
   '/api/hr-import': () => import('../api/hr-import'),
+  '/api/incorporation-requests': () => import('../api/incorporation-requests'),
+  '/api/incorporation-documents': () => import('../api/incorporation-documents'),
+  '/api/incorporation-drafts': () => import('../api/incorporation-drafts'),
+  '/api/incorporation-hr-direct': () => import('../api/incorporation-hr-direct'),
+  '/api/incorporation-decisions': () => import('../api/incorporation-decisions'),
+  '/api/staff-departure-notices': () => import('../api/staff-departure-notices'),
+  '/api/staff-departure-documents': () => import('../api/staff-departure-documents'),
+  '/api/staff-departure-decisions': () => import('../api/staff-departure-decisions'),
   '/api/operational-data': () => import('../api/operational-data'),
   '/api/operations': () => import('../api/operations'),
   '/api/price-lists': () => import('../api/price-lists'),
@@ -56,7 +64,7 @@ function configureLegacyEnvironment(environment: Environment) {
 }
 
 async function bodyFor(request: Request) {
-  if (!['POST', 'PUT', 'PATCH'].includes(request.method)) return undefined;
+  if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(request.method)) return undefined;
   const type = request.headers.get('content-type') || '';
   if (!type.includes('application/json')) return undefined;
   try {
@@ -89,9 +97,13 @@ async function runLegacyHandler(request: Request, handler: LegacyHandler): Promi
 
 async function assetOrSpa(request: Request, environment: Environment) {
   const asset = await environment.ASSETS.fetch(request);
-  const acceptsHtml = request.headers.get('accept')?.includes('text/html');
-  if (asset.status === 404 && acceptsHtml && (request.method === 'GET' || request.method === 'HEAD')) {
-    return environment.ASSETS.fetch(new Request(new URL('/index.html', request.url), request));
+  // Direct navigation can omit Accept: text/html (for example, embedded local
+  // browsers). A non-API GET is still a SPA route and must receive index.html.
+  if (asset.status === 404 && (request.method === 'GET' || request.method === 'HEAD')) {
+    return environment.ASSETS.fetch(new Request(new URL('/index.html', request.url), {
+      method: request.method,
+      headers: request.headers,
+    }));
   }
   return asset;
 }

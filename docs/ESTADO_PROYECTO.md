@@ -1,7 +1,7 @@
 # Estado real de NAVE.Plan
 
-**Corte:** 06/11/2026 · **Base:** checkout local sobre `988b75b`, `AGENTS.md`, Documento Maestro, Plan Maestro, migraciones y validaciones locales.
-**Alcance de este documento:** evidencia local. No certifica Supabase remoto, Cloudflare remoto, publicación, datos reales, secretos ni comportamiento de producción.
+**Corte:** 06/11/2026 · **Base:** checkout local, `AGENTS.md`, Documento Maestro, Plan Maestro, migraciones y validaciones locales; reconciliación remota controlada.
+**Alcance de este documento:** distingue evidencia local de la verificación puntual efectuada en Supabase `main / PRODUCTION`. No certifica por sí solo despliegue de Cloudflare, datos reales ni todos los flujos de producción.
 
 ## Lectura rápida
 
@@ -13,6 +13,14 @@ NAVE.Plan conserva una base local de React/Vite, APIs TypeScript, Worker Cloudfl
 | **Implementado localmente** | Código/migración presente, pero sin prueba suficiente del circuito indicado. |
 | **Pendiente** | Falta comportamiento, seguridad, prueba o contrato de fuente. |
 | **No verificado remotamente** | No hay evidencia que permita afirmarlo como publicado u operativo. |
+
+## Reconciliación remota Sprint 5 — comprobada
+
+- La auditoría previa confirmó que el ledger remoto sólo registraba `001_nave_planes_schema`, aunque existía la base observada de Legajos. Por ello no se ejecutó `db push` ni se asumió el historial local como aplicable.
+- Se creó y probó en Supabase local aislado la migración idempotente `20261106_039_sprint5_production_reconciliation.sql`, registrada localmente como `20261106000042`. Una segunda aplicación dentro de `BEGIN/ROLLBACK` no produjo errores.
+- El 06/11/2026 se aplicó en `main / PRODUCTION` mediante una única transacción con prerrequisitos y rollback atómico ante error. La transacción registró `20261106000042 | 039_sprint5_production_reconciliation` en `supabase_migrations.schema_migrations`.
+- Consulta posterior en producción confirmó `incorporation_requests`, `staff_departure_notices` y `can_access_incorporation(uuid,uuid,incorporation_request_status)`. La reconciliación no reconstruyó Legajos, equipos, vendedores ni datos históricos.
+- El ledger histórico anterior continúa incompleto: no usar `supabase db push` remoto como mecanismo de normalización sin una auditoría independiente del historial 002–041.
 
 ## Evidencia local reciente
 
@@ -40,12 +48,13 @@ NAVE.Plan conserva una base local de React/Vite, APIs TypeScript, Worker Cloudfl
 | Cartera/Mora | Modelo y UI de destino existen. | Sin fuente oficial, contrato, importador ni frecuencia; no tratar como cartera real. |
 | Presentaciones, cobros y reclutamiento final | Hay referencias, esquemas y documentación. | Expedientes, enlaces autorizados, Mercado Pago, Parte Diario nativo y flujo reclutamiento→Legajo no están terminados. |
 
-## Sprint 5: cierre local
+## Sprint 5: cierre local y esquema remoto
 
 - Alcance cerrado: Incorporaciones/Coaching, borradores parciales y privados, documentación privada, decisiones de Gerencia/RRHH/Admin, alta directa RRHH, avisos de baja separados de la baja operativa, baja directa controlada, auditoría y control de alcance.
 - Evidencia: validaciones locales, pruebas automatizadas y validación visual local aceptada el 06/11/2026.
-- Límite: el cierre habilita el commit local; no habilita migración remota, despliegue ni declaración de operación en producción.
-- Seguimiento posterior: validar OCR con DNI representativos y completar una matriz de regresión por rol en el ambiente objetivo antes de habilitar los circuitos remotos.
+- El esquema y políticas esenciales de Sprint 5 fueron reconciliados y verificados puntualmente en Supabase `main / PRODUCTION` el 06/11/2026.
+- Límite: aún no acredita que el Worker `gestioncomercial` contenga esta revisión ni que los flujos autenticados funcionen extremo a extremo en Cloudflare.
+- Seguimiento posterior: desplegar el Worker tras versionar/push, ejecutar smoke tests por rol en el ambiente objetivo, validar OCR con DNI representativos y completar una matriz ampliada por rol.
 
 ## Fuentes de continuidad
 

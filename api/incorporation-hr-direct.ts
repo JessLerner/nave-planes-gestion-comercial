@@ -43,7 +43,7 @@ export default async function handler(req: Req, res: Res) {
     const staff = await db.query<{ id: string }>(`insert into public.staff_members(full_name,dni,legajo,employment_type,active,area_id,role_id,responsible_staff_id,is_coaching,administrative_status,incorporation_authorized_at,incorporation_authorized_by) values($1,$2,null,'COACHING',true,$3,$4,$5,true,'coaching',now(),$6) returning id`, [`${request.surname} ${request.given_names}`.trim(), request.dni, request.area_id, request.role_id, request.supervisor_staff_id, userId]);
     await db.query(`update public.incorporation_requests set status='autorizado',reviewed_by=$2,reviewed_at=now(),review_note='Alta directa de RRHH',authorized_staff_member_id=$3,updated_at=now() where id=$1`, [requestId, userId, staff.rows[0].id]);
     await db.query(`insert into public.incorporation_request_decisions(request_id,decision,reason,decided_by) values($1,'autorizado','Alta directa de RRHH',$2)`, [requestId, userId]);
-    await db.query(`insert into public.incorporation_request_audit(request_id,event_type,actor_id,metadata) values($1,'rrhh_direct_authorized',$2,jsonb_build_object('staff_member_id',$3))`, [requestId, userId, staff.rows[0].id]);
+    await db.query(`insert into public.incorporation_request_audit(request_id,event_type,actor_id,metadata) values($1,'rrhh_direct_authorized',$2,jsonb_build_object('staff_member_id',$3::uuid))`, [requestId, userId, staff.rows[0].id]);
     await db.query('commit'); return res.status(200).json({ success: true, staff_member_id: staff.rows[0].id });
   } catch (error) {
     await db.query('rollback').catch(() => undefined);

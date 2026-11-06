@@ -20,6 +20,7 @@ NAVE.Plan conserva una base local de React/Vite, APIs TypeScript, Worker Cloudfl
 - Se creó y probó en Supabase local aislado la migración idempotente `20261106_039_sprint5_production_reconciliation.sql`, registrada localmente como `20261106000042`. Una segunda aplicación dentro de `BEGIN/ROLLBACK` no produjo errores.
 - El 06/11/2026 se aplicó en `main / PRODUCTION` mediante una única transacción con prerrequisitos y rollback atómico ante error. La transacción registró `20261106000042 | 039_sprint5_production_reconciliation` en `supabase_migrations.schema_migrations`.
 - Consulta posterior en producción confirmó `incorporation_requests`, `staff_departure_notices` y `can_access_incorporation(uuid,uuid,incorporation_request_status)`. La reconciliación no reconstruyó Legajos, equipos, vendedores ni datos históricos.
+- Cloudflare desplegó `gestioncomercial` desde `main` en la versión `2f691327`, commit `eb44456`, con 100% del tráfico. El smoke público de `https://gestioncomercial.naveplan.workers.dev/` mostró correctamente la pantalla de acceso.
 - El ledger histórico anterior continúa incompleto: no usar `supabase db push` remoto como mecanismo de normalización sin una auditoría independiente del historial 002–041.
 
 ## Evidencia local reciente
@@ -53,8 +54,9 @@ NAVE.Plan conserva una base local de React/Vite, APIs TypeScript, Worker Cloudfl
 - Alcance cerrado: Incorporaciones/Coaching, borradores parciales y privados, documentación privada, decisiones de Gerencia/RRHH/Admin, alta directa RRHH, avisos de baja separados de la baja operativa, baja directa controlada, auditoría y control de alcance.
 - Evidencia: validaciones locales, pruebas automatizadas y validación visual local aceptada el 06/11/2026.
 - El esquema y políticas esenciales de Sprint 5 fueron reconciliados y verificados puntualmente en Supabase `main / PRODUCTION` el 06/11/2026.
-- Límite: aún no acredita que el Worker `gestioncomercial` contenga esta revisión ni que los flujos autenticados funcionen extremo a extremo en Cloudflare.
-- Seguimiento posterior: desplegar el Worker tras versionar/push, ejecutar smoke tests por rol en el ambiente objetivo, validar OCR con DNI representativos y completar una matriz ampliada por rol.
+- El Worker `gestioncomercial` ya fue desplegado desde `main`; el smoke público de la ruta raíz fue correcto.
+- Límite: falta evidencia autenticada extremo a extremo por rol en Cloudflare.
+- Seguimiento posterior: ejecutar smoke tests por rol en el ambiente objetivo, validar OCR con DNI representativos y completar una matriz ampliada por rol.
 
 ## Fuentes de continuidad
 

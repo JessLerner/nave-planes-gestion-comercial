@@ -43,7 +43,7 @@
 ### Publicado/comprobado
 
 - Supabase `main / PRODUCTION`: reconciliación de esquema Sprint 5 y registro `20261106000042` aplicados y consultados el 06/11/2026.
-- **No hay todavía evidencia de despliegue del Worker `gestioncomercial` con esta revisión.** El Worker local no implica Cloudflare remoto ni aplicación publicada.
+- Worker `gestioncomercial`: Cloudflare desplegó `main`/`eb44456` como versión `2f691327` al 100% del tráfico. El smoke público de la URL raíz devolvió la pantalla de acceso.
 
 ## Sprint 5: cierre aceptado localmente
 
@@ -85,7 +85,7 @@
 ## Seguimiento posterior al cierre
 
 1. **Hecho el 06/11/2026:** reconciliación controlada `20261106_039_sprint5_production_reconciliation.sql` aplicada a Supabase `main / PRODUCTION`, con registro remoto `20261106000042`. El historial anterior no quedó normalizado; no ejecutar `supabase db push` remoto sin auditoría del ledger 002–041.
-2. Desplegar el Worker `gestioncomercial` una vez versionado y publicado este cambio; después ejecutar smoke tests autenticados por Supervisor, Gerencia, RRHH y Admin.
+2. Ejecutar smoke tests autenticados por Supervisor, Gerencia, RRHH y Admin sobre el Worker ya desplegado.
 3. Validar OCR con DNI representativos; no prometer extracción fiable hasta contar con esa evidencia.
 4. Mantener avisos de baja separados de la baja operativa y no habilitar permisos comerciales por estado administrativo.
 

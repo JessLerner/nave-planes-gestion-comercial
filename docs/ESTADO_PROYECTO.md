@@ -31,6 +31,16 @@ NAVE.Plan conserva una base local de React/Vite, APIs TypeScript, Worker Cloudfl
 - Worker local fue comprobado por HTTP en `127.0.0.1:8788` con Hyperdrive apuntando al PostgreSQL local. Esto no es evidencia de Cloudflare remoto.
 - La validación visual local fue aceptada para el cierre del Sprint 5. No es evidencia de despliegue remoto.
 
+## Gestión de cuentas y permisos administrativos — en preparación local
+
+- La migración local `20261106_040_access_account_management.sql` propone separar los perfiles globales (`admin`, exclusivamente Dirección y Administración General) del nuevo perfil técnico `administrativo`.
+- La aplicación remota, si se aprueba, debe registrar `20261106000043 | 040_access_account_management` mediante el procedimiento manual controlado; no usa ni requiere `supabase db push` remoto.
+- Una cuenta `administrativo` nace sin permisos globales. La propuesta incorpora concesiones explícitas y auditables únicamente para Legajos (`view_legajos` y `manage_legajos`) y elimina el acceso global que antes podía inferirse por área “Administración” o por el nombre de un cargo.
+- Un nuevo `hr_roles.grants_global_admin` queda inicialmente en `false`. Aun si un cargo conservara el mapeo técnico `admin`, no podrá recibir una cuenta global hasta que se lo autorice explícitamente; el operador debe marcar sólo los cargos de Dirección y Administración General que correspondan.
+- La invitación se vincula obligatoriamente a un Legajo activo y al perfil definido para su cargo. Dirección/Administración General puede conceder acceso global y permisos administrativos; Gerencia queda limitada a Supervisión de su estructura; RR. HH. puede crear cuentas dentro de la matriz, sin conceder acceso global.
+- `npm run lint` y `git diff --check` pasaron el 06/11/2026. La validación SQL transaccional contra el esquema local de control queda pendiente: esta sesión no expone `NAVE_TEST_DATABASE_URL` apuntando a `127.0.0.1:54322`; no se inició ni reinició ningún servicio para forzarla.
+- No se aplicó la migración 040 en producción, no se desplegó este código y Cloudflare todavía no contiene `SUPABASE_SERVICE_ROLE_KEY`. El secreto no se expuso ni se guardó como variable vacía.
+
 ## Estado por módulo
 
 | Módulo | Estado local | Pendiente / límite |
@@ -65,6 +75,7 @@ NAVE.Plan conserva una base local de React/Vite, APIs TypeScript, Worker Cloudfl
 - `docs/plan-maestro/`: brechas, backlog, criterios y decisiones. Es planificación, no evidencia operativa.
 - `docs/HANDOFF_CONTINUIDAD_SPRINT5.md`: cierre local, archivos críticos, evidencia y límites de publicación del Sprint 5.
 - `docs/LOCAL_SUPABASE_BOOTSTRAP.md`: procedimiento exclusivo de Supabase local.
+- `docs/APLICAR_MIGRACION_040_ACCESOS.md`: aplicación manual controlada, verificación y clasificación de cargos para cuentas y permisos.
 
 ## Límites y prohibiciones vigentes
 

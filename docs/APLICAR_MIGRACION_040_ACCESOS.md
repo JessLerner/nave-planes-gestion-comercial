@@ -8,6 +8,10 @@ No otorga cuentas, permisos ni acceso global automáticamente. No usar `supabase
 
 ## Prerrequisitos verificables
 
+### Identidad del destino y lectura previa
+
+No usar variables locales, URLs recordadas ni `supabase link` para inferir el destino. Antes de abrir el SQL Editor, el operador autorizado debe confirmar visualmente el proyecto y ambiente **Production** correctos. Ejecutar sólo las consultas de lectura de esta sección y conservar sus resultados sin datos personales. Si no puede verificarse el destino, detenerse.
+
 Ejecutar estas consultas en el SQL Editor de **Supabase main / PRODUCTION** antes de aplicar:
 
 ```sql
@@ -34,6 +38,10 @@ order by name;
 ```
 
 Esperado: todos los objetos existen; está `20261106000042`; y `20261106000043` todavía no está antes de la primera aplicación.
+
+### Respaldo y reversión aprobados
+
+Antes de aplicar, registrar un snapshot o respaldo administrado del proyecto y su identificador, y confirmar quién puede restaurarlo. La reversión no es un `db push`: si la aplicación falla, ejecutar `ROLLBACK` en esa misma sesión y verificar que 040 no quedó en el ledger. Si una aplicación ya confirmó pero debe revertirse, detener el alta de cuentas, restaurar el respaldo aprobado o ejecutar un script de reversión revisado expresamente; no eliminar manualmente filas del ledger ni desmontar RLS para resolverlo.
 
 ## Aplicación
 

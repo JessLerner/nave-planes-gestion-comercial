@@ -86,3 +86,18 @@ Los comandos de Supabase local y su secuencia documentada están en `docs/LOCAL_
 - Prohibido hacer `commit`, `push`, despliegue, publicación, cambio de secretos o cualquier operación sobre producción sin autorización explícita.
 - No declarar éxito por la mera presencia de código, una migración o un contenedor. Informar separadamente: **implementado**, **probado** (con comando/entorno), **pendiente** y **bloqueado**.
 - Una funcionalidad está terminada sólo si: cumple el alcance y criterios acordados; preserva flujos existentes; valida autorización y datos sensibles; tiene pruebas pertinentes ejecutadas o una limitación explicada; y su estado de migración/despliegue se comunica sin inferencias.
+
+## Panel de seguimiento de NAVE.Plan
+
+- Esta regla aplica a toda tarea futura de Codex. Antes de comenzar una tarea, consultar `project_instructions`, identificar la tarea existente con `list_tasks` (sin crear duplicados) y consultar `get_task`. Leer estado, revisión, dependencias y criterios de aceptación; separar las fases verificables antes de actuar.
+- Al terminar cada fase verificable, incluso si el estado general no cambia, registrar mediante `update_task` qué se hizo, el resultado de la verificación, evidencia concreta (pruebas, archivos, logs o commits reales), criterios de aceptación actualizados y el próximo paso. Conservar el historial: no reemplazar evidencias anteriores por resúmenes.
+- Antes de cada `update_task`, volver a consultar `get_task` y enviar la revisión vigente. Ante un conflicto de revisión, releer, reconciliar los avances ajenos y reintentar; no sobrescribirlos.
+- Mantener señales separadas en el panel: `code` para cambios locales, `test` para pruebas efectivamente ejecutadas, `external` para validaciones de servicios externos y `publication` para despliegues/publicaciones. Nunca inferir una señal a partir de otra.
+- Una actualización exitosa del panel no detiene el trabajo: continuar con la siguiente fase sin pedir confirmación adicional. Si falla la sincronización, conservar evidencia local, recuperar la conexión cuando sea posible y continuar fases seguras; informar las actualizaciones pendientes.
+- Sólo pasar una tarea a `Completada` si cumple todos los criterios de aceptación con evidencia suficiente. Si terminó la implementación sin pruebas suficientes, usar `Para probar`; ante un bloqueo real, registrar causa y próximo paso. Al finalizar, consultar dependencias del Plan Maestro y proponer la siguiente tarea sin ejecutarla si requiere autorización nueva.
+- Antes de trabajar sobre una tarea del panel, consultar sus instrucciones y la tarea con su revisión vigente. Ante un conflicto de revisión, releerla y reconciliar antes de actualizar.
+- El panel es sólo seguimiento: actualizarlo no autoriza cambios de código, secretos, migraciones remotas, servicios externos ni producción.
+- Al registrar avances, mantener señales separadas de **código**, **pruebas**, **verificación externa** y **publicación**, cada una con fecha y evidencia concreta. Código presente, test existente o migración en archivos no acreditan ejecución, aplicación ni despliegue.
+- Registrar sólo commits reales; los cambios sin commit siguen siendo locales y no publicados. Al concluir implementación, usar `Para probar` salvo validación completa respaldada por evidencia.
+- Mantener Scoring aislado: no modifica Operaciones, Pacing ni Adelantos. Parte Diario permanece externo hasta una migración validada. Las hojas privadas se acceden sólo desde backend; Mora y cobranza siguen fuera de alcance salvo decisión explícita de Jesica.
+- Antes de proponer una migración productiva, probarla de forma aislada y conservar la evidencia; no cambiar estados del panel sin una acción o verificación efectivamente realizada.

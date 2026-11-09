@@ -1,6 +1,6 @@
 # Validación local — migración 040
 
-**Corte:** 08/11/2026.  
+**Corte:** 08/11/2026.
 **Alcance:** validación exclusivamente local de `20261106_040_access_account_management.sql`. Se ejecutó un reset autorizado sobre la instancia descartable `supabase_db_naveplan_local_bootstrap`; no se conectó a servicios remotos, no se leyó ningún secreto, no hubo despliegues ni commits.
 
 ## Fase 1 — diagnóstico

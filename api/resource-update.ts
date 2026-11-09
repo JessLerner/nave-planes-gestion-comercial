@@ -19,9 +19,10 @@ export default async function handler(request: Request, response: Response) {
   const id = text(request.body?.id); if (!id) return response.status(400).json({ success: false, message: 'Recurso inválido.' });
   const database = await pool.connect();
   try {
-    const profile = await database.query<{ role: string; staff_member_id: string | null }>('select role, staff_member_id from public.profiles where id=$1', [user]);
+    const profile = await database.query<{ role: string; staff_member_id: string | null; can_manage_legajos: boolean }>(`select profile.role, profile.staff_member_id, exists(select 1 from public.profile_access_permissions permission where permission.profile_id=profile.id and permission.capability='manage_legajos') as can_manage_legajos from public.profiles profile where profile.id=$1`, [user]);
     const viewer = profile.rows[0];
-    if (!['admin', 'gerente', 'rrhh'].includes(viewer?.role || '')) return response.status(403).json({ success: false, message: 'No tenés permiso para editar la nómina.' });
+    const canManageLegajos = ['admin', 'gerente', 'rrhh'].includes(viewer?.role || '') || viewer?.can_manage_legajos === true;
+    if (!canManageLegajos) return response.status(403).json({ success: false, message: 'No tenés permiso para editar la nómina.' });
     if (request.body && typeof request.body === 'object' && (request.body as Record<string, unknown>).direct_deactivation === true) {
       if (!['rrhh', 'admin'].includes(viewer?.role || '')) return response.status(403).json({ success: false, message: 'Sólo RRHH o Administración puede ejecutar una baja directa.' });
       const reason = text((request.body as Record<string, unknown>).deactivation_reason);

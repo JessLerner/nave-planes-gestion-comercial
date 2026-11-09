@@ -16,7 +16,7 @@ type AuthState = {
 };
 
 const AuthContext = createContext<AuthState | null>(null);
-const CANONICAL_PRODUCTION_URL = 'https://nave-planes-gestion-comercial.vercel.app';
+const CANONICAL_PRODUCTION_URL = 'https://gestioncomercial.naveplan.workers.dev';
 
 function getRecoveryRedirectUrl() {
   // Vercel also exposes a project-specific alias. Authentication emails must
@@ -44,6 +44,7 @@ function toUser(profile: Record<string, unknown>, email: string): User {
     team_id: profile.team_id ? String(profile.team_id) : undefined,
     staff_member_id: profile.staff_member_id ? String(profile.staff_member_id) : undefined,
     branch: String(profile.branch || 'Nave.Plan'),
+    capabilities: Array.isArray(profile.capabilities) ? profile.capabilities.map(String) : [],
   };
 }
 

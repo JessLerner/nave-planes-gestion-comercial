@@ -1,30 +1,33 @@
 import { databasePool } from './lib/database';
+import { canManageActiveLegajo, legajosOrganizationalAccess } from './lib/legajos-organizational-access';
 
 type Request = { method?: string; headers?: Record<string, string | string[] | undefined>; body?: Record<string, unknown> };
 type Response = { status: (code: number) => Response; json: (body: unknown) => Response };
 const rawConnectionString = process.env.POSTGRES_URL || process.env.DATABASE_URL || '';
 const pool = databasePool(rawConnectionString);
 
-async function userId(request: Request) {
+async function identity(request: Request) {
   const value = request.headers?.authorization; const authorization = Array.isArray(value) ? value[0] : value;
   if (!authorization?.startsWith('Bearer ') || !process.env.SUPABASE_URL || !process.env.SUPABASE_ANON_KEY) return null;
   const response = await fetch(`${process.env.SUPABASE_URL}/auth/v1/user`, { headers: { Authorization: authorization, apikey: process.env.SUPABASE_ANON_KEY } });
-  return response.ok ? ((await response.json() as { id?: string }).id || null) : null;
+  const id = response.ok ? ((await response.json() as { id?: string }).id || null) : null;
+  return id ? { id, authorization } : null;
 }
 const text = (value: unknown) => String(value ?? '').trim();
 
 export default async function handler(request: Request, response: Response) {
   if (request.method !== 'PATCH') return response.status(405).json({ success: false, message: 'Método no permitido.' });
-  const user = await userId(request); if (!user) return response.status(401).json({ success: false, message: 'Sesión no válida.' });
+  const session = await identity(request); if (!session) return response.status(401).json({ success: false, message: 'Sesión no válida.' });
   const id = text(request.body?.id); if (!id) return response.status(400).json({ success: false, message: 'Recurso inválido.' });
+  let access;
+  try { access = await legajosOrganizationalAccess(session.authorization, session.id, 'legajos.manage'); }
+  catch { return response.status(503).json({ success: false, message: 'No se pudo resolver el acceso organizativo de Legajos.' }); }
+  if (!access.authorized || !canManageActiveLegajo(access, id)) return response.status(403).json({ success: false, message: 'No tenés permiso para editar este recurso de Legajos.' });
+  const user = session.id;
   const database = await pool.connect();
   try {
-    const profile = await database.query<{ role: string; staff_member_id: string | null; can_manage_legajos: boolean }>(`select profile.role, profile.staff_member_id, exists(select 1 from public.profile_access_permissions permission where permission.profile_id=profile.id and permission.capability='manage_legajos') as can_manage_legajos from public.profiles profile where profile.id=$1`, [user]);
-    const viewer = profile.rows[0];
-    const canManageLegajos = ['admin', 'gerente', 'rrhh'].includes(viewer?.role || '') || viewer?.can_manage_legajos === true;
-    if (!canManageLegajos) return response.status(403).json({ success: false, message: 'No tenés permiso para editar la nómina.' });
     if (request.body && typeof request.body === 'object' && (request.body as Record<string, unknown>).direct_deactivation === true) {
-      if (!['rrhh', 'admin'].includes(viewer?.role || '')) return response.status(403).json({ success: false, message: 'Sólo RRHH o Administración puede ejecutar una baja directa.' });
+      if (!['rrhh', 'admin'].includes(access.actor?.role || '')) return response.status(403).json({ success: false, message: 'Sólo RRHH o Administración puede ejecutar una baja directa.' });
       const reason = text((request.body as Record<string, unknown>).deactivation_reason);
       const date = text((request.body as Record<string, unknown>).deactivation_date);
       if (!reason || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return response.status(400).json({ success: false, message: 'Indicá motivo y fecha de baja.' });
@@ -37,18 +40,6 @@ export default async function handler(request: Request, response: Response) {
       await database.query(`insert into public.staff_status_events(staff_member_id,event_type,reason,supervisor_staff_id,manager_staff_id,created_by,occurred_at) values($1,'termination',$2,$3,$4,$5,$6::date)`, [id, reason, resource.rows[0].responsible_staff_id, resource.rows[0].effective_manager_staff_id, user, date]);
       await database.query('commit');
       return response.status(200).json({ success: true });
-    }
-    if (viewer.role === 'gerente') {
-      if (!viewer.staff_member_id) return response.status(403).json({ success: false, message: 'Tu cuenta de gerente no está vinculada a un recurso.' });
-      const inScope = await database.query(`
-        with recursive hierarchy as (
-          select id from public.staff_members where id = $1
-          union
-          select child.id from public.staff_members child join hierarchy parent on child.responsible_staff_id = parent.id
-        )
-        select 1 from public.staff_members where id = $2 and (id in (select id from hierarchy) or effective_manager_staff_id = $1)
-      `, [viewer.staff_member_id, id]);
-      if (!inScope.rowCount) return response.status(403).json({ success: false, message: 'Sólo podés editar recursos de tu estructura.' });
     }
     const roleId = text(request.body?.role_id); const responsibleId = text(request.body?.responsible_staff_id) || null;
     const managerId = text(request.body?.manager_staff_id) || null;
@@ -87,16 +78,8 @@ export default async function handler(request: Request, response: Response) {
     if (responsibleId && !parent.rows[0]) throw new Error('El responsable seleccionado no está activo.');
     if (role.rows[0].creates_seller_record && active && !responsibleId) throw new Error('Un vendedor activo debe tener un supervisor asignado.');
     if (role.rows[0].creates_seller_record && responsibleId && parent.rows[0]?.app_role_mapping !== 'supervisor') throw new Error('El responsable de un vendedor debe ser un supervisor activo.');
-    if (viewer.role === 'gerente' && responsibleId) {
-      const destinationInScope = await database.query(`
-        with recursive hierarchy as (
-          select id from public.staff_members where id=$1
-          union
-          select child.id from public.staff_members child join hierarchy parent on child.responsible_staff_id=parent.id
-        )
-        select 1 from public.staff_members where id=$2 and (id in (select id from hierarchy) or effective_manager_staff_id=$1)
-      `, [viewer.staff_member_id, responsibleId]);
-      if (!destinationInScope.rowCount) {
+    if (access.actor?.role === 'gerente' && responsibleId) {
+      if (!access.scope.staffIds.includes(responsibleId)) {
         await database.query('rollback');
         return response.status(403).json({ success: false, message: 'Sólo podés trasladar vendedores hacia supervisores de tu estructura.' });
       }

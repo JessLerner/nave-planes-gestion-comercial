@@ -1,33 +1,35 @@
 import { databasePool } from './lib/database';
+import { canReadLegajosHistory, legajosOrganizationalAccess } from './lib/legajos-organizational-access';
 
 type Req = { method?: string; headers?: Record<string, string | string[] | undefined>; query?: Record<string, string | string[] | undefined> };
 type Res = { status: (code: number) => Res; json: (body: unknown) => Res };
 const raw = process.env.POSTGRES_URL || process.env.DATABASE_URL || '';
 const pool = databasePool(raw);
 
-async function userId(req: Req) {
+async function identity(req: Req) {
   const value = req.headers?.authorization; const authorization = Array.isArray(value) ? value[0] : value;
   if (!authorization?.startsWith('Bearer ') || !process.env.SUPABASE_URL || !process.env.SUPABASE_ANON_KEY) return null;
   const response = await fetch(`${process.env.SUPABASE_URL}/auth/v1/user`, { headers: { Authorization: authorization, apikey: process.env.SUPABASE_ANON_KEY } });
-  return response.ok ? ((await response.json() as { id?: string }).id || null) : null;
+  const id = response.ok ? ((await response.json() as { id?: string }).id || null) : null;
+  return id ? { id, authorization } : null;
 }
 const text = (value: string | string[] | undefined) => typeof value === 'string' ? value.trim() : '';
 
 export default async function handler(req: Req, res: Res) {
   if (req.method !== 'GET') return res.status(405).json({ success: false, message: 'Método no permitido.' });
-  const id = await userId(req); if (!id) return res.status(401).json({ success: false, message: 'Sesión no válida.' });
-  const profile = await pool.query(`select p.role, p.staff_member_id, exists(select 1 from public.profile_access_permissions permission where permission.profile_id=p.id and permission.capability in ('view_legajos','manage_legajos')) as can_view_legajos from public.profiles p where p.id=$1`, [id]);
-  const viewer = profile.rows[0] as { role?: string; staff_member_id?: string | null; can_view_legajos?: boolean } | undefined;
-  // Working in the Administración area, or holding a title such as Director,
-  // is not an authorization. Only the global profiles and an explicit grant
-  // can read the complete personnel directory.
-  const globalAccess = viewer?.role === 'admin' || viewer?.role === 'rrhh' || viewer?.can_view_legajos === true;
-  if (!viewer || (!globalAccess && !['gerente', 'supervisor'].includes(viewer.role || '')) || (!globalAccess && !viewer.staff_member_id)) return res.status(403).json({ success: false, message: 'No tenés acceso a Legajos.' });
+  const session = await identity(req); if (!session) return res.status(401).json({ success: false, message: 'Sesión no válida.' });
+  let access;
+  try { access = await legajosOrganizationalAccess(session.authorization, session.id, 'legajos.read'); }
+  catch { return res.status(503).json({ success: false, message: 'No se pudo resolver el acceso organizativo de Legajos.' }); }
+  if (!access.authorized) return res.status(403).json({ success: false, message: 'No tenés acceso a Legajos.' });
+  const globalAccess = access.scope.includesAllActiveStaff;
   const view = text(req.query?.view);
+  const requestedStatus = text(req.query?.status) || 'active';
+  if ((view === 'history' || requestedStatus === 'inactive') && !canReadLegajosHistory(access)) return res.status(403).json({ success: false, message: 'Los legajos históricos e inactivos son exclusivos de Administración y RR. HH.' });
   if (view === 'turnover') {
     try {
-      const scope = viewer.role === 'supervisor' ? 'and supervisor.id=$1' : viewer.role === 'gerente' ? 'and supervisor.effective_manager_staff_id=$1' : '';
-      const params = scope ? [viewer.staff_member_id] : [];
+      const scope = globalAccess ? '' : 'and supervisor.id = any($1::uuid[])';
+      const params = globalAccess ? [] : [access.scope.staffIds];
       const result = await pool.query(`
         select supervisor.id as supervisor_id, supervisor.full_name as supervisor_name,
                coalesce(team.name, supervisor.full_name) as team_name,
@@ -45,18 +47,16 @@ export default async function handler(req: Req, res: Res) {
   }
   if (view === 'history') {
     try {
-      const scope = viewer.role === 'supervisor' ? 'and exists (select 1 from public.staff_status_events event where event.staff_member_id=staff.id and event.supervisor_staff_id=$1)' : viewer.role === 'gerente' ? 'and exists (select 1 from public.staff_status_events event where event.staff_member_id=staff.id and event.manager_staff_id=$1)' : '';
-      const rows = await pool.query(`select staff.id,staff.full_name,staff.dni,staff.legajo,role.name as role_name,responsible.full_name as supervisor_name,manager.full_name as manager_name,staff.deactivated_at,staff.deactivation_type,staff.deactivation_reason from public.staff_members staff left join public.hr_roles role on role.id=staff.role_id left join public.staff_members responsible on responsible.id=staff.responsible_staff_id left join public.staff_members manager on manager.id=staff.effective_manager_staff_id where staff.active=false ${scope} order by staff.deactivated_at desc nulls last,staff.full_name`, scope ? [viewer.staff_member_id] : []);
+      const rows = await pool.query(`select staff.id,staff.full_name,staff.dni,staff.legajo,role.name as role_name,responsible.full_name as supervisor_name,manager.full_name as manager_name,staff.deactivated_at,staff.deactivation_type,staff.deactivation_reason from public.staff_members staff left join public.hr_roles role on role.id=staff.role_id left join public.staff_members responsible on responsible.id=staff.responsible_staff_id left join public.staff_members manager on manager.id=staff.effective_manager_staff_id where staff.active=false order by staff.deactivated_at desc nulls last,staff.full_name`);
       return res.status(200).json({ success: true, data: rows.rows });
     } catch { return res.status(500).json({ success: false, message: 'No se pudieron cargar los históricos.' }); }
   }
-  const q = text(req.query?.q); const area = text(req.query?.area); const team = text(req.query?.team); const status = text(req.query?.status) || 'active'; const administrativeStatus = text(req.query?.administrative_status);
+  const q = text(req.query?.q); const area = text(req.query?.area); const team = text(req.query?.team); const status = requestedStatus; const administrativeStatus = text(req.query?.administrative_status);
   const page = Math.max(1, Number(text(req.query?.page)) || 1); const size = Math.min(100, Math.max(20, Number(text(req.query?.size)) || 50));
   const where: string[] = []; const values: unknown[] = []; const add = (sql: string, value?: unknown) => { if (value !== undefined) values.push(value); where.push(sql.replace('?', `$${values.length}`)); };
   if (!globalAccess) {
-    values.push(viewer!.staff_member_id);
-    const hierarchy = `staff.id in (with recursive hierarchy as (select id from public.staff_members where id=$1 union select child.id from public.staff_members child join hierarchy parent on child.responsible_staff_id=parent.id) select id from hierarchy)`;
-    where.push(viewer!.role === 'gerente' ? `(${hierarchy} or staff.effective_manager_staff_id=$1)` : hierarchy);
+    values.push(access.scope.staffIds);
+    where.push(`staff.id = any($${values.length}::uuid[])`);
   }
   if (status === 'active') where.push('staff.active=true'); else if (status === 'inactive') where.push('staff.active=false');
   if (administrativeStatus === 'coaching' || administrativeStatus === 'alta_definitiva') add('staff.administrative_status=?::public.administrative_status', administrativeStatus);
@@ -80,10 +80,8 @@ export default async function handler(req: Req, res: Res) {
     const count = await pool.query(`select count(*)::int as total from public.staff_members staff left join public.teams team on team.supervisor_staff_id=staff.responsible_staff_id ${clause}`, values);
     values.push(size, (page - 1) * size);
     const rows = await pool.query(`select staff.id, staff.full_name, staff.dni, staff.legajo, staff.employment_type, staff.role_id, staff.responsible_staff_id, staff.effective_manager_staff_id, staff.effective_manager_source, staff.administrative_status, staff.is_coaching, staff.is_freelance, staff.active, area.name as area_name, role.name as role_name, responsible.full_name as responsible_name, manager.full_name as effective_manager_name, team.id as team_id, team.name as team_name from public.staff_members staff left join public.hr_areas area on area.id=staff.area_id left join public.hr_roles role on role.id=staff.role_id left join public.staff_members responsible on responsible.id=staff.responsible_staff_id left join public.staff_members manager on manager.id=staff.effective_manager_staff_id left join public.teams team on team.supervisor_staff_id=staff.responsible_staff_id ${clause} order by staff.full_name limit $${values.length-1} offset $${values.length}`, values);
-    const responsibleScope = viewer!.role === 'gerente'
-      ? `and (staff.id in (with recursive hierarchy as (select id from public.staff_members where id=$1 union select child.id from public.staff_members child join hierarchy parent on child.responsible_staff_id=parent.id) select id from hierarchy) or staff.effective_manager_staff_id=$1)`
-      : '';
-    const responsibleParams = responsibleScope ? [viewer!.staff_member_id] : [];
+    const responsibleScope = globalAccess ? '' : 'and staff.id = any($1::uuid[])';
+    const responsibleParams = globalAccess ? [] : [access.scope.staffIds];
     const [areas, teams, roles, responsibles, managers] = await Promise.all([
       pool.query(`select id,name from public.hr_areas where active=true order by sort_order,name`),
       pool.query(`select t.id,t.name from public.teams t join public.staff_members staff on staff.id=t.supervisor_staff_id join public.hr_roles role on role.id=staff.role_id where t.active=true and t.is_sales_team=true and staff.active=true and role.app_role_mapping='supervisor'::public.app_role order by t.name`),

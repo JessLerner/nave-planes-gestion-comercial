@@ -49,6 +49,6 @@
     "tailwindcss": "^4.3.3",
     "tsx": "^4.21.0",
     "typescript": "^7.0.2",
-    "wrangler": "^4.48.0"
+    "wrangler": "^4.157.0"
   }
 }

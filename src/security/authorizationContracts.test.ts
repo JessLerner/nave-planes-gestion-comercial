@@ -126,3 +126,22 @@ test('temporary administrative capabilities are offered only when server checks 
     assert.doesNotMatch(accountPanel, new RegExp(`['"]${retiredCapability}['"]`));
   }
 });
+
+test('only pending invitations expose a safe resend or pre-verification email correction', async () => {
+  const [accountHandler, accountPanel, migration] = await Promise.all([
+    readProjectFile('api/access-users.ts'),
+    readProjectFile('src/components/hr/AccessManagementPanel.tsx'),
+    readProjectFile('supabase/migrations/20261109_041_pending_access_invitation_audit.sql'),
+  ]);
+
+  assert.match(accountHandler, /auth\.email_confirmed_at is not null as email_verified/);
+  assert.match(accountHandler, /auth\.invited_at is not null and auth\.email_confirmed_at is null as invitation_pending/);
+  assert.match(accountHandler, /action==='resend_pending_invitation'\|\|action==='change_pending_invitation_email'/);
+  assert.match(accountHandler, /auth\/v1\/admin\/users\/\$\{account\.id\}/);
+  assert.match(accountHandler, /auth\/v1\/invite/);
+  assert.match(accountHandler, /if\(!account\|\|!account\.invitation_pending\|\|account\.email_verified\)/);
+  assert.match(accountPanel, /account\.invitation_pending&&/);
+  assert.match(accountPanel, /Gestionar invitación/);
+  assert.match(accountPanel, /Corregir correo y reenviar/);
+  assert.match(migration, /'invitation_resent','pending_invitation_email_changed'/);
+});

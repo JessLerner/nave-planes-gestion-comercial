@@ -54,6 +54,9 @@ const dependencyNotes = {
   '20261105_038_incorporation_private_drafts_and_hr_direct.sql': ['034/035/037: incorporation workflow, private storage and drafts'],
   '20261106_039_sprint5_production_reconciliation.sql': ['001 plus observed Legajos base: staff_members, profiles, hr_areas/hr_roles and current_app_role()'],
   '20261106_040_access_account_management.sql': ['001 plus observed Legajos/profile base and current_app_role(); adds the administrative account role and explicit capability grants'],
+  '20261109_041_pending_access_invitation_audit.sql': ['040: access_account_audit and account-management roles'],
+  '20261110_042_organizational_access_context_self.sql': ['032/040: Legajos authority, projections and explicit administrative capabilities'],
+  '20261110_043_organizational_access_context_manager_scope.sql': ['042: common organizational-access contract and its restricted owner/ACL'],
 };
 
 const sourceFiles = (await readdir(sourceDir))

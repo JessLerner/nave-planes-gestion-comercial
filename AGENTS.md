@@ -87,6 +87,12 @@ Los comandos de Supabase local y su secuencia documentada están en `docs/LOCAL_
 - No declarar éxito por la mera presencia de código, una migración o un contenedor. Informar separadamente: **implementado**, **probado** (con comando/entorno), **pendiente** y **bloqueado**.
 - Una funcionalidad está terminada sólo si: cumple el alcance y criterios acordados; preserva flujos existentes; valida autorización y datos sensibles; tiene pruebas pertinentes ejecutadas o una limitación explicada; y su estado de migración/despliegue se comunica sin inferencias.
 
+## Coordinación entre agentes, sesiones y fuentes de verdad
+
+- El Panel de seguimiento es la fuente central de tareas, estados, decisiones, bloqueos y evidencias; `AGENTS.md` contiene las instrucciones operativas; Git conserva la trazabilidad del código.
+- Al comenzar o retomar una tarea, todo agente debe consultar estas tres fuentes, identificar la rama, HEAD, worktree y cambios ajenos, y reconstruir el contexto desde ellas sin depender de conversaciones previas.
+- Al cambiar de agente, sesión o cuenta se aplica el mismo procedimiento. Al finalizar una fase verificable, el agente actualiza la tarea existente del Panel con la evidencia real, manteniendo separadas las señales de código, pruebas, validación externa y publicación.
+
 ## Panel de seguimiento de NAVE.Plan
 
 - Esta regla aplica a toda tarea futura de Codex. Antes de comenzar una tarea, consultar `project_instructions`, identificar la tarea existente con `list_tasks` (sin crear duplicados) y consultar `get_task`. Leer estado, revisión, dependencias y criterios de aceptación; separar las fases verificables antes de actuar.

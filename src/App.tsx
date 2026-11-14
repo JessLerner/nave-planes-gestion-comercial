@@ -22,6 +22,7 @@ import { PasswordSetupScreen } from './auth/PasswordSetupScreen';
 
 function MainLayout() {
   const { currentUser } = useApp();
+  const canManageEtl = currentUser.role === 'admin';
   const [activeTab, setActiveTab] = useState<string>('pacing');
   // Keep every visited workspace mounted. Switching sections must never erase
   // an unfinished form, filters, preview or import selection.
@@ -29,12 +30,14 @@ function MainLayout() {
   const [isCalendarConfigOpen, setIsCalendarConfigOpen] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
-  // If user switches away from admin while on extractor, gracefully return to pacing
+  // ETL administration is a global-admin surface. Keep hidden tabs from
+  // remaining mounted after a session/profile change as well as hiding them
+  // from navigation.
   React.useEffect(() => {
-    if (activeTab === 'extractor' && currentUser.role !== 'admin') {
+    if ((activeTab === 'database' || activeTab === 'extractor') && !canManageEtl) {
       setActiveTab('pacing');
     }
-  }, [currentUser.role, activeTab]);
+  }, [canManageEtl, activeTab]);
 
   const openTab = (tab: string) => {
     setVisitedTabs(current => new Set([...current, tab]));
@@ -69,8 +72,8 @@ function MainLayout() {
             {visitedTabs.has('prices') && <div className={activeTab === 'prices' ? '' : 'hidden'}><PriceListModule /></div>}
             {visitedTabs.has('hr') && <div className={activeTab === 'hr' ? '' : 'hidden'}><HrAndAdvancesModule /></div>}
             {visitedTabs.has('cartera') && <div className={activeTab === 'cartera' ? '' : 'hidden'}><CarteraMoraModule /></div>}
-            {visitedTabs.has('database') && <div className={activeTab === 'database' ? '' : 'hidden'}><DatabaseConnectorsModule /></div>}
-            {visitedTabs.has('extractor') && <div className={activeTab === 'extractor' ? '' : 'hidden'}><ExtractorHubModule /></div>}
+            {canManageEtl && visitedTabs.has('database') && <div className={activeTab === 'database' ? '' : 'hidden'}><DatabaseConnectorsModule /></div>}
+            {canManageEtl && visitedTabs.has('extractor') && <div className={activeTab === 'extractor' ? '' : 'hidden'}><ExtractorHubModule /></div>}
           </div>
         </main>
       </div>

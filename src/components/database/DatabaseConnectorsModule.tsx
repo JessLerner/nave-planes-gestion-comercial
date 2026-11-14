@@ -22,6 +22,7 @@ import { DatabaseConnectorConfig } from '../../types/database';
 export const DatabaseConnectorsModule: React.FC = () => {
   const {
     connectors,
+    currentUser,
     updateConnector,
     testConnector,
     syncConnector,
@@ -33,6 +34,10 @@ export const DatabaseConnectorsModule: React.FC = () => {
     carteraMora,
     importBulkData,
   } = useApp();
+
+  if (currentUser.role !== 'admin') {
+    return <div className="rounded-xl border border-rose-500/30 bg-slate-900 p-6 text-sm text-slate-300">Acceso restringido a Administración General.</div>;
+  }
 
   const [selectedConnector, setSelectedConnector] = useState<DatabaseConnectorConfig | null>(null);
   const [testResult, setTestResult] = useState<{ id: string; success: boolean; msg: string } | null>(null);

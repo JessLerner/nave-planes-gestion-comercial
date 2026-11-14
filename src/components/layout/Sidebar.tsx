@@ -77,15 +77,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
       badge: null,
       description: 'Agrupamiento y trazabilidad',
     },
-    {
-      id: 'database',
-      label: 'Bases de Datos & ETL',
-      icon: Database,
-      badge: null,
-      description: 'PostgreSQL, Fox CRM & Sheets',
-    },
     ...(currentUser.role === 'admin'
       ? [
+          {
+            id: 'database',
+            label: 'Bases de Datos & ETL',
+            icon: Database,
+            badge: null,
+            description: 'PostgreSQL, Fox CRM & Sheets',
+          },
           {
             id: 'extractor',
             label: 'Extractor Google & Supabase',

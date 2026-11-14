@@ -47,6 +47,16 @@ const handlers: Record<string, () => Promise<{ default: unknown }>> = {
   '/api/wage-advances': () => import('../api/wage-advances'),
 };
 
+// These endpoints belong only to the local Express prototype. They must not
+// fall through to the SPA in the deployed Worker, where a direct /api request
+// could otherwise receive index.html and look like a valid integration.
+function isLegacyLocalEtlPath(path: string) {
+  return path === '/api/data'
+    || path.startsWith('/api/data/')
+    || path.startsWith('/api/connectors/')
+    || ['/api/ingest', '/api/stream', '/api/records', '/api/sync-logs', '/api/stats', '/api/config', '/api/reset-demo', '/api/export'].includes(path);
+}
+
 function configureLegacyEnvironment(environment: Environment) {
   // The existing API modules create their pg pools on import. Setting these
   // values first lets them run unchanged while Hyperdrive keeps the direct
@@ -114,6 +124,9 @@ async function assetOrSpa(request: Request, environment: Environment) {
 export default {
   async fetch(request: Request, environment: Environment): Promise<Response> {
     const path = new URL(request.url).pathname.replace(/\/$/, '') || '/';
+    if (isLegacyLocalEtlPath(path)) {
+      return Response.json({ success: false, message: 'Esta ruta ETL sólo existe en el entorno local aislado.' }, { status: 404 });
+    }
     const loader = handlers[path];
     if (!loader) return assetOrSpa(request, environment);
 

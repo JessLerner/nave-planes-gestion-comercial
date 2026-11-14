@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import fs from 'fs';
 import path from 'path';
 import { Pool } from 'pg';
+import { authorizeLocalEtlAdmin } from './api/lib/local-etl-access';
 
 dotenv.config();
 
@@ -14,6 +15,40 @@ const DATA_FILE = path.resolve(process.cwd(), '.concesionaria_db.json');
 
 app.use(express.json({ limit: '20mb' }));
 app.use(express.urlencoded({ extended: true, limit: '20mb' }));
+
+const localEtlDatabaseUrl = process.env.POSTGRES_URL || process.env.DATABASE_URL || '';
+const localEtlPool = localEtlDatabaseUrl ? new Pool({ connectionString: localEtlDatabaseUrl }) : null;
+
+async function requireLocalEtlAdmin(req: Request, res: Response, next: () => void) {
+  const authorization = typeof req.headers.authorization === 'string' ? req.headers.authorization : undefined;
+  const decision = await authorizeLocalEtlAdmin(
+    authorization,
+    async (token) => {
+      if (!process.env.SUPABASE_URL || !process.env.SUPABASE_ANON_KEY) return null;
+      const response = await fetch(`${process.env.SUPABASE_URL}/auth/v1/user`, {
+        headers: { Authorization: `Bearer ${token}`, apikey: process.env.SUPABASE_ANON_KEY },
+      });
+      return response.ok ? ((await response.json() as { id?: string }).id || null) : null;
+    },
+    async (userId) => {
+      if (!localEtlPool) return null;
+      const profile = await localEtlPool.query<{ role: string }>('select role from public.profiles where id=$1', [userId]);
+      return profile.rows[0]?.role || '';
+    },
+  );
+  if (decision.status !== 200) return res.status(decision.status).json({ success: false, message: decision.message });
+  next();
+}
+
+// The local Express prototype can open external connections and mutate its
+// local caches. Every browser-facing management surface is therefore admin
+// only. `/api/ingest` remains a service-to-service path with its own shared
+// ingestion secret and is not exposed by the Production Worker.
+const LOCAL_ETL_ADMIN_PATHS = [
+  '/api/data', '/api/data/import', '/api/connectors/test', '/api/connectors/sync',
+  '/api/stream', '/api/records', '/api/sync-logs', '/api/stats', '/api/config', '/api/reset-demo', '/api/export',
+];
+app.use(LOCAL_ETL_ADMIN_PATHS, requireLocalEtlAdmin);
 
 // CORS middleware for Google Apps Script & Chrome Extension fetch calls
 app.use((req, res, next) => {

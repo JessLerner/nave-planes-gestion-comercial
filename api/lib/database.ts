@@ -6,7 +6,7 @@ export function databasePoolConfig(rawConnectionString: string): PoolConfig {
     .replace(/[?&]$/, '');
 
   // Hyperdrive exposes a local Postgres endpoint to the Worker. It rejects a
-  // second SSL negotiation, while direct Supabase connections on Vercel need it.
+  // second SSL negotiation, while direct remote Supabase connections need it.
   if (process.env.CLOUDFLARE_HYPERDRIVE === 'true') return { connectionString };
   // Supabase CLI exposes PostgreSQL without TLS on its loopback port.  Keeping
   // this exception local lets integration tests exercise the same handlers

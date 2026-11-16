@@ -60,7 +60,7 @@ La corrección debe retirar el segundo circuito de interfaz/API/base, conservand
 
 ### Confirmado en ambiente desplegado
 
-**Nada en esta investigación.** No se consultó la base, no se revisó la versión desplegada, no se invocaron APIs y no se hicieron escrituras. Que una migración o ruta exista localmente no prueba que esté activa en Supabase/Cloudflare/Vercel.
+**Nada en esta investigación.** No se consultó la base, no se revisó la versión desplegada, no se invocaron APIs y no se hicieron escrituras. Que una migración o ruta exista localmente no prueba que esté activa en Supabase/Cloudflare.
 
 ### Aún no verificado y requerido antes de un cambio
 

@@ -86,7 +86,7 @@ automáticas: cada fuente debe verificarse antes de pasar a producción.
   marca/vigencia y vistas restringidas para cuota 1, valor de suscripción y
   sobrepautas de gerencia.
 - [ ] Incorporar el esquema Supabase versionado (`price_import_runs`, fuentes,
-  planes, tramos y aprobaciones) y APIs Vercel con permisos; no cargar listas
+  planes, tramos y aprobaciones) y APIs con permisos; no cargar listas
   desde estado local del navegador.
 
 ## Criterios no negociables
@@ -145,7 +145,7 @@ validación/migración manual, `[ ]` pendiente.
 - [x] Worker Cloudflare publicado con frontend, APIs, Hyperdrive y variables
   runtime de Supabase.
 - [x] Autenticación y consultas/escrituras principales verificadas desde
-  Cloudflare; Vercel permanece como respaldo durante la estabilización.
+  Cloudflare.
 - [x] Logs de Cloudflare habilitados para diagnóstico.
 - [ ] Ejecutar una regresión completa en Cloudflare: Legajos (lectura, edición,
   baja e historial), Fox, Operaciones y Adelantos.

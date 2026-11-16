@@ -1,6 +1,6 @@
-# Migración gradual a Cloudflare
+# Publicación en Cloudflare
 
-La aplicación seguirá publicada en Vercel hasta que esta versión haya sido validada. El Worker concentra las once APIs existentes y los archivos estáticos en una única publicación, evitando el límite de funciones del plan Hobby.
+Cloudflare Worker concentra las APIs y los archivos estáticos en una única publicación. Esta guía describe configuración de repositorio; no acredita qué revisión está activa en un entorno remoto.
 
 ## Preparación local
 
@@ -20,6 +20,6 @@ La aplicación seguirá publicada en Vercel hasta que esta versión haya sido va
 ```
 
 5. Publicar con `npm run cf:deploy`, probar login, Legajos, actualización de recursos, adelantos, operaciones e importación Fox en la URL `workers.dev`.
-6. Recién después, mover el dominio desde Vercel al Worker.
+6. Configurar en Supabase las Redirect URLs del dominio Cloudflare autorizado antes de enviar invitaciones o recuperaciones de contraseña.
 
 El plan Free alcanza para la primera etapa: un Worker con 100.000 solicitudes diarias y Hyperdrive con 100.000 consultas diarias. Si el volumen real los supera, se evalúa Workers Paid antes de que la plataforma deje de responder.

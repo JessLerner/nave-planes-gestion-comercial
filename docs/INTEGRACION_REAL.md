@@ -4,18 +4,18 @@ La aplicación no debe usar ejemplos ni datos de prueba. Este repositorio ahora 
 
 ## Estado actual que hay que corregir
 
-- La pantalla puede desplegarse en Vercel, pero el `server.ts` actual es un servidor local Express. Vercel no lo ejecuta como servidor persistente y por eso `/api/data` no es el backend productivo.
+- El `server.ts` actual es un servidor local Express; no es el backend productivo persistente. Las rutas `/api/data` heredadas no pertenecen al Worker productivo.
 - Google Sheets con permiso de lectura necesita un proceso externo autorizado que lea la hoja y escriba en Supabase; no necesita ni debe exponer una clave de Supabase en el navegador.
 - Fox CRM debe integrarse por su API/webhook oficial o por el extractor ya existente. La plataforma recibirá datos normalizados, no hará scraping desde el frontend.
 - Antes de otorgar acceso a la interfaz hace falta activar Supabase Auth y crear los usuarios reales con sus roles/equipos. Sin eso no es seguro mostrar información comercial, DNI o teléfonos.
 
 ## Arquitectura objetivo
 
-`Fox CRM / Google Sheets / CSV mensual -> Extractor o Edge Function -> Supabase -> aplicación Vercel`
+`Fox CRM / Google Sheets / CSV mensual -> Extractor o Edge Function -> Supabase -> aplicación Cloudflare`
 
 1. Supabase es la fuente central de verdad. Ejecutar la migración incluida desde SQL Editor.
 2. El extractor se ejecuta con una credencial secreta en servidor y escribe mediante el rol de servicio o una Edge Function protegida con `INGEST_SHARED_SECRET`.
-3. La aplicación de Vercel usa únicamente `VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY`, con RLS y autenticación por usuario.
+3. La aplicación publicada por Cloudflare usa únicamente `VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY`, con RLS y autenticación por usuario.
 4. Cada importación conserva el identificador externo y la fecha de actualización para que repetir una sincronización haga *upsert*, no duplique ventas ni scoring.
 
 ## Información necesaria para terminar cada fuente

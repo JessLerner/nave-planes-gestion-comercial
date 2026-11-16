@@ -4,10 +4,9 @@ import path from 'path';
 import {defineConfig} from 'vite';
 
 export default defineConfig(() => {
-  // GitHub Pages serves this repository under its name, whereas Vercel serves
-  // it from the domain root. A fixed GitHub Pages base made the Vercel build
-  // request non-existent JS/CSS assets and resulted in a blank page.
-  const base = process.env.VERCEL || process.env.CLOUDFLARE_WORKER
+  // Cloudflare Workers serves the application from the domain root. GitHub
+  // Pages remains a repository preview and needs the repository base path.
+  const base = process.env.CLOUDFLARE_WORKER
     ? '/'
     : process.env.VITE_BASE_PATH || '/nave-planes-gestion-comercial/';
 

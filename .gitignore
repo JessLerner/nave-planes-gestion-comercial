@@ -16,3 +16,4 @@ coverage/
 *.zip
 .aistudio/
 /.local-supabase/
+/tmp/

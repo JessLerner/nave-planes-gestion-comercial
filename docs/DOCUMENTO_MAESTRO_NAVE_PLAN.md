@@ -4,6 +4,13 @@
 **Naturaleza del producto:** plataforma interna en desarrollo para gestión comercial y operativa de una concesionaria.
 **Criterio de lectura:** este documento separa evidencia de código local, documentación de proyecto y validación productiva. Un módulo incompleto es trabajo planificado, no un defecto de un producto finalizado.
 
+## Orientación y fuentes vigentes
+
+- **Arquitectura principal:** React/Vite (`src/`) consume APIs TypeScript (`api/`) adaptadas por `cloudflare/worker.ts`; Supabase (`supabase/`) concentra persistencia, autenticación, políticas, migraciones y Edge Functions. `server.ts` es un prototipo local heredado, no el backend desplegable actual.
+- **Documentación vigente:** este Documento Maestro describe el producto y su arquitectura; [Estado del Proyecto](ESTADO_PROYECTO.md) resume continuidad y evidencia local; [AGENTS.md](../AGENTS.md) define la operación del repositorio.
+- **Evidencia histórica:** los informes fechados no sustituyen el estado vigente ni crean tareas operativas independientes. El repositorio conserva sólo documentación técnica necesaria; el seguimiento operativo se registra en el Panel.
+- **Tareas operativas:** el Panel de escritorio definido en `AGENTS.md` es la fuente única de tareas, decisiones, bloqueos y evidencias. Este repositorio conserva contexto técnico, no un backlog paralelo.
+
 ## 1. Estado ejecutivo
 
 NAVE.Plan ya tiene una base transaccional y de permisos relevante: autenticación Supabase, RLS, nómina/jerarquía, operaciones, adelantos, importación Fox asistida, métricas comerciales y el circuito de listas de precios. El alcance final todavía es mucho más amplio que el código operativo actual.

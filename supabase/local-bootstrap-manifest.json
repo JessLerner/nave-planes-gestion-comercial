@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-02T04:20:00.689Z",
+  "generatedAt": "2026-11-16T00:51:07.274Z",
   "generator": "scripts/generate-local-supabase-migrations.mjs",
   "sourceOfTruth": "supabase/migrations",
   "purpose": "Bootstrap local only. Never use this derived tree with supabase link, db push, or remote environments.",
@@ -363,6 +363,136 @@
       "sha256": "3ba6d4150eb63fc3d3ab734a301557796d04998d6d688bcfe74208ebea9baa39",
       "dependencies": [
         "033/034/035: price list publishing and segments"
+      ]
+    },
+    {
+      "order": 37,
+      "originalFile": "supabase/migrations/20261103_034_incorporation_requests_coaching.sql",
+      "localFile": ".local-supabase/supabase/migrations/20261103000037_034_incorporation_requests_coaching.sql",
+      "localVersion": "20261103000037",
+      "sha256": "4efcc7a7aab95380aec2f2321e615a3859d24ca69a1cb0a5458d55e56d5b85d0",
+      "dependencies": [
+        "032: Legajos roster projections; 006: private rrhh-legajos bucket"
+      ]
+    },
+    {
+      "order": 38,
+      "originalFile": "supabase/migrations/20261103_035_incorporation_access_hardening.sql",
+      "localFile": ".local-supabase/supabase/migrations/20261103000038_035_incorporation_access_hardening.sql",
+      "localVersion": "20261103000038",
+      "sha256": "7d0b9c4c959cd0539df47dc36d1db153cf781cd504fa5a80fe87cdd52feaad49",
+      "dependencies": [
+        "034: incorporation requests and private documents"
+      ]
+    },
+    {
+      "order": 39,
+      "originalFile": "supabase/migrations/20261103_036_staff_departure_notices.sql",
+      "localFile": ".local-supabase/supabase/migrations/20261103000039_036_staff_departure_notices.sql",
+      "localVersion": "20261103000039",
+      "sha256": "4b7453ce5a7bc7e0c0c98600349b482b2e6234e0b08db854f3f47b630dfffeaa",
+      "dependencies": [
+        "024: staff exit history; 006: private rrhh-legajos bucket"
+      ]
+    },
+    {
+      "order": 40,
+      "originalFile": "supabase/migrations/20261103_037_incorporation_partial_drafts.sql",
+      "localFile": ".local-supabase/supabase/migrations/20261103000040_037_incorporation_partial_drafts.sql",
+      "localVersion": "20261103000040",
+      "sha256": "2669d93e72bd232c94971c503f7f35a6fcf6b13d68c95b0bde88cb4dbbc6ae1b",
+      "dependencies": [
+        "034/035: incorporation workflow and access"
+      ]
+    },
+    {
+      "order": 41,
+      "originalFile": "supabase/migrations/20261105_038_incorporation_private_drafts_and_hr_direct.sql",
+      "localFile": ".local-supabase/supabase/migrations/20261105000041_038_incorporation_private_drafts_and_hr_direct.sql",
+      "localVersion": "20261105000041",
+      "sha256": "aa774b6b2c056ad792312287b8c6d007f733a2f06d498aae2943b916cf58259b",
+      "dependencies": [
+        "034/035/037: incorporation workflow, private storage and drafts"
+      ]
+    },
+    {
+      "order": 42,
+      "originalFile": "supabase/migrations/20261106_039_sprint5_production_reconciliation.sql",
+      "localFile": ".local-supabase/supabase/migrations/20261106000042_039_sprint5_production_reconciliation.sql",
+      "localVersion": "20261106000042",
+      "sha256": "940f2c1a19b6c517abeace4341fabb98762a09fba471207da8fd94c2b9eda40d",
+      "dependencies": [
+        "001 plus observed Legajos base: staff_members, profiles, hr_areas/hr_roles and current_app_role()"
+      ]
+    },
+    {
+      "order": 43,
+      "originalFile": "supabase/migrations/20261106_040_access_account_management.sql",
+      "localFile": ".local-supabase/supabase/migrations/20261106000043_040_access_account_management.sql",
+      "localVersion": "20261106000043",
+      "sha256": "c0a5b632d054d12c4ca677822356799a2e7a05094abd008a410a2b5aac3984c3",
+      "dependencies": [
+        "001 plus observed Legajos/profile base and current_app_role(); adds the administrative account role and explicit capability grants"
+      ]
+    },
+    {
+      "order": 44,
+      "originalFile": "supabase/migrations/20261109_041_pending_access_invitation_audit.sql",
+      "localFile": ".local-supabase/supabase/migrations/20261109000044_041_pending_access_invitation_audit.sql",
+      "localVersion": "20261109000044",
+      "sha256": "1f9fc4477725ec140922ee45d46674f4fd394b218adb4d2b27e483ea34be16e8",
+      "dependencies": [
+        "040: access_account_audit and account-management roles"
+      ]
+    },
+    {
+      "order": 45,
+      "originalFile": "supabase/migrations/20261110_042_organizational_access_context_self.sql",
+      "localFile": ".local-supabase/supabase/migrations/20261110000045_042_organizational_access_context_self.sql",
+      "localVersion": "20261110000045",
+      "sha256": "318c5b73cd636d19daba62f271d83343f9d5f72141c18e3defb326837c2b7bda",
+      "dependencies": [
+        "032/040: Legajos authority, projections and explicit administrative capabilities"
+      ]
+    },
+    {
+      "order": 46,
+      "originalFile": "supabase/migrations/20261110_043_organizational_access_context_manager_scope.sql",
+      "localFile": ".local-supabase/supabase/migrations/20261110000046_043_organizational_access_context_manager_scope.sql",
+      "localVersion": "20261110000046",
+      "sha256": "43725744a77bca933170e756ccfef47cdb1d6b6dee4c04870ff2587f7f2f1d02",
+      "dependencies": [
+        "042: common organizational-access contract and its restricted owner/ACL"
+      ]
+    },
+    {
+      "order": 47,
+      "originalFile": "supabase/migrations/20261112_044_legajos_organizational_access_permissions.sql",
+      "localFile": ".local-supabase/supabase/migrations/20261112000047_044_legajos_organizational_access_permissions.sql",
+      "localVersion": "20261112000047",
+      "sha256": "0d680197ef50a4aea561cf61bc75b6f155b45a44cc96d5394779b89366c061bd",
+      "dependencies": [
+        "042/043: organizational-access contract and Legajos authorization alignment"
+      ]
+    },
+    {
+      "order": 48,
+      "originalFile": "supabase/migrations/20261114_045_app_control_sales_ingestion.sql",
+      "localFile": ".local-supabase/supabase/migrations/20261114000048_045_app_control_sales_ingestion.sql",
+      "localVersion": "20261114000048",
+      "sha256": "7bd5e57567ac8e7b9e8c1cced51d79ca5999c3bde8971a364108615aea89ef47",
+      "dependencies": [
+        "020: sales_operations and external App Control contract"
+      ]
+    },
+    {
+      "order": 49,
+      "originalFile": "supabase/migrations/20261115_046_revoke_public_roster_rebuild_execute.sql",
+      "localFile": ".local-supabase/supabase/migrations/20261115000049_046_revoke_public_roster_rebuild_execute.sql",
+      "localVersion": "20261115000049",
+      "sha256": "2772c689399bb316e433dc168123652cc6c4d0e236405c4b4f73c40a31c643fe",
+      "dependencies": [
+        "032: SECURITY DEFINER roster rebuild and its statement-level trigger"
       ]
     }
   ]

@@ -57,6 +57,9 @@ const dependencyNotes = {
   '20261109_041_pending_access_invitation_audit.sql': ['040: access_account_audit and account-management roles'],
   '20261110_042_organizational_access_context_self.sql': ['032/040: Legajos authority, projections and explicit administrative capabilities'],
   '20261110_043_organizational_access_context_manager_scope.sql': ['042: common organizational-access contract and its restricted owner/ACL'],
+  '20261112_044_legajos_organizational_access_permissions.sql': ['042/043: organizational-access contract and Legajos authorization alignment'],
+  '20261114_045_app_control_sales_ingestion.sql': ['020: sales_operations and external App Control contract'],
+  '20261115_046_revoke_public_roster_rebuild_execute.sql': ['032: SECURITY DEFINER roster rebuild and its statement-level trigger'],
 };
 
 const sourceFiles = (await readdir(sourceDir))

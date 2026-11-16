@@ -254,7 +254,54 @@ El modelo heredado `price_lists` coexiste con el nuevo circuito versionado: `com
 6. **Módulos dependientes:** cartera/mora, información importante, parte diario de consulta, notificaciones y reclutamiento, solamente con fuente, permisos y circuito acordados.
 7. **Optimización posterior:** instrumentar rendimiento y reducir recargas/requests sólo después de confirmar las rutas críticas con datos reales.
 
-## 7. Criterios de “operativo” para los próximos entregables
+## 7. Definición funcional vigente — Operaciones & Scoring (16/11/2026)
+
+**Autoridad:** decisiones de negocio aprobadas el 16/11/2026. **Estado:** especificación acordada; no acredita implementación, migración, integración ni validación en plataforma. Esta sección prevalece sobre definiciones incompatibles del documento y de la especificación 13. La seguridad, las plantillas oficiales y los expedientes de la especificación 13 siguen vigentes salvo donde esta sección los precise.
+
+### Navegación futura
+
+- `Operaciones & Scoring` será un grupo desplegable del menú lateral con **OP Cantadas**, **Presentaciones** y **Scoring**, sin pantalla intermedia de tarjetas.
+- `RRHH & Adelantos` adoptará el mismo patrón: Incorporaciones, Avisos de baja, Adelantos de Sueldo, Legajos y Métricas de Rotación & Permanencia.
+- Ambos son requisitos futuros: esta documentación no autoriza ni afirma cambios de interfaz.
+
+### OP Cantadas, señas y anulaciones
+
+- Parte Diario externo continúa creando cantadas en Google Sheets. NAVE.Plan sincronizará altas y cambios y escribirá en Sheets únicamente modificaciones autorizadas realizadas desde NAVE.Plan. La integración requerirá identificador estable, idempotencia, manejo de errores y prevención de bucles; no está implementada.
+- El supervisor opera sólo su estructura actual y, antes de presentar, puede Presentar, Modificar datos comerciales, Cancelar seña o Anular cantada. Modificar datos no altera pagos. Tras presentar no se edita ningún campo, excepto completar/cancelar seña o una corrección formal solicitada por Administración. Un SX nuevo sólo procede mediante traspaso de cash.
+- Una seña puede completarse después. Cancelar seña permite el tratamiento específico del pago: comprobante nuevo para pago online; para efectivo, importe, fecha y receptor, con confirmación del receptor. No implica borrar la cantada ni generar un reembolso por sí misma.
+- Anular cantada exige motivo de catálogo de Administración General y comentario opcional. Sin cobro deja de contar y se elimina el registro operativo, con política de auditoría/retención aún pendiente. Con cobro se presenta a Administración con estado visible **Anulada** y puede igualmente enviarse a Scoring. Se requieren métricas mensuales de casos y motivos por equipo y gerencia.
+- Administración General administra el catálogo de motivos de anulación, cancelación y traspaso, sin modificar el motivo histórico registrado.
+
+### Presentaciones, devoluciones y traspasos
+
+- Presentaciones mostrará botón **Presentar**, indicadores Cantadas / Presentadas / Faltan presentar y listado con devolución administrativa. El formulario aparece sólo al iniciar Presentar, desde la vista o desde una cantada elegible. No puede presentarse una operación inexistente en Cantadas; los datos precargados son de sólo lectura.
+- Se conservan Minuta de Ventas, Minuta de Licitaciones, Planilla de Caja y los expedientes Administrativo y Caja definidos en la especificación 13. Generar o descargar no es Enviar ni genera el contrato oficial de terminal.
+- Administración devuelve **Enviada a Scoring** o **Necesita corrección** con observaciones. En este último caso se corrige lo indicado y se reenvía; la versión operativa anterior se reemplaza sin duplicar cantadas ni presentaciones. La auditoría mínima sin conservar documentos erróneos queda pendiente de política.
+- El traspaso de cash reutiliza un mismo cobro para volver a presentar, con igual o distinto titular, vinculado a la misma cantada. Motivos iniciales: Contrato vencido, Error de carga y Cambio de titular; este último requiere autorización de Gerencia/Dirección, cuyo circuito exacto está pendiente. El contrato anterior queda anulado y sólo este circuito puede sustituir el SX: se conservan SX anterior y vigente sin duplicar dinero ni cantada.
+
+### Scoring, contadores y estructura
+
+- Scoring es sólo lectura, búsqueda y filtros de todas las marcas dentro del alcance del usuario. No aprueba, no bloquea ni modifica operaciones; «Enviada a Scoring» no significa Scoring aprobado. Ante traspaso muestra ambos SX, el anterior como contrato anulado por traspaso y el vigente, junto con los resultados oficiales observados disponibles, sin inventarlos.
+- Los indicadores cuentan cantadas únicas: corregir, reenviar o traspasar no suma cantada ni presentación; una anulada sin cobro se descuenta. Los contadores son mensuales y reinician por período; el tablero anual queda como mejora futura.
+- Para consulta y atribución de estos contadores, un cambio de responsable traslada todas sus operaciones —incluidas anuladas— a la estructura actual. Esta regla sustituye snapshots históricos inmutables para métricas operativas; la trazabilidad organizativa se conserva por separado.
+
+### Documentos y Google Drive
+
+- Los documentos se mantienen privados en Supabase Storage. Al presionar Enviar se copian también a una carpeta de Google Drive compartida con Administración.
+- El primer envío de cada mes crea la carpeta mensual y dentro una carpeta por equipo; no se crean meses futuros anticipadamente. Permisos, nombres, reenvíos, cambios de equipo, fallos parciales y credenciales sólo de servidor siguen pendientes de diseño seguro.
+- Antes de cerrar el mapeo se obtendrá un contrato completo por marca. Se mantienen controles de acceso, archivos permitidos, primera página de contrato y protección de datos sensibles de la especificación 13.
+
+### Pendientes que no se presumen resueltos
+
+1. Efecto exacto de Cancelar seña y criterios de comprobantes/confirmación de efectivo.
+2. Aprobador, conciliación y efectos documentales del traspaso de cash por cambio de titular.
+3. Contratos por marca, mapeo de plantillas, requisitos y validaciones documentales.
+4. Retención/auditoría de documentos erróneos y anulaciones sin cobro.
+5. Contrato bidireccional con Sheets/Parte Diario, concurrencia, fallos y prevención de bucles.
+6. Permisos y operación segura de Drive; rol Administración y confirmación de efectivo.
+7. Corte mensual y atribución al cambiar la estructura.
+
+## 8. Criterios de “operativo” para los próximos entregables
 
 Un módulo pasa de implementado a operativo cuando cumple simultáneamente:
 
@@ -264,6 +311,6 @@ Un módulo pasa de implementado a operativo cuando cumple simultáneamente:
 4. Pantalla conectada a datos reales, sin estados demo para decisiones.
 5. Prueba de flujo completo con los roles involucrados y evidencia de resultado.
 
-## 8. Alcance y límites de este relevamiento
+## 9. Alcance y límites de este relevamiento
 
 El documento refleja el repositorio local y la documentación disponible al 01/11/2026. No ejecuta ni certifica migraciones, no consulta el proyecto Supabase ni confirma que una publicación Cloudflare siga activa. Esas verificaciones son la primera tarea del orden propuesto.

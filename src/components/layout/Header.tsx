@@ -54,10 +54,26 @@ export const Header: React.FC<HeaderProps> = ({
         return 'CRM, Marketing & Reparto de Datos';
       case 'operations':
         return 'Operaciones & Auditoría de Scoring';
+      case 'operations-cantadas':
+        return 'Operaciones & Scoring / OP Cantadas';
+      case 'operations-presentations':
+        return 'Operaciones & Scoring / Presentaciones';
+      case 'operations-scoring':
+        return 'Operaciones & Scoring / Scoring';
       case 'prices':
         return 'Listas de Precios & Modelos';
       case 'hr':
         return 'Recursos Humanos & Adelantos de Sueldo';
+      case 'hr-incorporations':
+        return 'RRHH & Adelantos / Incorporaciones';
+      case 'hr-departures':
+        return 'RRHH & Adelantos / Avisos de baja';
+      case 'hr-advances':
+        return 'RRHH & Adelantos / Adelantos de Sueldo';
+      case 'hr-legajos':
+        return 'RRHH & Adelantos / Legajos';
+      case 'hr-turnover':
+        return 'RRHH & Adelantos / Métricas de Rotación & Permanencia';
       case 'cartera':
         return 'Control de Cartera, Mora & Agrupamiento';
       case 'database':

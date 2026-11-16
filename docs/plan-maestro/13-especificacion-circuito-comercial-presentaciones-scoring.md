@@ -1,13 +1,13 @@
 # 13 — Especificación consolidada: circuito comercial, presentaciones y Scoring
 
 **Estado:** especificación funcional para planificación. No está implementada ni verifica ambientes desplegados.
-**Prevalencia:** reemplaza definiciones anteriores incompatibles sobre Parte Diario, Operaciones, documentos, Scoring, indicadores y Mora.
+**Prevalencia:** se integra con la definición funcional del Documento Maestro de 16/11/2026, que prevalece si existe contradicción.
 
 ## 1. Circuito comercial definitivo
 
 ```text
-Parte Diario externo
-  └─ venta cantada ──► Expediente de presentación ──► presentación registrada ──► Scoring oficial observado
+Parte Diario externo / Google Sheets
+  └─ venta cantada ──► Expediente de presentación ──► envío registrado ──► Scoring oficial observado
        (fuente/fecha A)       (preparación/fecha B)          (fecha C)              (fecha D)
 ```
 
@@ -22,21 +22,22 @@ Las etapas son independientes. Una cantada puede no presentarse; una presentada 
 
 ## 2. Fuentes, relación y atribución histórica
 
-- Parte Diario permanece externo y no se modifica. Nave.Plan sólo consulta/sincroniza por upsert idempotente.
+- Parte Diario permanece externo. NAVE.Plan sincroniza altas/cambios y escribe en Sheets sólo modificaciones autorizadas efectuadas desde NAVE.Plan; el contrato debe prevenir duplicados, bucles y conflictos concurrentes.
 - La relación primaria propuesta entre cantada, expediente y Scoring es el identificador de origen más N° de suscripción cuando exista; antes de que exista, debe conservarse la clave externa de Parte Diario y permitir vinculación explícita/auditable posterior. No se debe usar sólo nombre de cliente.
-- Cada etapa conserva fuente, identificador, fecha propia, estado, responsable cuando corresponda y snapshot histórico de vendedor, equipo, supervisor y gerencia.
-- Un cambio posterior de Legajo/equipo no puede reatribuir silenciosamente indicadores de períodos previos.
+- Cada etapa conserva fuente, identificador, fecha propia, estado y responsable cuando corresponda. La trazabilidad organizativa se conserva separadamente.
+- Para consulta y contadores operativos, un cambio de responsable reatribuye todas sus operaciones a la estructura actual; no se usa snapshot histórico inmutable para esos indicadores.
 - Reimportar Scoring o Parte Diario actualiza la representación vigente sin contar una operación varias veces. Las métricas deben contar identidad de operación, no filas/corridas.
 
-## 3. Estados y transiciones propuestos
+## 3. Estados y transiciones funcionales
 
 | Estado de presentación | Entrada permitida | Salida permitida | Regla |
 | --- | --- | --- | --- |
-| Sin iniciar | Cantada sincronizada sin expediente | En preparación | No presupone documentos ni Scoring. |
-| En preparación | Supervisor inicia expediente | Incompleta / Lista para presentar | Se guardan borradores y faltantes. |
-| Incompleta | Falla requisito o discrepancia pendiente | En preparación / Lista para presentar | Impide marcar completo, no borra información. |
-| Lista para presentar | Requisitos validados y PDFs definitivos | Presentada / En preparación | Descargar no cambia este estado. |
-| Presentada | Confirmación manual autorizada de envío/procedimiento externo | — o corrección controlada a definir | Registra responsable y fecha; NAVE.Plan no afirma haber enviado correo. |
+| Cantada | Sin presentación | Presentar, modificar datos comerciales, cancelar seña o anular | Pagos no se modifican desde la edición comercial. |
+| En preparación | Supervisor inicia presentación | Incompleta / Lista para enviar | Recupera datos de Cantadas como sólo lectura. |
+| Lista para enviar | Requisitos y PDFs definitivos | Enviada a Administración | Generar/descargar no equivale a Enviar. |
+| Enviada a Administración | Envío explícito | Enviada a Scoring / Necesita corrección / Anulada | Administración registra devolución; Scoring es independiente. |
+| Necesita corrección | Observación administrativa | Enviada a Administración | Se reemplaza la versión operativa corregida, sin duplicar indicadores. |
+| Anulada con cobro | Anulación de cantada | Enviada a Administración / Enviada a Scoring | Conserva etiqueta Anulada; no inventa resultado de Scoring. |
 
 Las etiquetas y el tratamiento de una reversión desde Presentada requieren validación antes de implementar. El resultado de Scoring se mantiene como atributo observado separado, nunca como transición de presentación.
 
@@ -48,7 +49,7 @@ El supervisor, dentro de su alcance, selecciona una venta cantada y obtiene los 
 2. solicita documentos con requisito explícito por marca/condición;
 3. propone datos extraídos sólo cuando la técnica y privacidad aprobadas lo permitan;
 4. señala campos faltantes y contradicciones, sin sobrescribir silenciosamente;
-5. permite corrección manual de campos editables;
+5. permite sólo los datos/documentos que no provengan de Cantadas o del contrato, y una corrección posterior expresamente devuelta por Administración;
 6. llena los tres formularios oficiales tras confirmación;
 7. genera PDFs, valida orden/requisitos y produce dos expedientes descargables;
 8. registra preparación y, por acto separado, la presentación efectiva.
@@ -135,16 +136,16 @@ La implementación deberá fijar límite de tamaño, tipo MIME, validación de f
 
 ## 8. Scoring: consulta, seguimiento y analítica
 
-Flujo: **Google Sheets oficial privada → sincronización autenticada periódica → copia de consulta NAVE.Plan**. No hay escritura hacia Sheets ni aprobación/rechazo/anulación interna.
+Flujo: **Google Sheets oficial privada → sincronización autenticada periódica → copia de consulta NAVE.Plan**. Scoring no escribe en Sheets ni aprueba, rechaza, anula o bloquea operaciones internamente.
 
 - Conservar categoría, códigos, motivos y texto originales.
 - Usar mapeos comunes sólo si son versionados y aprobados por marca; no inferir equivalencias.
 - Registrar fuente, corrida, última sincronización exitosa, error y última información válida.
 - La frecuencia se define técnicamente: no se promete tiempo real.
 - Estados observables: aprobado, pendiente, rechazado, anulado cuando la fuente los provea.
-- Desglose: marca, gerencia, supervisor, vendedor, equipo, período, código/motivo rechazo y motivo anulación.
+- Desglose: todas las marcas, gerencia, supervisor, vendedor, equipo, período, código/motivo rechazo y motivo anulación. Ante traspaso, se muestran SX anterior y vigente, con la anulación comercial anterior y los resultados oficiales observados de ambos cuando existan.
 
-Indicadores: operaciones únicas por resultado observado; porcentaje de aprobación con denominador y cohorte declarados; comparación de cantadas/presentadas/aprobadas; objetivos de fábrica, cumplimiento y proyección. La aprobación cuenta como referencia comercial de posibles comisiones, sin calcular ni pagar comisión.
+Indicadores: cantadas únicas, presentadas y resultados observados, sin duplicar por corrección, reenvío o traspaso. Una anulación sin cobro se descuenta. Los contadores mensuales reinician por período y usan la estructura actual; el tablero anual es futuro. La aprobación es referencia comercial, sin calcular ni pagar comisión.
 
 El circuito interno de `auditScoring`, `apply_scoring_to_operation`, `canPresentToFactory` y `apto_fabrica` está identificado como incompatible. Su retiro será progresivo y documentado en [12](12-investigacion-blk-01-scoring.md); no se eliminan aún tablas/campos/históricos.
 
@@ -155,6 +156,7 @@ El circuito interno de `auditScoring`, `apply_scoring_to_operation`, `canPresent
 - Credenciales exclusivamente servidor; ningún documento sensible se envía a OCR/IA externo sin decisión de privacidad y técnica aprobada.
 - Registro de acción/metadato de documento, nunca contenido sensible en logs.
 - Descargas controladas y auditables; conservación/eliminación sujeta a política pendiente.
+- Supabase Storage es el repositorio privado. Al Enviar, los documentos se copian a Google Drive compartido con Administración: el primer envío mensual crea la carpeta del mes y una carpeta por equipo. Drive no sustituye controles de Supabase; permisos, nombres, reintentos y fallos parciales requieren definición previa.
 - Supervisión opera sólo su estructura; roles globales conforme matriz a confirmar. Documentos de venta no reutilizan automáticamente las políticas de candidatos sin revisión.
 
 ## 10. Componentes reutilizables y dependencias
@@ -171,7 +173,7 @@ El circuito interno de `auditScoring`, `apply_scoring_to_operation`, `canPresent
 ## 11. Implementación por etapas propuesta
 
 1. **Diseño y evidencia:** confirmar ambiente/consumidores, aprobar el mapeo ya relevado de plantillas, definir identificadores, reglas de requisitos, retención y atribución histórica.
-2. **Datos de cantadas:** INT-02, sincronización sólo lectura/idempotente desde Parte Diario, sin presentación automática.
+2. **Datos de cantadas:** INT-02, sincronización idempotente y escritura de modificaciones autorizadas desde NAVE.Plan hacia Parte Diario/Sheets, sin presentación automática ni bucles.
 3. **Desacople Scoring:** BLK-01/BLK-05; retirar acciones internas y asegurar que fuente no modifica operaciones.
 4. **Expediente:** modelo, permisos, carga segura, formularios reales, PDFs y estados de preparación/presentación.
 5. **Automatización/análisis:** INT-03, CMP-07, NEW-08; fuentes por marca, corridas y métricas con cohortes.
@@ -186,13 +188,13 @@ Aplican ACC-18 a ACC-26 de [10](10-criterios-aceptacion.md), más estas verifica
 - Minutas aparecen siempre en posiciones 1 y 2 del administrativo.
 - La primera página del contrato es la única que persiste y aparece en el PDF final.
 - Reimportación de misma fila no altera Pacing/Adelantos/operación ni duplica conteos.
-- Un cambio futuro de equipo/gerencia no altera el snapshot histórico utilizado en el indicador aprobado.
+- Un cambio futuro de equipo/gerencia reatribuye los indicadores operativos a la estructura actual, conservando trazabilidad organizativa separada.
 
 ## 13. Decisiones aún necesarias
 
 1. Aprobar el mapeo por campo y la versión operativa de las plantillas ya inspeccionadas.
-2. Aprobar identificador para vincular cantada→presentación→Scoring cuando aún no existe SX.
-3. Aprobar reglas de documentos/anexos por marca, discrepancias y reversión de Presentada.
-4. Definir retención/eliminación, límites y controles de documentos sensibles.
-5. Definir cohortes/denominadores, período comercial y objetivos de fábrica.
-6. Definir scheduler/frecuencia/alertas para Google Sheets privadas y fuentes futuras de Mora.
+2. Precisar el efecto de Cancelar seña, validación de comprobantes y confirmación de efectivo.
+3. Definir aprobador, conciliación y efecto documental del traspaso de cash por cambio de titular.
+4. Aprobar reglas de documentos/anexos por marca, discrepancias y retención/auditoría de versiones erróneas.
+5. Definir contrato de sincronización bidireccional con Sheets/Parte Diario, concurrencia, fallos y prevención de bucles.
+6. Definir permisos, nombres, reintentos y comportamiento de Drive, más scheduler/frecuencia/alertas de Sheets privadas.

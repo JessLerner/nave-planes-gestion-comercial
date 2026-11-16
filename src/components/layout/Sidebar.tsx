@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import {
   TrendingUp,
@@ -12,6 +12,8 @@ import {
   Car,
   Database,
   Sparkles,
+  ChevronDown,
+  ChevronRight,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -28,6 +30,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onCloseMobile,
 }) => {
   const { operations, wageAdvances, currentUser } = useApp();
+  const [expandedGroups, setExpandedGroups] = useState(() => new Set<string>());
 
   const pendingScoringCount = operations.filter(op => op.scoring_status === 'pending').length;
   const pendingAdvancesCount = wageAdvances.filter(wa => wa.status === 'pending').length;
@@ -54,6 +57,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
       badge: pendingScoringCount > 0 ? `${pendingScoringCount} audit` : null,
       badgeColor: 'bg-amber-500/20 text-amber-300 border border-amber-500/30',
       description: 'Ventas, peritajes y calidad',
+      children: [
+        { id: 'operations-cantadas', label: 'OP Cantadas' },
+        { id: 'operations-presentations', label: 'Presentaciones' },
+        { id: 'operations-scoring', label: 'Scoring' },
+      ],
     },
     {
       id: 'prices',
@@ -69,6 +77,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
       badge: pendingAdvancesCount > 0 ? `${pendingAdvancesCount} pend.` : null,
       badgeColor: 'bg-blue-500/20 text-blue-300 border border-blue-500/30',
       description: 'Legajos, rotación y adelantos',
+      children: [
+        { id: 'hr-incorporations', label: 'Incorporaciones' },
+        { id: 'hr-departures', label: 'Avisos de baja' },
+        { id: 'hr-advances', label: 'Adelantos de Sueldo' },
+        { id: 'hr-legajos', label: 'Legajos' },
+        { id: 'hr-turnover', label: 'Métricas de Rotación & Permanencia' },
+      ],
     },
     {
       id: 'cartera',
@@ -149,34 +164,59 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <nav className="p-3 space-y-1">
             {navItems.map(item => {
               const Icon = item.icon;
-              const isActive = activeTab === item.id;
+              const isGroup = 'children' in item;
+              const isActive = activeTab === item.id || (isGroup && activeTab.startsWith(`${item.id}-`));
+              const isExpanded = isGroup && (expandedGroups.has(item.id) || isActive);
               return (
-                <button
-                  key={item.id}
-                  onClick={() => {
-                    setActiveTab(item.id);
-                    onCloseMobile?.();
-                  }}
-                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-left transition-all ${
+                <div key={item.id}>
+                  <button
+                    onClick={() => {
+                      if (isGroup) {
+                        setExpandedGroups(current => {
+                          const next = new Set(current);
+                          if (next.has(item.id)) next.delete(item.id);
+                          else next.add(item.id);
+                          return next;
+                        });
+                        return;
+                      }
+                      setActiveTab(item.id);
+                      onCloseMobile?.();
+                    }}
+                    aria-expanded={isGroup ? isExpanded : undefined}
+                    className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-left transition-all ${
                     isActive
                       ? 'bg-blue-600 text-white font-medium shadow-md shadow-blue-600/20'
                       : 'text-slate-300 hover:bg-slate-800 hover:text-white'
-                  }`}
-                >
-                <div className="flex items-center gap-3 min-w-0">
-                  <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-white' : 'text-slate-400'}`} />
-                  <span className="text-xs truncate">{item.label}</span>
-                </div>
-                {item.badge && (
-                  <span
-                    className={`text-[10px] px-1.5 py-0.5 rounded font-mono font-medium shrink-0 ml-1.5 ${
-                      isActive ? 'bg-white/20 text-white' : item.badgeColor
                     }`}
                   >
-                    {item.badge}
-                  </span>
-                )}
-              </button>
+                    <div className="flex items-center gap-3 min-w-0">
+                      <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-white' : 'text-slate-400'}`} />
+                      <span className="text-xs truncate">{item.label}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      {item.badge && (
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded font-mono font-medium shrink-0 ${isActive ? 'bg-white/20 text-white' : item.badgeColor}`}>
+                          {item.badge}
+                        </span>
+                      )}
+                      {isGroup && (isExpanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />)}
+                    </div>
+                  </button>
+                  {isGroup && isExpanded && (
+                    <div className="ml-7 mt-1 space-y-1 border-l border-slate-700/70 pl-2">
+                      {item.children?.map(child => (
+                        <button
+                          key={child.id}
+                          onClick={() => { setActiveTab(child.id); onCloseMobile?.(); }}
+                          className={`w-full rounded-md px-3 py-2 text-left text-xs transition-colors ${activeTab === child.id ? 'bg-blue-600/25 text-blue-100 font-medium' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}
+                        >
+                          {child.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
             );
           })}
         </nav>

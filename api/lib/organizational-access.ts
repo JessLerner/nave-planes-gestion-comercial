@@ -70,9 +70,10 @@ const strings = (value: unknown) => Array.isArray(value) ? value.filter((entry):
 const nullableString = (value: unknown) => typeof value === 'string' ? value : null;
 const bool = (value: unknown) => value === true;
 
-// This adapter is intentionally RPC-only.  A Hyperdrive/Worker variant would
-// not have auth.uid() and must not be improvised without a separate identity
-// contract.  No consumer imports this file in Fase 1.
+// This adapter is intentionally RPC-only. A server-side consumer must forward
+// the verified user's bearer token to Supabase so auth.uid() remains the
+// identity source; a Hyperdrive-only variant must not be improvised without a
+// separate identity contract.
 export async function organizationalAccessContextSelf(
   rpc: AuthenticatedRpc,
   request: OrganizationalAccessRequest,

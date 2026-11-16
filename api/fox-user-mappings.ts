@@ -1,13 +1,11 @@
 import type { PoolClient } from 'pg';
 import { confidentNameMatch, matchesSupervisorContext } from './lib/name-match';
 import { databasePool } from './lib/database';
-
-type VercelRequest = { method?: string; headers?: Record<string, string | string[] | undefined>; body?: unknown };
-type VercelResponse = { status: (code: number) => VercelResponse; json: (body: unknown) => VercelResponse };
+import type { ApiRequest, ApiResponse } from './lib/http';
 const rawConnectionString = process.env.POSTGRES_URL || process.env.DATABASE_URL || '';
 const pool = databasePool(rawConnectionString);
 
-async function userIdFromRequest(req: VercelRequest) {
+async function userIdFromRequest(req: ApiRequest) {
   const header = req.headers?.authorization;
   const authorization = Array.isArray(header) ? header[0] : header;
   if (!authorization?.startsWith('Bearer ') || !process.env.SUPABASE_URL || !process.env.SUPABASE_ANON_KEY) return null;
@@ -21,7 +19,7 @@ async function accessProfile(db: PoolClient, userId: string) {
   return result.rows[0] || null;
 }
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+export default async function handler(req: ApiRequest, res: ApiResponse) {
   if (!rawConnectionString) return res.status(503).json({ success: false, message: 'La base operativa no está configurada.' });
   const userId = await userIdFromRequest(req);
   if (!userId) return res.status(401).json({ success: false, message: 'Sesión no válida o vencida.' });

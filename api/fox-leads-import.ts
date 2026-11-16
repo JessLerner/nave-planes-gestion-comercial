@@ -1,8 +1,6 @@
 import { confidentNameMatch, matchesSupervisorContext } from './lib/name-match';
 import { databasePool } from './lib/database';
-
-type VercelRequest = { method?: string; headers?: Record<string, string | string[] | undefined>; body?: unknown };
-type VercelResponse = { status: (code: number) => VercelResponse; json: (body: unknown) => VercelResponse };
+import type { ApiRequest, ApiResponse } from './lib/http';
 
 type ImportedLead = {
   leadId?: unknown;
@@ -52,7 +50,7 @@ const nameSignature = (value: string | null) => normalizeUser(value)
   .sort((left, right) => left.localeCompare(right, 'es-AR'))
   .join(' ') || null;
 
-async function verifySupabaseAccessToken(req: VercelRequest) {
+async function verifySupabaseAccessToken(req: ApiRequest) {
   const header = req.headers?.authorization;
   const authorization = Array.isArray(header) ? header[0] : header;
   if (!authorization?.startsWith('Bearer ')) return null;
@@ -91,7 +89,7 @@ function cleanLead(row: ImportedLead) {
   };
 }
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+export default async function handler(req: ApiRequest, res: ApiResponse) {
   if (req.method !== 'POST') return res.status(405).json({ success: false, message: 'Método no permitido.' });
   if (!rawConnectionString) return res.status(503).json({ success: false, message: 'La base operativa no está configurada.' });
 

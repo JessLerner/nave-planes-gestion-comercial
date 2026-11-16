@@ -1,12 +1,10 @@
 import { databasePool } from './lib/database';
-
-type VercelRequest = { method?: string; headers?: Record<string, string | string[] | undefined>; query?: Record<string, string | string[] | undefined> };
-type VercelResponse = { status: (code: number) => VercelResponse; json: (body: unknown) => VercelResponse };
+import type { ApiRequest, ApiResponse } from './lib/http';
 
 const rawConnectionString = process.env.POSTGRES_URL || process.env.DATABASE_URL || '';
 const pool = databasePool(rawConnectionString);
 
-async function verifySupabaseAccessToken(req: VercelRequest) {
+async function verifySupabaseAccessToken(req: ApiRequest) {
   const header = req.headers?.authorization;
   const authorization = Array.isArray(header) ? header[0] : header;
   if (!authorization?.startsWith('Bearer ')) return null;
@@ -19,7 +17,7 @@ async function verifySupabaseAccessToken(req: VercelRequest) {
   return user.id ?? null;
 }
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+export default async function handler(req: ApiRequest, res: ApiResponse) {
   if (req.method !== 'GET') return res.status(405).json({ success: false, message: 'Método no permitido.' });
   if (!rawConnectionString) return res.status(503).json({ success: false, message: 'La base operativa no está configurada.' });
   const userId = await verifySupabaseAccessToken(req);

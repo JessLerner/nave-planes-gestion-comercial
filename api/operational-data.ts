@@ -1,17 +1,12 @@
 import { databasePool } from './lib/database';
+import type { ApiRequest, ApiResponse } from './lib/http';
 
-type VercelRequest = { method?: string; headers?: Record<string, string | string[] | undefined> };
-type VercelResponse = {
-  status: (code: number) => VercelResponse;
-  json: (body: unknown) => VercelResponse;
-};
-
-// This endpoint runs only on Vercel. It keeps the database connection string
+// This endpoint runs in the server-side API adapter. It keeps the database connection string
 // on the server and deliberately omits DNI, legajo and other HR-only fields.
 const rawConnectionString = process.env.POSTGRES_URL || process.env.DATABASE_URL || '';
 const pool = databasePool(rawConnectionString);
 
-async function verifySupabaseAccessToken(req: VercelRequest) {
+async function verifySupabaseAccessToken(req: ApiRequest) {
   const header = req.headers?.authorization;
   const authorization = Array.isArray(header) ? header[0] : header;
   if (!authorization?.startsWith('Bearer ')) return null;
@@ -24,7 +19,7 @@ async function verifySupabaseAccessToken(req: VercelRequest) {
   return user.id ? { id: user.id } : null;
 }
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+export default async function handler(req: ApiRequest, res: ApiResponse) {
   if (req.method !== 'GET') {
     return res.status(405).json({ success: false, message: 'Método no permitido.' });
   }

@@ -15,7 +15,7 @@
 
 NAVE.Plan ya tiene una base transaccional y de permisos relevante: autenticación Supabase, RLS, nómina/jerarquía, operaciones, adelantos, importación Fox asistida, métricas comerciales y el circuito de listas de precios. El alcance final todavía es mucho más amplio que el código operativo actual.
 
-La arquitectura efectiva es **React/Vite → Worker Cloudflare (y APIs Vercel compatibles) → Supabase**. Supabase concentra el modelo de negocio y las fuentes externas deben ingresar mediante importadores o funciones protegidas; no son fuentes que el navegador deba consultar directamente.
+La arquitectura efectiva es **React/Vite → Worker Cloudflare → Supabase**. Supabase concentra el modelo de negocio y las fuentes externas deben ingresar mediante importadores o funciones protegidas; no son fuentes que el navegador deba consultar directamente.
 
 ### Lectura rápida por madurez
 
@@ -88,7 +88,6 @@ Componentes compartidos: `AppContext` (estado y cálculos comunes), `AuthProvide
 | --- | --- | --- |
 | Supabase | Auth, PostgreSQL, RLS, Storage, RPC y Edge Functions | Núcleo del sistema; migraciones versionadas. Aplicación efectiva por ambiente debe verificarse. |
 | Cloudflare Worker + Hyperdrive | Hosting del frontend y APIs con acceso a PostgreSQL | Publicación documentada; falta regresión integral actual. |
-| Vercel | Compatibilidad/fallback de APIs | Disponible como respaldo, no arquitectura objetivo. |
 | Fox CRM | Corte manual de leads, métricas y mapeo usuario↔recurso | Importación/RPC presentes; automatización diaria pendiente. |
 | App Control Operaciones / Google Sheets | Fuente de ventas, cobros, modelos, orígenes y potencial roster | Contrato documentado; integración por pestaña pendiente. |
 | Google Sheets Scoring | Peugeot inicialmente, con clave SX/N° suscripción | Edge Function disponible; automatización/configuración de fuente pendiente. |

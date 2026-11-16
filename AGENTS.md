@@ -86,3 +86,26 @@ Los comandos de Supabase local y su secuencia documentada están en `docs/LOCAL_
 - Prohibido hacer `commit`, `push`, despliegue, publicación, cambio de secretos o cualquier operación sobre producción sin autorización explícita.
 - No declarar éxito por la mera presencia de código, una migración o un contenedor. Informar separadamente: **implementado**, **probado** (con comando/entorno), **pendiente** y **bloqueado**.
 - Una funcionalidad está terminada sólo si: cumple el alcance y criterios acordados; preserva flujos existentes; valida autorización y datos sensibles; tiene pruebas pertinentes ejecutadas o una limitación explicada; y su estado de migración/despliegue se comunica sin inferencias.
+- Cada funcionalidad debe incluir una revisión del código directamente relacionado para identificar simplificaciones seguras.
+- Sólo se elimina código cuando se comprueba que no tiene consumidores y existen pruebas suficientes.
+- Se actualiza documentación existente antes de crear nuevos archivos.
+- El Panel es la fuente operativa de tareas y seguimiento.
+- El repositorio no debe acumular informes repetidos ni transcripciones de conversaciones como documentación vigente.
+- No se realizan auditorías generales salvo necesidad técnica concreta y autorizada.
+
+## Coordinación entre agentes, sesiones y fuentes de verdad
+
+- El Panel de seguimiento es la fuente central de tareas, estados, decisiones, bloqueos y evidencias; `AGENTS.md` contiene las instrucciones operativas; Git conserva la trazabilidad del código.
+- Al comenzar o retomar una tarea, todo agente debe consultar estas tres fuentes, identificar la rama, HEAD, worktree y cambios ajenos, y reconstruir el contexto desde ellas sin depender de conversaciones previas.
+- Al cambiar de agente, sesión o cuenta se aplica el mismo procedimiento. Al finalizar una fase verificable, el agente actualiza la tarea existente del Panel con la evidencia real, manteniendo separadas las señales de código, pruebas, validación externa y publicación.
+
+## Panel de seguimiento de NAVE.Plan — fuente única
+
+- La fuente única y operativa de tareas, decisiones, bloqueos y evidencias es el **Panel de escritorio** en `D:\Jess 2026\PROGRAMAS\NAVE-Plan-Escritorio`. El sitio de Chrome y el panel local histórico son sólo consultas de referencia mientras se conserva su información; ningún agente debe actualizar ambos ni inferir estado desde ellos.
+- No editar directamente `panel.sqlite3` ni `connection.json`. Mantener el panel abierto en la misma sesión de Windows y usar exclusivamente `C:\Users\RusaJess\AppData\Local\Programs\Python\Python313\python.exe "D:\Jess 2026\PROGRAMAS\NAVE-Plan-Escritorio\codex_client.py"` (o `python` si resuelve al mismo intérprete) con `instructions`, `list`, `get ID` y `update ID REVISION cambio.json`.
+- Si `list` no responde, comprobar primero que existe una instancia del panel; no iniciar una segunda ni modificar archivos de datos. El servidor incorpora bloqueo de instancia: si informa que ya está abierto, usar la instancia existente. Informar el bloqueo si la conexión no se recupera.
+- Al comenzar o retomar: leer `instructions`, ejecutar `list` (índice liviano de todas las tareas), identificar la tarea existente sin duplicarla y consultar `get ID` para su contenido completo. Registrar rama, HEAD, worktree y cambios ajenos junto con el estado de la tarea.
+- Antes de cada escritura, releer `get ID` y usar su `revision` vigente. Ante HTTP 409, releer, reconciliar y preparar un cambio mínimo; nunca reintentar a ciegas ni reemplazar evidencia histórica.
+- Al cerrar cada fase verificable, actualizar la tarea existente con hechos y próximo paso único. Mantener cuatro señales independientes: `code`, `test`, `external` y `publication`, con fecha y evidencia concreta. Código, commits, migraciones y pruebas locales no acreditan aplicación, despliegue ni validación externa.
+- Sólo usar `Completada` cuando todos los criterios de aceptación estén satisfechos con evidencia. Si falta validación, usar `Para probar`; si depende de una autorización, ambiente o decisión real, usar `Bloqueada` con causa y acción siguiente.
+- El panel organiza seguimiento: no autoriza cambios de código, secretos, migraciones remotas, servicios externos ni producción. Registrar sólo commits reales. Mantener Scoring aislado, Parte Diario externo hasta migración validada, hojas privadas sólo desde backend y Mora/cobranza fuera de alcance salvo decisión explícita de Jesica.

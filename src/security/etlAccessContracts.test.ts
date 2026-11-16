@@ -34,6 +34,7 @@ test('las superficies ETL se restringen en navegación, componente, servidor loc
   assert.match(app, /activeTab === 'database' \|\| activeTab === 'extractor'/);
   assert.match(app, /canManageEtl && visitedTabs\.has\('database'\)/);
   assert.match(databaseModule, /currentUser\.role !== 'admin'/);
+  assert.match(databaseModule, /const \[showSqlSchema, setShowSqlSchema\] = useState\(false\);[\s\S]*?if \(currentUser\.role !== 'admin'\)/);
   assert.match(server, /app\.use\(LOCAL_ETL_ADMIN_PATHS, requireLocalEtlAdmin\)/);
   assert.match(worker, /isLegacyLocalEtlPath\(path\)/);
 });

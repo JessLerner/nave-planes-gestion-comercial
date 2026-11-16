@@ -148,16 +148,6 @@ export const HrAndAdvancesModule: React.FC = () => {
           Adelantos de Sueldo ({visibleAdvances.length})
         </button>
         <button
-          onClick={() => setActiveSubTab('recruitment')}
-          className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-            activeSubTab === 'recruitment'
-              ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20'
-              : 'text-slate-400 hover:text-white'
-          }`}
-        >
-          Reclutamiento ({visibleCandidates.length})
-        </button>
-        <button
           onClick={() => setActiveSubTab('legajos')}
           className={`px-4 py-2 rounded-lg font-medium transition-colors ${
             activeSubTab === 'legajos' ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20' : 'text-slate-400 hover:text-white'

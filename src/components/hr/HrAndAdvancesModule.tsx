@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import {
   Briefcase,
@@ -25,7 +25,13 @@ import { DepartureNoticesPanel } from './DepartureNoticesPanel';
 import { HrDirectIncorporation } from './HrDirectIncorporation';
 import { HrDirectDeparture } from './HrDirectDeparture';
 
-export const HrAndAdvancesModule: React.FC = () => {
+type HrSubTab = 'advances' | 'recruitment' | 'turnover' | 'legajos' | 'historical' | 'incorporations' | 'departures';
+
+interface HrAndAdvancesModuleProps {
+  initialSubTab?: HrSubTab;
+}
+
+export const HrAndAdvancesModule: React.FC<HrAndAdvancesModuleProps> = ({ initialSubTab = 'advances' }) => {
   const {
     sellers,
     teams,
@@ -40,7 +46,8 @@ export const HrAndAdvancesModule: React.FC = () => {
     updateCandidateDocs,
   } = useApp();
 
-  const [activeSubTab, setActiveSubTab] = useState<'advances' | 'recruitment' | 'turnover' | 'legajos' | 'historical' | 'incorporations' | 'departures'>('advances');
+  const [activeSubTab, setActiveSubTab] = useState<HrSubTab>(initialSubTab);
+  useEffect(() => setActiveSubTab(initialSubTab), [initialSubTab]);
 
   // Advance request form state
   const [showRequestModal, setShowRequestModal] = useState(false);

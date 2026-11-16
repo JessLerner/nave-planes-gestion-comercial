@@ -40,9 +40,14 @@ function MainLayout() {
   }, [canManageEtl, activeTab]);
 
   const openTab = (tab: string) => {
-    setVisitedTabs(current => new Set([...current, tab]));
+    const workspace = tab.startsWith('operations-') ? 'operations' : tab.startsWith('hr-') ? 'hr' : tab;
+    setVisitedTabs(current => new Set([...current, workspace]));
     setActiveTab(tab);
   };
+
+  const activeWorkspace = activeTab.startsWith('operations-') ? 'operations' : activeTab.startsWith('hr-') ? 'hr' : activeTab;
+  const operationView = activeTab === 'operations-scoring' ? 'scoring' : activeTab === 'operations-presentations' ? 'presentations' : 'cantadas';
+  const hrView = (activeTab.startsWith('hr-') ? activeTab.slice(3) : 'advances') as 'advances' | 'turnover' | 'legajos' | 'incorporations' | 'departures';
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-slate-950 text-slate-100">
@@ -68,9 +73,9 @@ function MainLayout() {
           <div className="max-w-7xl mx-auto pb-12">
             {visitedTabs.has('pacing') && <div className={activeTab === 'pacing' ? '' : 'hidden'}><PacingDashboard onOpenCalendarConfig={() => setIsCalendarConfigOpen(true)} /></div>}
             {visitedTabs.has('crm') && <div className={activeTab === 'crm' ? '' : 'hidden'}><CrmLeadsModule /></div>}
-            {visitedTabs.has('operations') && <div className={activeTab === 'operations' ? '' : 'hidden'}><OperationsModule /></div>}
+            {visitedTabs.has('operations') && <div className={activeWorkspace === 'operations' ? '' : 'hidden'}><OperationsModule view={operationView} /></div>}
             {visitedTabs.has('prices') && <div className={activeTab === 'prices' ? '' : 'hidden'}><PriceListModule /></div>}
-            {visitedTabs.has('hr') && <div className={activeTab === 'hr' ? '' : 'hidden'}><HrAndAdvancesModule /></div>}
+            {visitedTabs.has('hr') && <div className={activeWorkspace === 'hr' ? '' : 'hidden'}><HrAndAdvancesModule initialSubTab={hrView} /></div>}
             {visitedTabs.has('cartera') && <div className={activeTab === 'cartera' ? '' : 'hidden'}><CarteraMoraModule /></div>}
             {canManageEtl && visitedTabs.has('database') && <div className={activeTab === 'database' ? '' : 'hidden'}><DatabaseConnectorsModule /></div>}
             {canManageEtl && visitedTabs.has('extractor') && <div className={activeTab === 'extractor' ? '' : 'hidden'}><ExtractorHubModule /></div>}

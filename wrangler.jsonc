@@ -25,9 +25,9 @@
   "observability": {
     "enabled": true,
     "head_sampling_rate": 1,
+    "redact_query_string": true,
     "logs": {
-      "invocation_logs": true,
-      "redact_query_string": true
+      "invocation_logs": true
     }
   }
 }

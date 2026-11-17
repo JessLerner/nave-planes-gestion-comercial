@@ -26,7 +26,13 @@ import {
 } from '../../types';
 import { formatARS, canPresentToFactory } from '../../utils/businessLogic';
 
-export const OperationsModule: React.FC = () => {
+type OperationsView = 'cantadas' | 'presentations' | 'scoring';
+
+interface OperationsModuleProps {
+  view?: OperationsView;
+}
+
+export const OperationsModule: React.FC<OperationsModuleProps> = ({ view = 'cantadas' }) => {
   const {
     operations,
     scoringSourceRows,
@@ -208,18 +214,18 @@ export const OperationsModule: React.FC = () => {
         <div>
           <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-blue-400">
             <FileCheck2 className="w-4 h-4" />
-            <span>Control Operativo & Auditoría Administrativa</span>
+            <span>{view === 'scoring' ? 'Consulta de Scoring' : view === 'presentations' ? 'Presentaciones' : 'Control Operativo'}</span>
           </div>
           <h2 className="text-xl font-bold text-white mt-1">
-            Registro de Operaciones & Control de Scoring
+            {view === 'scoring' ? 'Scoring' : view === 'presentations' ? 'Presentaciones' : 'OP Cantadas'}
           </h2>
-          <p className="text-xs text-slate-400 mt-0.5">
+          {view !== 'presentations' && <p className="text-xs text-slate-400 mt-0.5">
             <strong className="text-amber-400">Regla estricta de Fábrica:</strong> Un contrato solo puede avanzar a "Apto Presentación a Fábrica" si el llamado de Scoring figura como <strong className="text-emerald-400">APROBADO</strong>.
-          </p>
+          </p>}
         </div>
 
         <div className="flex items-center gap-3">
-          {['admin', 'rrhh', 'gerente', 'supervisor'].includes(currentUser.role) && (
+          {view === 'cantadas' && ['admin', 'rrhh', 'gerente', 'supervisor'].includes(currentUser.role) && (
           <button
             onClick={() => setShowNewOpModal(true)}
             className="flex items-center gap-2 px-3.5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-semibold shadow-lg shadow-blue-600/20 transition-all"
@@ -231,6 +237,14 @@ export const OperationsModule: React.FC = () => {
         </div>
       </div>
 
+      {view === 'presentations' ? (
+        <div className="rounded-xl border border-slate-800 bg-slate-900 p-5">
+          <h3 className="text-sm font-semibold text-white">Circuito de Presentaciones pendiente</h3>
+          <p className="mt-1 text-xs text-slate-400">
+            Esta vista no habilita formularios ni acciones hasta que se implemente el circuito aprobado de expedientes, documentos y devoluciones administrativas.
+          </p>
+        </div>
+      ) : <>
       {/* 2. Search & Filter Bar */}
       <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
         <div className="relative flex-1 max-w-sm">
@@ -273,7 +287,7 @@ export const OperationsModule: React.FC = () => {
       </div>
 
       {/* 3. Operations Table */}
-      <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
+      {view === 'scoring' && <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
         <div className="px-4 py-3 border-b border-slate-800 flex items-center justify-between gap-4">
           <div>
             <h3 className="text-sm font-semibold text-white">Scoring sincronizado</h3>
@@ -330,10 +344,10 @@ export const OperationsModule: React.FC = () => {
             </tbody>
           </table>
         </div>
-      </div>
+      </div>}
 
       {/* 4. Operations Table */}
-      <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
+      {view === 'cantadas' && <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead className="bg-slate-950/60 text-slate-400 font-semibold border-b border-slate-800 uppercase tracking-wider text-[10px]">
@@ -480,7 +494,8 @@ export const OperationsModule: React.FC = () => {
             </tbody>
           </table>
         </div>
-      </div>
+      </div>}
+      </>}
 
       {/* Modal: Audit Scoring (Quality Call) */}
       {selectedOpForAudit && (

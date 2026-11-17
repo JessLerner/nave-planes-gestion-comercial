@@ -21,6 +21,7 @@ type Environment = {
   SUPABASE_ANON_KEY?: string;
   SUPABASE_PUBLISHABLE_KEY?: string;
   SUPABASE_SERVICE_ROLE_KEY?: string;
+  PUBLIC_APP_URL?: string;
 };
 
 const handlers: Record<string, () => Promise<{ default: unknown }>> = {
@@ -74,6 +75,7 @@ function configureLegacyEnvironment(environment: Environment) {
     process.env.SUPABASE_ANON_KEY = environment.SUPABASE_ANON_KEY || key;
   }
   if (environment.SUPABASE_SERVICE_ROLE_KEY) process.env.SUPABASE_SERVICE_ROLE_KEY = environment.SUPABASE_SERVICE_ROLE_KEY;
+  if (environment.PUBLIC_APP_URL) process.env.PUBLIC_APP_URL = environment.PUBLIC_APP_URL;
 }
 
 async function bodyFor(request: Request) {

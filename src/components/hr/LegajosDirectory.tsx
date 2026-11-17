@@ -33,6 +33,7 @@ const matchScore = (reference: string, candidate: string) => {
 
 export const LegajosDirectory: React.FC = () => {
   const { session, user } = useAuth();
+  const canManageLegajos = ['admin', 'gerente', 'rrhh'].includes(user?.role || '') || Boolean(user?.capabilities?.includes('manage_legajos'));
   const [data, setData] = useState<Directory>();
   const [q, setQ] = useState(''); const [area, setArea] = useState('');
   const [team, setTeam] = useState(''); const [status, setStatus] = useState('active'); const [page, setPage] = useState(1);
@@ -189,7 +190,7 @@ export const LegajosDirectory: React.FC = () => {
   return <section className="space-y-4">
     <div className="flex flex-wrap items-center gap-2 rounded-lg border border-slate-800 bg-slate-900 p-3 text-xs"><span className="text-slate-400">Estado administrativo</span><select value={administrativeStatus} onChange={(event) => setAdministrativeStatus(event.target.value)} className="rounded border border-slate-700 bg-slate-950 px-2 py-1"><option value="">Todos</option><option value="coaching">Coaching</option><option value="alta_definitiva">Alta definitiva</option><option value="pending_classification">Pendiente de clasificación</option></select><AdministrativeStatusBadge status={administrativeStatus === 'coaching' || administrativeStatus === 'alta_definitiva' ? administrativeStatus : null} /></div>
     <div className="flex items-center justify-between"><div><h3 className="text-lg font-bold text-white">Legajos</h3><p className="text-xs text-slate-400">Nómina maestra con acceso según jerarquía.</p></div><button onClick={() => void load()} className="rounded border border-slate-700 p-2"><RefreshCw className={loading ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} /></button></div>
-    <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-dashed border-slate-700 bg-slate-900 p-3 text-xs text-slate-300"><FileUp className="h-4 w-4" />Previsualizar archivo RRHH<input className="hidden" type="file" accept=".xlsx,.xls" onChange={(event) => void inspect(event.target.files?.[0])} /></label>
+    {canManageLegajos && <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-dashed border-slate-700 bg-slate-900 p-3 text-xs text-slate-300"><FileUp className="h-4 w-4" />Previsualizar archivo RRHH<input className="hidden" type="file" accept=".xlsx,.xls" onChange={(event) => void inspect(event.target.files?.[0])} /></label>}
     {previewMessage && <p className="rounded-lg border border-slate-800 bg-slate-900 p-3 text-xs text-slate-300">{previewMessage}</p>}
     {preview.length > 0 && <>
       <div className="grid grid-cols-2 gap-2 text-xs md:grid-cols-4"><p className="rounded bg-emerald-500/10 p-2 text-emerald-300">{summary.ready} listos</p><p className="rounded bg-violet-500/10 p-2 text-violet-300">{summary.freelance} Freelance</p><p className="rounded bg-slate-800 p-2 text-slate-400">{summary.excluded} excluidos</p><p className="rounded bg-amber-500/10 p-2 text-amber-300">{summary.review} a revisar</p></div>

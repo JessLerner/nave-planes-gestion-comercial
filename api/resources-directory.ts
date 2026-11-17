@@ -16,9 +16,12 @@ const text = (value: string | string[] | undefined) => typeof value === 'string'
 export default async function handler(req: Req, res: Res) {
   if (req.method !== 'GET') return res.status(405).json({ success: false, message: 'Método no permitido.' });
   const id = await userId(req); if (!id) return res.status(401).json({ success: false, message: 'Sesión no válida.' });
-  const profile = await pool.query(`select p.role, p.staff_member_id, area.name as area_name, hr_role.name as resource_role from public.profiles p left join public.staff_members staff on staff.id=p.staff_member_id left join public.hr_areas area on area.id=staff.area_id left join public.hr_roles hr_role on hr_role.id=staff.role_id where p.id=$1`, [id]);
-  const viewer = profile.rows[0] as { role?: string; staff_member_id?: string | null; area_name?: string | null; resource_role?: string | null } | undefined;
-  const globalAccess = viewer?.role === 'admin' || viewer?.role === 'rrhh' || viewer?.area_name === 'Administración' || viewer?.resource_role === 'Director';
+  const profile = await pool.query(`select p.role, p.staff_member_id, exists(select 1 from public.profile_access_permissions permission where permission.profile_id=p.id and permission.capability in ('view_legajos','manage_legajos')) as can_view_legajos from public.profiles p where p.id=$1`, [id]);
+  const viewer = profile.rows[0] as { role?: string; staff_member_id?: string | null; can_view_legajos?: boolean } | undefined;
+  // Working in the Administración area, or holding a title such as Director,
+  // is not an authorization. Only the global profiles and an explicit grant
+  // can read the complete personnel directory.
+  const globalAccess = viewer?.role === 'admin' || viewer?.role === 'rrhh' || viewer?.can_view_legajos === true;
   if (!viewer || (!globalAccess && !['gerente', 'supervisor'].includes(viewer.role || '')) || (!globalAccess && !viewer.staff_member_id)) return res.status(403).json({ success: false, message: 'No tenés acceso a Legajos.' });
   const view = text(req.query?.view);
   if (view === 'turnover') {

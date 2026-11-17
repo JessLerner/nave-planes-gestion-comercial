@@ -24,8 +24,9 @@ import { IncorporationPanel } from './IncorporationPanel';
 import { DepartureNoticesPanel } from './DepartureNoticesPanel';
 import { HrDirectIncorporation } from './HrDirectIncorporation';
 import { HrDirectDeparture } from './HrDirectDeparture';
+import { AccessManagementPanel } from './AccessManagementPanel';
 
-type HrSubTab = 'advances' | 'recruitment' | 'turnover' | 'legajos' | 'historical' | 'incorporations' | 'departures';
+type HrSubTab = 'advances' | 'recruitment' | 'turnover' | 'legajos' | 'historical' | 'incorporations' | 'departures' | 'access';
 
 interface HrAndAdvancesModuleProps {
   initialSubTab?: HrSubTab;
@@ -60,6 +61,7 @@ export const HrAndAdvancesModule: React.FC<HrAndAdvancesModuleProps> = ({ initia
   const [selectedAdvanceForReview, setSelectedAdvanceForReview] = useState<WageAdvance | null>(null);
   const [rejectionNotes, setRejectionNotes] = useState('');
   const isSupervisor = currentUser.role === 'supervisor';
+  const canManageHrDirectly = ['admin', 'rrhh'].includes(currentUser.role);
   const canApproveAdvances = currentUser.role === 'gerente';
   const visibleSellers = isSupervisor
     ? sellers.filter(s => s.team_id === currentUser.team_id)
@@ -176,11 +178,13 @@ export const HrAndAdvancesModule: React.FC<HrAndAdvancesModuleProps> = ({ initia
         >
           Históricos
         </button>
+        {['admin', 'gerente', 'rrhh'].includes(currentUser.role) && <button onClick={() => setActiveSubTab('access')} className={`px-4 py-2 rounded-lg font-medium transition-colors ${activeSubTab === 'access' ? 'bg-violet-600 text-white shadow-md shadow-violet-600/20' : 'text-slate-400 hover:text-white'}`}>Cuentas y accesos</button>}
       </div>
 
       {activeSubTab === 'legajos' && <LegajosDirectory />}
-      {activeSubTab === 'incorporations' && <><HrDirectIncorporation onCompleted={() => undefined} /><IncorporationPanel /></>}
-      {activeSubTab === 'departures' && <><HrDirectDeparture /><DepartureNoticesPanel /></>}
+      {activeSubTab === 'incorporations' && <>{canManageHrDirectly && <HrDirectIncorporation onCompleted={() => undefined} />}<IncorporationPanel /></>}
+      {activeSubTab === 'departures' && <>{canManageHrDirectly && <HrDirectDeparture />}<DepartureNoticesPanel /></>}
+      {activeSubTab === 'access' && <AccessManagementPanel />}
 
       {/* SUB-TAB 1: WAGE ADVANCES */}
       {activeSubTab === 'advances' && (

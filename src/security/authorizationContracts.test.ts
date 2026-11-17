@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { ADMINISTRATIVE_CAPABILITIES } from './accessCapabilities';
 
 const readProjectFile = (relativePath: string) =>
   readFile(fileURLToPath(new URL(`../../${relativePath}`, import.meta.url)), 'utf8');
@@ -91,4 +92,37 @@ test('browser authentication code does not embed server credentials', async () =
   assert.doesNotMatch(source, /SUPABASE_SERVICE_ROLE_KEY|DATABASE_URL|POSTGRES_PASSWORD|INGEST_SHARED_SECRET/);
   assert.match(source, /fetch\('\/api\/public-config'\)/);
   assert.match(source, /fetch\('\/api\/session'/);
+});
+
+test('temporary administrative capabilities are offered only when server checks exist', async () => {
+  const [migration, accountHandler, accountPanel, resources, resourceUpdate] = await Promise.all([
+    readProjectFile('supabase/migrations/20261106_040_access_account_management.sql'),
+    readProjectFile('api/access-users.ts'),
+    readProjectFile('src/components/hr/AccessManagementPanel.tsx'),
+    readProjectFile('api/resources-directory.ts'),
+    readProjectFile('api/resource-update.ts'),
+  ]);
+
+  assert.deepEqual(ADMINISTRATIVE_CAPABILITIES, ['view_legajos', 'manage_legajos']);
+  assert.match(accountHandler, /ADMINISTRATIVE_CAPABILITIES/);
+  assert.match(accountPanel, /ADMINISTRATIVE_CAPABILITIES\.map/);
+  assert.match(
+    migration,
+    /add constraint profile_access_permissions_capability_check\s+check \(capability in \('view_legajos', 'manage_legajos'\)\)/s,
+  );
+  assert.match(resources, /permission\.capability in \('view_legajos','manage_legajos'\)/);
+  assert.match(resourceUpdate, /permission\.capability='manage_legajos'/);
+
+  for (const retiredCapability of [
+    'manage_accounts',
+    'manage_incorporations',
+    'manage_departures',
+    'manage_operations',
+    'review_wage_advances',
+    'manage_fox_mappings',
+    'manage_price_lists',
+  ]) {
+    assert.doesNotMatch(migration, new RegExp(`['"]${retiredCapability}['"]`));
+    assert.doesNotMatch(accountPanel, new RegExp(`['"]${retiredCapability}['"]`));
+  }
 });

@@ -24,8 +24,12 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
 
   try {
     const result = await pool.query(
-      `select id, full_name, role, team_id, branch, staff_member_id
-         from public.profiles where id = $1 limit 1`,
+      `select profile.id, profile.full_name, profile.role, profile.team_id, profile.branch, profile.staff_member_id,
+              coalesce(array_agg(permission.capability order by permission.capability) filter (where permission.capability is not null), '{}') as capabilities
+         from public.profiles profile
+         left join public.profile_access_permissions permission on permission.profile_id=profile.id
+        where profile.id = $1
+        group by profile.id, profile.full_name, profile.role, profile.team_id, profile.branch, profile.staff_member_id`,
       [identity.id],
     );
     if (!result.rowCount) return res.status(403).json({ success: false, message: 'Tu cuenta no tiene perfil operativo asignado.' });

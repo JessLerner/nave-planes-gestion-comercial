@@ -145,3 +145,13 @@ test('only pending invitations expose a safe resend or pre-verification email co
   assert.match(accountPanel, /Corregir correo y reenviar/);
   assert.match(migration, /'invitation_resent','pending_invitation_email_changed'/);
 });
+
+test('account management keeps Gerencia in the effective Legajos hierarchy', async () => {
+  const accountHandler = await readProjectFile('api/access-users.ts');
+
+  assert.match(accountHandler, /staff\.effective_manager_staff_id=\$1/);
+  assert.match(accountHandler, /staff\.active and staff\.effective_manager_staff_id=\$1/);
+  assert.match(accountHandler, /staff\.active and staff\.effective_manager_staff_id=\$2/);
+  assert.doesNotMatch(accountHandler, /join hierarchy parent on child\.responsible_staff_id/);
+  assert.match(accountHandler, /staff\.id=profile\.staff_member_id and staff\.active and role\.app_role_mapping='gerente'::public\.app_role/);
+});

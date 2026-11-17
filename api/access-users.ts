@@ -20,16 +20,19 @@ export default async function handler(req:Req,res:Res){
   const actorId=await identity(req);if(!actorId)return res.status(401).json({success:false,message:'Sesión no válida.'});
   const db=await pool.connect();
   try{
-    const actor=(await db.query<{role:Role;staff_member_id:string|null}>('select role,staff_member_id from public.profiles where id=$1',[actorId])).rows[0];
+    const actor=(await db.query<{role:Role;staff_member_id:string|null;active_manager:boolean}>(`select profile.role,profile.staff_member_id,exists(select 1 from public.staff_members staff join public.hr_roles role on role.id=staff.role_id where staff.id=profile.staff_member_id and staff.active and role.app_role_mapping='gerente'::public.app_role) as active_manager from public.profiles profile where profile.id=$1`,[actorId])).rows[0];
     if(!actor)return res.status(403).json({success:false,message:'No tenés perfil operativo para gestionar cuentas.'});
-    const isGlobalAdmin=actor.role==='admin'; const isHr=actor.role==='rrhh'; const isManager=actor.role==='gerente'&&!!actor.staff_member_id;
+    const isGlobalAdmin=actor.role==='admin'; const isHr=actor.role==='rrhh'; const isManager=actor.role==='gerente'&&!!actor.staff_member_id&&actor.active_manager;
     if(!isGlobalAdmin&&!isHr&&!isManager)return res.status(403).json({success:false,message:'Sólo Dirección, Administración General, Gerencia o RR. HH. pueden gestionar cuentas.'});
-    const scopeSql=isManager?`and staff.id in (with recursive hierarchy as (select id from public.staff_members where id=$1 union select child.id from public.staff_members child join hierarchy parent on child.responsible_staff_id=parent.id) select id from hierarchy)`:'';
+    // Gerencia follows the effective hierarchy from Legajos.  Do not fall back
+    // to responsible_staff_id: a transfer or manual manager exception must
+    // immediately remove account-management access from the former manager.
+    const scopeSql=isManager?`and staff.effective_manager_staff_id=$1`:'';
     const scopeValues=isManager?[actor.staff_member_id!]:[];
     if(req.method==='GET'){
       const [staff,accounts]=await Promise.all([
         db.query(`select staff.id,staff.full_name,hr_role.app_role_mapping from public.staff_members staff join public.hr_roles hr_role on hr_role.id=staff.role_id left join public.profiles profile on profile.staff_member_id=staff.id where staff.active and hr_role.app_role_mapping is not null and (hr_role.app_role_mapping <> 'admin'::public.app_role or hr_role.grants_global_admin) and profile.id is null ${scopeSql} order by staff.full_name`,scopeValues),
-        db.query(`select profile.id,profile.full_name,profile.role,profile.staff_member_id,auth.email,auth.email_confirmed_at is not null as email_verified,auth.invited_at is not null and auth.email_confirmed_at is null as invitation_pending,coalesce(array_agg(permission.capability order by permission.capability) filter(where permission.capability is not null),'{}') capabilities from public.profiles profile left join auth.users auth on auth.id=profile.id left join public.profile_access_permissions permission on permission.profile_id=profile.id where 1=1 ${isManager?`and profile.staff_member_id in (with recursive hierarchy as (select id from public.staff_members where id=$1 union select child.id from public.staff_members child join hierarchy parent on child.responsible_staff_id=parent.id) select id from hierarchy)`:''} group by profile.id,profile.full_name,profile.role,profile.staff_member_id,auth.email,auth.email_confirmed_at,auth.invited_at order by profile.full_name`,scopeValues),
+        db.query(`select profile.id,profile.full_name,profile.role,profile.staff_member_id,auth.email,auth.email_confirmed_at is not null as email_verified,auth.invited_at is not null and auth.email_confirmed_at is null as invitation_pending,coalesce(array_agg(permission.capability order by permission.capability) filter(where permission.capability is not null),'{}') capabilities from public.profiles profile left join auth.users auth on auth.id=profile.id left join public.profile_access_permissions permission on permission.profile_id=profile.id where 1=1 ${isManager?`and profile.staff_member_id in (select staff.id from public.staff_members staff where staff.active and staff.effective_manager_staff_id=$1)`:''} group by profile.id,profile.full_name,profile.role,profile.staff_member_id,auth.email,auth.email_confirmed_at,auth.invited_at order by profile.full_name`,scopeValues),
       ]);
       return res.status(200).json({success:true,data:{eligible_staff:staff.rows,accounts:accounts.rows,capabilities:[...capabilities],can_grant_capabilities:isGlobalAdmin}});
     }
@@ -42,7 +45,7 @@ export default async function handler(req:Req,res:Res){
       const profileId=text(req.body?.profile_id);
       if(!profileId)return res.status(400).json({success:false,message:'Seleccioná la invitación pendiente.'});
       if(!serviceKey)return res.status(503).json({success:false,message:'La invitación segura no está configurada todavía.'});
-      const pendingScopeSql=isManager?`and profile.staff_member_id in (with recursive hierarchy as (select id from public.staff_members where id=$2 union select child.id from public.staff_members child join hierarchy parent on child.responsible_staff_id=parent.id) select id from hierarchy)`:'';
+      const pendingScopeSql=isManager?`and profile.staff_member_id in (select staff.id from public.staff_members staff where staff.active and staff.effective_manager_staff_id=$2)`:'';
       const account=(await db.query<{id:string;full_name:string;role:Role;staff_member_id:string;email:string;email_verified:boolean;invitation_pending:boolean}>(`select profile.id,profile.full_name,profile.role,profile.staff_member_id,auth.email,auth.email_confirmed_at is not null as email_verified,auth.invited_at is not null and auth.email_confirmed_at is null as invitation_pending from public.profiles profile join auth.users auth on auth.id=profile.id where profile.id=$1 ${pendingScopeSql}`,[profileId,...scopeValues])).rows[0];
       if(!account||!account.invitation_pending||account.email_verified)return res.status(409).json({success:false,message:'Sólo se pueden gestionar invitaciones pendientes de verificación.'});
       const nextEmail=action==='change_pending_invitation_email'?email:account.email;

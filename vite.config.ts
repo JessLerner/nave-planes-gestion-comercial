@@ -4,11 +4,10 @@ import path from 'path';
 import {defineConfig} from 'vite';
 
 export default defineConfig(() => {
-  // Cloudflare Workers serves the application from the domain root. GitHub
-  // Pages remains a repository preview and needs the repository base path.
-  const base = process.env.CLOUDFLARE_WORKER
-    ? '/'
-    : process.env.VITE_BASE_PATH || '/nave-planes-gestion-comercial/';
+  // Workers Builds invokes the default `npm run build`, so the safe default
+  // must resolve assets from the Worker domain root. GitHub Pages can still
+  // opt into its repository path explicitly through VITE_BASE_PATH.
+  const base = process.env.VITE_BASE_PATH || '/';
 
   return {
     base,

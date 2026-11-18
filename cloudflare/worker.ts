@@ -20,6 +20,8 @@ type Environment = {
   SUPABASE_URL?: string;
   SUPABASE_ANON_KEY?: string;
   SUPABASE_PUBLISHABLE_KEY?: string;
+  SUPABASE_SERVICE_ROLE_KEY?: string;
+  PUBLIC_APP_URL?: string;
 };
 
 const handlers: Record<string, () => Promise<{ default: unknown }>> = {
@@ -27,6 +29,7 @@ const handlers: Record<string, () => Promise<{ default: unknown }>> = {
   '/api/fox-leads-metrics': () => import('../api/fox-leads-metrics'),
   '/api/fox-user-mappings': () => import('../api/fox-user-mappings'),
   '/api/hr-import': () => import('../api/hr-import'),
+  '/api/access-users': () => import('../api/access-users'),
   '/api/incorporation-requests': () => import('../api/incorporation-requests'),
   '/api/incorporation-documents': () => import('../api/incorporation-documents'),
   '/api/incorporation-drafts': () => import('../api/incorporation-drafts'),
@@ -71,6 +74,8 @@ function configureLegacyEnvironment(environment: Environment) {
     process.env.SUPABASE_PUBLISHABLE_KEY = key;
     process.env.SUPABASE_ANON_KEY = environment.SUPABASE_ANON_KEY || key;
   }
+  if (environment.SUPABASE_SERVICE_ROLE_KEY) process.env.SUPABASE_SERVICE_ROLE_KEY = environment.SUPABASE_SERVICE_ROLE_KEY;
+  if (environment.PUBLIC_APP_URL) process.env.PUBLIC_APP_URL = environment.PUBLIC_APP_URL;
 }
 
 async function bodyFor(request: Request) {

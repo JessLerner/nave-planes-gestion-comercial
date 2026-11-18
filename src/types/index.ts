@@ -1,4 +1,4 @@
-export type UserRole = 'admin' | 'gerente' | 'supervisor' | 'rrhh';
+export type UserRole = 'admin' | 'gerente' | 'supervisor' | 'rrhh' | 'administrativo';
 
 export interface User {
   id: string;
@@ -8,6 +8,7 @@ export interface User {
   team_id?: string;
   staff_member_id?: string;
   branch: string;
+  capabilities?: string[];
   avatar?: string;
 }
 

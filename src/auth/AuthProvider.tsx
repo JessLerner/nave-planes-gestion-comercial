@@ -38,6 +38,7 @@ function toUser(profile: Record<string, unknown>, email: string): User {
     team_id: profile.team_id ? String(profile.team_id) : undefined,
     staff_member_id: profile.staff_member_id ? String(profile.staff_member_id) : undefined,
     branch: String(profile.branch || 'Nave.Plan'),
+    capabilities: Array.isArray(profile.capabilities) ? profile.capabilities.map(String) : [],
   };
 }
 

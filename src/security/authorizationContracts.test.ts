@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { ADMINISTRATIVE_CAPABILITIES } from './accessCapabilities';
 
 const readProjectFile = (relativePath: string) =>
   readFile(fileURLToPath(new URL(`../../${relativePath}`, import.meta.url)), 'utf8');
@@ -91,4 +92,66 @@ test('browser authentication code does not embed server credentials', async () =
   assert.doesNotMatch(source, /SUPABASE_SERVICE_ROLE_KEY|DATABASE_URL|POSTGRES_PASSWORD|INGEST_SHARED_SECRET/);
   assert.match(source, /fetch\('\/api\/public-config'\)/);
   assert.match(source, /fetch\('\/api\/session'/);
+});
+
+test('temporary administrative capabilities are offered only when server checks exist', async () => {
+  const [migration, accountHandler, accountPanel, resources, resourceUpdate] = await Promise.all([
+    readProjectFile('supabase/migrations/20261106_040_access_account_management.sql'),
+    readProjectFile('api/access-users.ts'),
+    readProjectFile('src/components/hr/AccessManagementPanel.tsx'),
+    readProjectFile('api/resources-directory.ts'),
+    readProjectFile('api/resource-update.ts'),
+  ]);
+
+  assert.deepEqual(ADMINISTRATIVE_CAPABILITIES, ['view_legajos', 'manage_legajos']);
+  assert.match(accountHandler, /ADMINISTRATIVE_CAPABILITIES/);
+  assert.match(accountPanel, /ADMINISTRATIVE_CAPABILITIES\.map/);
+  assert.match(
+    migration,
+    /add constraint profile_access_permissions_capability_check\s+check \(capability in \('view_legajos', 'manage_legajos'\)\)/s,
+  );
+  assert.match(resources, /permission\.capability in \('view_legajos','manage_legajos'\)/);
+  assert.match(resourceUpdate, /permission\.capability='manage_legajos'/);
+
+  for (const retiredCapability of [
+    'manage_accounts',
+    'manage_incorporations',
+    'manage_departures',
+    'manage_operations',
+    'review_wage_advances',
+    'manage_fox_mappings',
+    'manage_price_lists',
+  ]) {
+    assert.doesNotMatch(migration, new RegExp(`['"]${retiredCapability}['"]`));
+    assert.doesNotMatch(accountPanel, new RegExp(`['"]${retiredCapability}['"]`));
+  }
+});
+
+test('only pending invitations expose a safe resend or pre-verification email correction', async () => {
+  const [accountHandler, accountPanel, migration] = await Promise.all([
+    readProjectFile('api/access-users.ts'),
+    readProjectFile('src/components/hr/AccessManagementPanel.tsx'),
+    readProjectFile('supabase/migrations/20261109_041_pending_access_invitation_audit.sql'),
+  ]);
+
+  assert.match(accountHandler, /auth\.email_confirmed_at is not null as email_verified/);
+  assert.match(accountHandler, /auth\.invited_at is not null and auth\.email_confirmed_at is null as invitation_pending/);
+  assert.match(accountHandler, /action==='resend_pending_invitation'\|\|action==='change_pending_invitation_email'/);
+  assert.match(accountHandler, /auth\/v1\/admin\/users\/\$\{account\.id\}/);
+  assert.match(accountHandler, /auth\/v1\/invite/);
+  assert.match(accountHandler, /if\(!account\|\|!account\.invitation_pending\|\|account\.email_verified\)/);
+  assert.match(accountPanel, /account\.invitation_pending&&/);
+  assert.match(accountPanel, /Gestionar invitación/);
+  assert.match(accountPanel, /Corregir correo y reenviar/);
+  assert.match(migration, /'invitation_resent','pending_invitation_email_changed'/);
+});
+
+test('account management keeps Gerencia in the effective Legajos hierarchy', async () => {
+  const accountHandler = await readProjectFile('api/access-users.ts');
+
+  assert.match(accountHandler, /staff\.effective_manager_staff_id=\$1/);
+  assert.match(accountHandler, /staff\.active and staff\.effective_manager_staff_id=\$1/);
+  assert.match(accountHandler, /staff\.active and staff\.effective_manager_staff_id=\$2/);
+  assert.doesNotMatch(accountHandler, /join hierarchy parent on child\.responsible_staff_id/);
+  assert.match(accountHandler, /staff\.id=profile\.staff_member_id and staff\.active and role\.app_role_mapping='gerente'::public\.app_role/);
 });

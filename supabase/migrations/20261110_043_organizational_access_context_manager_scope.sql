@@ -13,7 +13,12 @@ security definer
 set search_path = pg_catalog, public
 as $$
 declare
-  v_user_id uuid := auth.uid();
+  -- Read the authenticated identity from the request settings populated by
+  -- Supabase Data API. This avoids requiring USAGE on the managed auth schema.
+  v_user_id uuid := coalesce(
+    nullif(current_setting('request.jwt.claim.sub', true), ''),
+    (nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'sub')
+  )::uuid;
   v_actor record;
   v_capabilities text[] := '{}'::text[];
   v_authorized boolean := false;
@@ -34,8 +39,8 @@ begin
     raise exception using errcode = '22023', message = 'Unsupported organizational operation.';
   end if;
 
-  -- auth.uid() is the only identity source. A missing session never produces
-  -- a roster, aggregate or out-of-scope identifier.
+  -- The Data API JWT claims are the only identity source. A missing session
+  -- never produces a roster, aggregate or out-of-scope identifier.
   if v_user_id is null then
     return jsonb_build_object(
       'actor', null, 'authorized', false, 'effective_at', p_as_of,

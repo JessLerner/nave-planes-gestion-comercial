@@ -2,6 +2,7 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "gestioncomercial",
   "main": "cloudflare/worker.ts",
+  "keep_vars": true,
   "compatibility_date": "2026-10-31",
   "compatibility_flags": [
     "nodejs_compat",

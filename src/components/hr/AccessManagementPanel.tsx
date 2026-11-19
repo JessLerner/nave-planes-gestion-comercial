@@ -2,11 +2,10 @@ import React,{useEffect,useMemo,useState}from'react';
 import {useAuth}from'../../auth/AuthProvider';
 import { ADMINISTRATIVE_CAPABILITIES, ADMINISTRATIVE_CAPABILITY_LABELS, type AdministrativeCapability } from '../../security/accessCapabilities';
 
-type Role='admin'|'gerente'|'supervisor'|'rrhh'|'administrativo';
+import { ACCOUNT_ROLE_LABELS as labels, type AccountRole as Role } from '../../security/accountRoles';
 type Capability=AdministrativeCapability;
 type Staff={id:string;full_name:string;app_role_mapping:Role};
 type Account={id:string;full_name:string;role:Role;staff_member_id:string|null;email:string|null;email_verified:boolean;invitation_pending:boolean;capabilities:Capability[]};
-const labels:Record<Role,string>={admin:'Acceso global (Dirección / Administración General)',gerente:'Gerencia',supervisor:'Supervisión',rrhh:'RR. HH.',administrativo:'Administración con permisos específicos'};
 
 export const AccessManagementPanel:React.FC=()=>{
   const {session,user}=useAuth();const[staff,setStaff]=useState<Staff[]>([]);const[accounts,setAccounts]=useState<Account[]>([]);const[staffId,setStaffId]=useState('');const[email,setEmail]=useState('');const[role,setRole]=useState<Role>('supervisor');const[grants,setGrants]=useState<Capability[]>([]);const[canGrant,setCanGrant]=useState(false);const[message,setMessage]=useState('');const[busy,setBusy]=useState(false);const[pendingAction,setPendingAction]=useState<Account>();const[replacementEmail,setReplacementEmail]=useState('');

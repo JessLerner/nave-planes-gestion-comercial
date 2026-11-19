@@ -73,12 +73,12 @@ test('operational authorization retains server-side scope checks for the five ap
   assert.match(operationalData, /t\.manager_staff_id = \$1/);
 
   // Dirección/Administración and RRHH: backend-recognized global scope where defined.
-  assert.match(operationalData, /profile\.role === 'admin' \|\| profile\.role === 'rrhh'/);
-  assert.match(resources, /viewer\?\.role === 'admin' \|\| viewer\?\.role === 'rrhh'/);
+  assert.match(operationalData, /profile\.role === 'admin' \|\| profile\.role === 'direccion'\) \|\| profile\.role === 'rrhh'/);
+  assert.match(resources, /viewer\?\.role === 'admin' \|\| viewer\?\.role === 'direccion'\) \|\| viewer\?\.role === 'rrhh'/);
 
   // Adelantos: request and review restrictions are enforced by the API, not the UI.
   assert.match(advances, /profile\.role !== 'supervisor'/);
-  assert.match(advances, /\['gerente', 'admin'\]\.includes\(profile\.role\)/);
+  assert.match(advances, /\['gerente', 'admin','direccion'\]\.includes\(profile\.role\)/);
 });
 
 test('browser authentication code does not embed server credentials', async () => {

@@ -56,7 +56,7 @@ export const OperationsModule: React.FC<OperationsModuleProps> = ({ view = 'cant
     .toUpperCase();
 
   const accessibleTeamIds = new Set(
-    currentUser.role === 'admin' || currentUser.role === 'rrhh'
+    (currentUser.role === 'admin' || currentUser.role === 'direccion') || currentUser.role === 'rrhh'
       ? teams.map(team => team.id)
       : currentUser.role === 'supervisor'
         ? (currentUser.team_id ? [currentUser.team_id] : [])
@@ -82,7 +82,7 @@ export const OperationsModule: React.FC<OperationsModuleProps> = ({ view = 'cant
 
   const visibleScoringRows = scoringSourceRows.filter(row => {
     const teamId = scoringRowTeamId(row.supervisor_name);
-    const hasGlobalScoringAccess = currentUser.role === 'admin' || currentUser.role === 'rrhh';
+    const hasGlobalScoringAccess = (currentUser.role === 'admin' || currentUser.role === 'direccion') || currentUser.role === 'rrhh';
     if (!hasGlobalScoringAccess && (!teamId || !accessibleTeamIds.has(teamId))) return false;
     if (filterBrand !== 'all' && normalize(row.brand) !== normalize(filterBrand)) return false;
     if (!searchTerm) return true;
@@ -225,7 +225,7 @@ export const OperationsModule: React.FC<OperationsModuleProps> = ({ view = 'cant
         </div>
 
         <div className="flex items-center gap-3">
-          {view === 'cantadas' && ['admin', 'rrhh', 'gerente', 'supervisor'].includes(currentUser.role) && (
+          {view === 'cantadas' && ['admin','direccion', 'rrhh', 'gerente', 'supervisor'].includes(currentUser.role) && (
           <button
             onClick={() => setShowNewOpModal(true)}
             className="flex items-center gap-2 px-3.5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-semibold shadow-lg shadow-blue-600/20 transition-all"
@@ -478,7 +478,7 @@ export const OperationsModule: React.FC<OperationsModuleProps> = ({ view = 'cant
                         )}
                       </td>
                       <td className="py-3 px-4 text-right">
-                        {['admin', 'rrhh'].includes(currentUser.role) && (
+                        {['admin','direccion', 'rrhh'].includes(currentUser.role) && (
                           <button
                             onClick={() => handleOpenAuditModal(op)}
                             className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded text-xs transition-colors"

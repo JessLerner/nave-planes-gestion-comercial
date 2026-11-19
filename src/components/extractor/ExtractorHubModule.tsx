@@ -127,7 +127,7 @@ export const ExtractorHubModule: React.FC = () => {
   const apiBaseUrl = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
 
   // 1. Role Check: Strictly Admin Only
-  if (currentUser.role !== 'admin') {
+  if (currentUser.isPlatformOwner !== true) {
     return (
       <div className="py-16 px-4">
         <div className="max-w-md mx-auto bg-slate-900 border border-slate-800 rounded-2xl p-8 text-center shadow-xl">

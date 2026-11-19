@@ -15,7 +15,7 @@ async function userIdFromRequest(req: ApiRequest) {
 }
 
 async function accessProfile(db: PoolClient, userId: string) {
-  const result = await db.query<{ role: 'admin' | 'supervisor'; team_id: string | null }>(`select role,team_id from public.profiles where id = $1 limit 1`, [userId]);
+  const result = await db.query<{ role: 'direccion' | 'admin' | 'supervisor'; team_id: string | null }>(`select role,team_id from public.profiles where id = $1 limit 1`, [userId]);
   return result.rows[0] || null;
 }
 
@@ -26,7 +26,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
   const db = await pool.connect();
   try {
     const profile = await accessProfile(db, userId);
-    if (!profile || !['admin', 'supervisor'].includes(profile.role)) return res.status(403).json({ success: false, message: 'No tenés permisos para revisar asociaciones de Fox.' });
+    if (!profile || !['admin','direccion', 'supervisor'].includes(profile.role)) return res.status(403).json({ success: false, message: 'No tenés permisos para revisar asociaciones de Fox.' });
     if (req.method === 'GET') {
       const [users, historicalMappings, resources, pendingSuggestions] = await Promise.all([
         db.query(`
@@ -62,7 +62,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
           where staff.active=true
           order by staff.full_name
         `),
-        profile.role === 'admin'
+        (profile.role === 'admin' || profile.role === 'direccion')
           ? db.query(`
               select suggestion.id as suggestion_id, suggestion.fox_user_key, staff.id as suggested_seller_id,
                 staff.full_name as suggested_resource_name, proposer.full_name as proposed_by_name
@@ -81,14 +81,14 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         const validContext = candidate && matchesSupervisorContext(user.fox_supervisor_name, candidate.responsible_name);
         return { ...user, suggested_seller_id: validContext ? candidate.id : null };
       });
-      return res.status(200).json({ success: true, canConfirm: profile.role === 'admin', unmappedUsers, sellers: [
+      return res.status(200).json({ success: true, canConfirm: (profile.role === 'admin' || profile.role === 'direccion'), unmappedUsers, sellers: [
         ...resources.rows,
         { id: '__terminated__', full_name: 'RECURSOS CON BAJA — histórico Fox', team_id: null },
       ], reviewUsers: historicalMappings.rows, pendingSuggestions: pendingSuggestions.rows });
     }
     if (req.method !== 'POST') return res.status(405).json({ success: false, message: 'Método no permitido.' });
     const body = req.body as { mappings?: unknown; suggestions?: unknown };
-    const mappings = profile.role === 'admin' ? body?.mappings : body?.suggestions;
+    const mappings = (profile.role === 'admin' || profile.role === 'direccion') ? body?.mappings : body?.suggestions;
     if (!Array.isArray(mappings) || mappings.length === 0 || mappings.length > 200) return res.status(400).json({ success: false, message: 'Las asociaciones no tienen un formato válido.' });
     await db.query('begin');
     let updated = 0;

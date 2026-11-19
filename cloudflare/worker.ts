@@ -137,6 +137,15 @@ export default {
       return Response.json({ success: false, message: 'La conexión operativa no está configurada.' }, { status: 503 });
     }
     try {
+      if (path !== '/api/session' && path !== '/api/public-config') {
+        const { verifySupabaseAccessToken, getOperationalRole } = await import('../api/session');
+        const actor = await verifySupabaseAccessToken({ headers: { authorization: request.headers.get('authorization') || '' } });
+        if (!actor) return Response.json({ success: false }, { status: 401 });
+        const { canUseOperationalEndpoint } = await import('../src/security/accountRoles');
+        if (!canUseOperationalEndpoint(await getOperationalRole(actor.id), path)) {
+          return Response.json({ success: false, message: 'Sin permiso para esta operación.' }, { status: 403 });
+        }
+      }
       const { default: handler } = await loader();
       return await runLegacyHandler(request, handler as LegacyHandler);
     } catch (error) {

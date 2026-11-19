@@ -20,7 +20,7 @@ export default async function handler(req: Req, res: Res) {
   const db = await pool.connect();
   try {
     const profile = (await db.query<{ role: string }>('select role from public.profiles where id=$1', [userId])).rows[0];
-    if (!['rrhh','admin'].includes(profile?.role || '')) return res.status(403).json({ success: false, message: 'Sólo RRHH o Administración puede registrar altas directas.' });
+    if (!['rrhh','admin','direccion'].includes(profile?.role || '')) return res.status(403).json({ success: false, message: 'Sólo RRHH o Administración puede registrar altas directas.' });
     const body = req.body || {}; const action = text(body.action) || 'create';
     if (action === 'create') {
       const dni = text(body.dni).replace(/\D/g, ''), supervisorId = text(body.supervisor_staff_id), roleId = text(body.role_id), areaId = text(body.area_id);

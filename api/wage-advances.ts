@@ -3,7 +3,7 @@ import { databasePool } from './lib/database';
 
 type Request = { method?: string; headers?: Record<string, string | string[] | undefined>; body?: Record<string, unknown> };
 type Response = { status: (code: number) => Response; json: (body: unknown) => Response };
-type Profile = { role: 'admin' | 'gerente' | 'supervisor' | 'rrhh'; team_id: string | null; staff_member_id: string | null };
+type Profile = { role: 'direccion' | 'admin' | 'gerente' | 'supervisor' | 'rrhh'; team_id: string | null; staff_member_id: string | null };
 
 const rawConnectionString = process.env.POSTGRES_URL || process.env.DATABASE_URL || '';
 const pool = databasePool(rawConnectionString);
@@ -23,7 +23,7 @@ async function profileFor(database: PoolClient, id: string) {
 }
 
 async function canManageSeller(database: PoolClient, profile: Profile, sellerId: string) {
-  if (profile.role === 'admin' || profile.role === 'rrhh') return true;
+  if ((profile.role === 'admin' || profile.role === 'direccion') || profile.role === 'rrhh') return true;
   if (profile.role === 'supervisor') {
     const result = await database.query('select 1 from public.sellers where id=$1 and team_id=$2', [sellerId, profile.team_id]);
     return Boolean(result.rowCount);
@@ -53,7 +53,7 @@ export default async function handler(request: Request, response: Response) {
       return response.status(201).json({ success: true, advance: created.rows[0], minSalesRequired: current.min_sales_for_advance });
     }
     if (action === 'review') {
-      if (!['gerente', 'admin'].includes(profile.role)) return response.status(403).json({ success: false, message: 'Sólo Gerencia o Administración puede resolver adelantos.' });
+      if (!['gerente', 'admin','direccion'].includes(profile.role)) return response.status(403).json({ success: false, message: 'Sólo Gerencia o Administración puede resolver adelantos.' });
       const id = text(request.body?.id, 64); const status = text(request.body?.status, 20);
       if (!id || !['approved', 'rejected'].includes(status)) return response.status(400).json({ success: false, message: 'La decisión no es válida.' });
       const advance = await database.query<{ seller_id: string }>('select seller_id from public.wage_advances where id=$1 and status=\'pending\'', [id]);

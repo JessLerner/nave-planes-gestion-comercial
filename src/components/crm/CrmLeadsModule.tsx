@@ -136,7 +136,7 @@ const LegacyCrmLeadsModule: React.FC = () => {
         </div>
       </div>
 
-      {currentUser.role === 'admin' && <FoxReportImportPanel />}
+      {(currentUser.role === 'admin' || currentUser.role === 'direccion') && <FoxReportImportPanel />}
 
       {/* 2. Conversion Metrics KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

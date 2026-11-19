@@ -87,7 +87,7 @@ export default async function handler(request: Request, response: Response) {
   const database = await pool.connect();
   try {
     const profile = await database.query('select role from public.profiles where id=$1', [userId]);
-    if (profile.rows[0]?.role !== 'admin') return response.status(403).json({ success: false, message: 'Sólo Administración puede aplicar la estructura.' });
+    if ((profile.rows[0]?.role !== 'admin' && profile.rows[0]?.role !== 'direccion')) return response.status(403).json({ success: false, message: 'Sólo Administración puede aplicar la estructura.' });
     const existing = await database.query('select count(*)::int as total from public.staff_members');
     if ((existing.rows[0]?.total || 0) > 0) return response.status(409).json({ success: false, message: 'Ya existe una nómina. No se reemplaza automáticamente.' });
 

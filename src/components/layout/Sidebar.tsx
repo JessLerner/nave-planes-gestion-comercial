@@ -92,7 +92,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       badge: null,
       description: 'Agrupamiento y trazabilidad',
     },
-    ...(currentUser.role === 'admin'
+    ...(currentUser.isPlatformOwner === true
       ? [
           {
             id: 'database',

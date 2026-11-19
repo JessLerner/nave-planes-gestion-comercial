@@ -33,7 +33,7 @@ const matchScore = (reference: string, candidate: string) => {
 
 export const LegajosDirectory: React.FC = () => {
   const { session, user } = useAuth();
-  const canManageLegajos = ['admin', 'gerente', 'rrhh'].includes(user?.role || '') || Boolean(user?.capabilities?.includes('manage_legajos'));
+  const canManageLegajos = ['admin','direccion', 'gerente', 'rrhh'].includes(user?.role || '') || Boolean(user?.capabilities?.includes('manage_legajos'));
   const [data, setData] = useState<Directory>();
   const [q, setQ] = useState(''); const [area, setArea] = useState('');
   const [team, setTeam] = useState(''); const [status, setStatus] = useState('active'); const [page, setPage] = useState(1);

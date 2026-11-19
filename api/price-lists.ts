@@ -2,7 +2,7 @@ import { databasePool } from './lib/database';
 
 type Request = { method?: string; headers?: Record<string, string | string[] | undefined>; body?: unknown };
 type Response = { status: (code: number) => Response; json: (body: unknown) => Response };
-type Profile = { id: string; role: 'admin' | 'gerente' | 'supervisor' | 'rrhh'; staff_member_id: string | null; can_manage_price_lists: boolean };
+type Profile = { id: string; role: 'direccion' | 'admin' | 'gerente' | 'supervisor' | 'rrhh'; staff_member_id: string | null; can_manage_price_lists: boolean };
 
 const connectionString = process.env.POSTGRES_URL || process.env.DATABASE_URL || '';
 const pool = databasePool(connectionString);
@@ -28,7 +28,7 @@ export default async function handler(request: Request, response: Response) {
   const db = await pool.connect();
   try {
     const profileResult = await db.query<Profile>(
-      'select id,role,staff_member_id,can_manage_price_lists from public.profiles where id=$1 limit 1',
+      "select id,role,staff_member_id,(role='direccion' or can_manage_price_lists) as can_manage_price_lists from public.profiles where id=$1 limit 1",
       [userId],
     );
     const profile = profileResult.rows[0];

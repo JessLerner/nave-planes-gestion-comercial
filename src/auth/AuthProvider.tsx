@@ -35,6 +35,7 @@ function toUser(profile: Record<string, unknown>, email: string): User {
     name: String(profile.full_name || 'Usuario Nave.Plan'),
     email,
     role: profile.role as User['role'],
+    isPlatformOwner: profile.is_platform_owner === true && profile.role === 'admin',
     team_id: profile.team_id ? String(profile.team_id) : undefined,
     staff_member_id: profile.staff_member_id ? String(profile.staff_member_id) : undefined,
     branch: String(profile.branch || 'Nave.Plan'),

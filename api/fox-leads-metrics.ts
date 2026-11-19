@@ -30,7 +30,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     const exists = await pool.query(`select to_regclass('public.fox_lead_daily_snapshots') as table_name`);
     if (!exists.rows[0]?.table_name) return res.status(200).json({ success: true, ready: false, message: 'La estructura de Fox todavía no fue aplicada.' });
 
-    const scope = profile.role === 'admin' || profile.role === 'rrhh'
+    const scope = (profile.role === 'admin' || profile.role === 'direccion') || profile.role === 'rrhh'
       ? { sql: 'true', params: [] as unknown[] }
       : profile.role === 'supervisor'
         ? { sql: 's.team_id = $1', params: [profile.team_id] }

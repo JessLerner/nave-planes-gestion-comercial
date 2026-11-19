@@ -151,7 +151,7 @@ export const PacingDashboard: React.FC<{ onOpenCalendarConfig: () => void }> = (
               style={{ width: `${Math.round(workingDaysInfo.completionRate * 100)}%` }}
             />
           </div>
-          {(currentUser.role === 'admin' || currentUser.role === 'gerente') && (
+          {((currentUser.role === 'admin' || currentUser.role === 'direccion') || currentUser.role === 'gerente') && (
             <button
               onClick={onOpenCalendarConfig}
               className="px-2.5 py-1 text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded transition-colors"
@@ -267,7 +267,7 @@ export const PacingDashboard: React.FC<{ onOpenCalendarConfig: () => void }> = (
             </p>
           </div>
           <div className="text-xs text-slate-400">
-            {currentUser.role === 'gerente' || currentUser.role === 'admin' ? (
+            {currentUser.role === 'gerente' || (currentUser.role === 'admin' || currentUser.role === 'direccion') ? (
               <span className="text-blue-400 font-medium">Gerencia: Objetivos editables</span>
             ) : (
               <span className="text-slate-400">Supervisión: Vista táctica asignada</span>
@@ -544,7 +544,7 @@ export const PacingDashboard: React.FC<{ onOpenCalendarConfig: () => void }> = (
                       )}
                     </td>
                     <td className="py-3 px-4 text-right">
-                      {currentUser.role === 'admin' && (
+                      {(currentUser.role === 'admin' || currentUser.role === 'direccion') && (
                         <button
                           onClick={() => setEditingSellerProfile({ ...seller })}
                           className="mr-2 px-2.5 py-1 bg-indigo-600/20 hover:bg-indigo-600/35 text-indigo-200 border border-indigo-500/30 rounded text-xs transition-colors"

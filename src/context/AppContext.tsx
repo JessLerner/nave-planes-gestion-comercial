@@ -445,6 +445,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode; initialUser: Use
 
   // Sync Fox CRM via Data-Extractor shortcut
   const syncDataExtractor = async () => {
+    if (!currentUser.isPlatformOwner) return;
     setIsSyncingDataExtractor(true);
     const foxConn = connectors.find(c => c.type === 'data_extractor');
     if (foxConn) {
@@ -594,7 +595,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode; initialUser: Use
   };
 
   const updatePriceListItem = (item: PriceListItem) => {
-    if (currentUser.role !== 'admin') return;
+    if ((currentUser.role !== 'admin' && currentUser.role !== 'direccion')) return;
     setPriceLists(prev => {
       const next = prev.map(pl => (pl.id === item.id ? item : pl));
       syncToBackend({ priceLists: next });
@@ -603,7 +604,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode; initialUser: Use
   };
 
   const addPriceListItem = (item: Omit<PriceListItem, 'id' | 'updated_at'>) => {
-    if (currentUser.role !== 'admin') return;
+    if ((currentUser.role !== 'admin' && currentUser.role !== 'direccion')) return;
     const newItem: PriceListItem = {
       ...item,
       id: `pl-${Date.now().toString().slice(-4)}`,
@@ -656,7 +657,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode; initialUser: Use
   };
 
   const updateSeller = (sellerId: string, changes: Partial<Omit<Seller, 'id'>>) => {
-    if (currentUser.role !== 'admin') return;
+    if ((currentUser.role !== 'admin' && currentUser.role !== 'direccion')) return;
     setSellers(prev => {
       const next = prev.map(s => (s.id === sellerId ? { ...s, ...changes } : s));
       syncToBackend({ sellers: next });

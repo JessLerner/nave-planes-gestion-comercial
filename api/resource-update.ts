@@ -21,10 +21,10 @@ export default async function handler(request: Request, response: Response) {
   try {
     const profile = await database.query<{ role: string; staff_member_id: string | null; can_manage_legajos: boolean }>(`select profile.role, profile.staff_member_id, exists(select 1 from public.profile_access_permissions permission where permission.profile_id=profile.id and permission.capability='manage_legajos') as can_manage_legajos from public.profiles profile where profile.id=$1`, [user]);
     const viewer = profile.rows[0];
-    const canManageLegajos = ['admin', 'gerente', 'rrhh'].includes(viewer?.role || '') || viewer?.can_manage_legajos === true;
+    const canManageLegajos = ['admin','direccion', 'gerente', 'rrhh'].includes(viewer?.role || '') || viewer?.can_manage_legajos === true;
     if (!canManageLegajos) return response.status(403).json({ success: false, message: 'No tenés permiso para editar la nómina.' });
     if (request.body && typeof request.body === 'object' && (request.body as Record<string, unknown>).direct_deactivation === true) {
-      if (!['rrhh', 'admin'].includes(viewer?.role || '')) return response.status(403).json({ success: false, message: 'Sólo RRHH o Administración puede ejecutar una baja directa.' });
+      if (!['rrhh', 'admin','direccion'].includes(viewer?.role || '')) return response.status(403).json({ success: false, message: 'Sólo RRHH o Administración puede ejecutar una baja directa.' });
       const reason = text((request.body as Record<string, unknown>).deactivation_reason);
       const date = text((request.body as Record<string, unknown>).deactivation_date);
       if (!reason || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return response.status(400).json({ success: false, message: 'Indicá motivo y fecha de baja.' });
@@ -102,7 +102,7 @@ export default async function handler(request: Request, response: Response) {
       }
     }
     const inheritedManager = parent.rows[0]
-      ? (parent.rows[0].effective_manager_staff_id || (['gerente', 'admin'].includes(parent.rows[0].app_role_mapping || '') ? parent.rows[0].id : null))
+      ? (parent.rows[0].effective_manager_staff_id || (['gerente', 'admin','direccion'].includes(parent.rows[0].app_role_mapping || '') ? parent.rows[0].id : null))
       : null;
     const canChooseManager = !role.rows[0].creates_seller_record;
     const selectedManager = managerId && canChooseManager ? await database.query<{ id: string }>(`select staff.id from public.staff_members staff join public.hr_roles role on role.id=staff.role_id where staff.id=$1 and staff.active=true and role.app_role_mapping in ('gerente'::public.app_role,'admin'::public.app_role)`, [managerId]) : { rows: [] };

@@ -61,7 +61,7 @@ export const HrAndAdvancesModule: React.FC<HrAndAdvancesModuleProps> = ({ initia
   const [selectedAdvanceForReview, setSelectedAdvanceForReview] = useState<WageAdvance | null>(null);
   const [rejectionNotes, setRejectionNotes] = useState('');
   const isSupervisor = currentUser.role === 'supervisor';
-  const canManageHrDirectly = ['admin', 'rrhh'].includes(currentUser.role);
+  const canManageHrDirectly = ['admin','direccion', 'rrhh'].includes(currentUser.role);
   const canApproveAdvances = currentUser.role === 'gerente';
   const visibleSellers = isSupervisor
     ? sellers.filter(s => s.team_id === currentUser.team_id)
@@ -178,7 +178,7 @@ export const HrAndAdvancesModule: React.FC<HrAndAdvancesModuleProps> = ({ initia
         >
           Históricos
         </button>
-        {['admin', 'gerente', 'rrhh'].includes(currentUser.role) && <button onClick={() => setActiveSubTab('access')} className={`px-4 py-2 rounded-lg font-medium transition-colors ${activeSubTab === 'access' ? 'bg-violet-600 text-white shadow-md shadow-violet-600/20' : 'text-slate-400 hover:text-white'}`}>Cuentas y accesos</button>}
+        {['admin','direccion', 'gerente', 'rrhh'].includes(currentUser.role) && <button onClick={() => setActiveSubTab('access')} className={`px-4 py-2 rounded-lg font-medium transition-colors ${activeSubTab === 'access' ? 'bg-violet-600 text-white shadow-md shadow-violet-600/20' : 'text-slate-400 hover:text-white'}`}>Cuentas y accesos</button>}
       </div>
 
       {activeSubTab === 'legajos' && <LegajosDirectory />}

@@ -1,10 +1,11 @@
 import { databasePool } from './lib/database';
+import { ACCOUNT_ROLE_LABELS } from '../src/security/accountRoles';
 import type { ApiRequest, ApiResponse } from './lib/http';
 
 const rawConnectionString = process.env.POSTGRES_URL || process.env.DATABASE_URL || '';
 const pool = databasePool(rawConnectionString);
 
-async function verifySupabaseAccessToken(req: ApiRequest) {
+export async function verifySupabaseAccessToken(req: ApiRequest) {
   const header = req.headers?.authorization;
   const authorization = Array.isArray(header) ? header[0] : header;
   if (!authorization?.startsWith('Bearer ')) return null;
@@ -17,6 +18,11 @@ async function verifySupabaseAccessToken(req: ApiRequest) {
   return user.id ? { id: user.id } : null;
 }
 
+export async function getOperationalRole(id: string) {
+  const result = await pool.query('select role from public.profiles where id=$1', [id]);
+  return result.rows[0]?.role;
+}
+
 export default async function handler(req: ApiRequest, res: ApiResponse) {
   if (req.method !== 'GET') return res.status(405).json({ success: false, message: 'Método no permitido.' });
   const identity = await verifySupabaseAccessToken(req);
@@ -25,6 +31,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
   try {
     const result = await pool.query(
       `select profile.id, profile.full_name, profile.role, profile.team_id, profile.branch, profile.staff_member_id,
+              exists(select 1 from naveplan_private.platform_owner o where o.profile_id=profile.id and profile.role='admin') as is_platform_owner,
               coalesce(array_agg(permission.capability order by permission.capability) filter (where permission.capability is not null), '{}') as capabilities
          from public.profiles profile
          left join public.profile_access_permissions permission on permission.profile_id=profile.id
@@ -32,7 +39,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         group by profile.id, profile.full_name, profile.role, profile.team_id, profile.branch, profile.staff_member_id`,
       [identity.id],
     );
-    if (!result.rowCount) return res.status(403).json({ success: false, message: 'Tu cuenta no tiene perfil operativo asignado.' });
+    if (!result.rowCount || !Object.hasOwn(ACCOUNT_ROLE_LABELS,result.rows[0].role)) return res.status(403).json({ success: false, message: 'Tu cuenta no tiene perfil operativo asignado.' });
     return res.status(200).json({ success: true, profile: result.rows[0] });
   } catch (error) {
     const details = error instanceof Error

@@ -1,10 +1,12 @@
-export type UserRole = 'admin' | 'gerente' | 'supervisor' | 'rrhh' | 'administrativo';
+import type { AccountRole } from '../security/accountRoles';
+export type UserRole = AccountRole;
 
 export interface User {
   id: string;
   name: string;
   email: string;
   role: UserRole;
+  isPlatformOwner?: boolean;
   team_id?: string;
   staff_member_id?: string;
   branch: string;

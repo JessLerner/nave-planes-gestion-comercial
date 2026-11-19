@@ -17,3 +17,9 @@ export function canInviteRole(actor: unknown, target: unknown): boolean {
   if (actor === 'rrhh') return target !== 'direccion';
   return actor === 'admin' || actor === 'direccion';
 }
+
+// Existing handlers check the operation, capabilities and organizational scope.
+export function canUseOperationalEndpoint(role: unknown, path: string): boolean {
+  if (role === 'administrativo') return path === '/api/resources-directory' || path === '/api/resource-update';
+  return role === 'admin' || role === 'direccion' || role === 'gerente' || role === 'supervisor' || role === 'rrhh';
+}

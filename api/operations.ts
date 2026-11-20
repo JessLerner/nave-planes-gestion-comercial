@@ -7,7 +7,7 @@ type Response = { status: (code: number) => Response; json: (body: unknown) => R
 const rawConnectionString = process.env.POSTGRES_URL || process.env.DATABASE_URL || '';
 const pool = databasePool(rawConnectionString);
 
-type Profile = { id: string; role: 'admin' | 'gerente' | 'supervisor' | 'rrhh'; team_id: string | null; staff_member_id: string | null };
+type Profile = { id: string; role: 'direccion' | 'admin' | 'gerente' | 'supervisor' | 'rrhh'; team_id: string | null; staff_member_id: string | null };
 
 const stringValue = (value: unknown, maximum = 240) => typeof value === 'string' && value.trim().length <= maximum ? value.trim() : '';
 const numericValue = (value: unknown) => typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null;
@@ -29,7 +29,7 @@ async function profileFor(database: PoolClient, userId: string): Promise<Profile
 }
 
 async function canAccessTeam(database: PoolClient, profile: Profile, teamId: string) {
-  if (profile.role === 'admin' || profile.role === 'rrhh') return true;
+  if ((profile.role === 'admin' || profile.role === 'direccion') || profile.role === 'rrhh') return true;
   if (profile.role === 'supervisor') return profile.team_id === teamId;
   if (!profile.staff_member_id) return false;
   const team = await database.query('select 1 from public.teams where id = $1 and manager_staff_id = $2 limit 1', [teamId, profile.staff_member_id]);
@@ -79,7 +79,7 @@ export default async function handler(request: Request, response: Response) {
     }
 
     if (action === 'audit') {
-      if (!['admin', 'rrhh'].includes(profile.role)) return response.status(403).json({ success: false, message: 'Sólo Administración o RRHH puede auditar scoring.' });
+      if (!['admin','direccion', 'rrhh'].includes(profile.role)) return response.status(403).json({ success: false, message: 'Sólo Administración o RRHH puede auditar scoring.' });
       const operationId = stringValue(request.body?.operation_id, 64);
       const status = stringValue(request.body?.status, 20);
       const notes = stringValue(request.body?.notes, 4_000) || null;

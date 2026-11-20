@@ -42,7 +42,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     const profile = profileResult.rows[0] as { role: string; team_id: string | null; staff_member_id: string | null } | undefined;
     if (!profile) return res.status(403).json({ success: false, message: 'Tu cuenta no tiene perfil operativo asignado.' });
 
-    const scopedTeamFilter = profile.role === 'admin' || profile.role === 'rrhh'
+    const scopedTeamFilter = (profile.role === 'admin' || profile.role === 'direccion') || profile.role === 'rrhh'
       ? { sql: 'true', params: [] as unknown[] }
       : profile.role === 'supervisor'
         ? { sql: 't.id = $1', params: [profile.team_id] }
@@ -93,7 +93,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
                rejection_reason_2, approval_reason, cancellation_reason,
                last_seen_at
         from public.scoring_source_rows sr
-        where ${profile.role === 'admin' || profile.role === 'rrhh'
+        where ${(profile.role === 'admin' || profile.role === 'direccion') || profile.role === 'rrhh'
           ? 'true'
           : `exists (
               select 1 from public.teams t

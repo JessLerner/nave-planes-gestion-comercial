@@ -32,8 +32,8 @@ async function requireLocalEtlAdmin(req: Request, res: Response, next: () => voi
     },
     async (userId) => {
       if (!localEtlPool) return null;
-      const profile = await localEtlPool.query<{ role: string }>('select role from public.profiles where id=$1', [userId]);
-      return profile.rows[0]?.role || '';
+      const profile = await localEtlPool.query<{ role: string }>('select p.role from public.profiles p join naveplan_private.platform_owner o on o.profile_id=p.id where p.id=$1', [userId]);
+      return profile.rows[0]?.role === 'admin';
     },
   );
   if (decision.status !== 200) return res.status(decision.status).json({ success: false, message: decision.message });

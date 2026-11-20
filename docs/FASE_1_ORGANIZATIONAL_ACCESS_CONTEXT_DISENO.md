@@ -226,3 +226,22 @@ Cada fixture compara conjuntos de IDs y razones, no textos ni PII. Las pruebas d
 - `npm test`: 30 aprobadas, 0 fallos, 5 integraciones aisladas omitidas por falta de variables/acknowledgement local.
 - `npm run build:cloudflare`: aprobado; persiste sólo advertencia no bloqueante por bundle mayor a 500 kB.
 - No se inició servidor local, no se conectó a servicios externos, no se consultó Production ni se desplegó.
+
+
+## Ampliación de roles y titularidad de la plataforma
+
+La sesión identifica al usuario mediante Supabase Auth y lee el perfil por ese mismo UUID. El registro privado `naveplan_private.platform_owner` admite una sola fila. La sesión sólo informa `is_platform_owner` para ese perfil con rol histórico `admin`. La edición de un Legajo y los permisos de invitación carecen de acceso al registro. Un perfil histórico adicional con rol `admin` conserva el rol almacenado y pierde acceso técnico por carecer de titularidad.
+
+| Perfil | Acceso |
+| --- | --- |
+| Administración General | Cuenta propietaria existente, con ambas superficies técnicas. Excluida de altas y reenvíos. |
+| Dirección | Acceso funcional y organizativo global, con exclusión de conectores, pipelines y extractor. |
+| Administración | Legajos mediante concesión individual de lectura o edición. |
+| RRHH | Circuitos de RRHH y documentos según sus políticas vigentes. |
+| Contaduría y Marketing | Sesión y cierre de sesión. Los módulos pendientes de definición quedan denegados. |
+| Gerencia y Supervisión | Se mantienen el gerente efectivo y la jerarquía vigentes. |
+| Vendedor | Excluido del circuito de cuentas. |
+
+**Secuencia de publicación propuesta.** Confirmar por un canal administrativo independiente el UUID de Auth de la propietaria, su perfil histórico `admin` y la cuenta verificada. Revisar los mapeos de cargo y los roles históricos vinculados. Usar el mismo rol de conexión que utilizará el Worker para verificar lectura del registro privado. Mantener el UUID fuera de Git, de los logs y del Panel.
+
+Aplicar 047 en una transacción independiente para confirmar los valores del enum antes de usarlos. Aplicar 048 y 049 juntas en la siguiente transacción, configurando `naveplan.verified_owner_id` sólo en esa conexión y transacción. Si falla una comprobación, revertirla y revisar la causa. Las migraciones ajustan el catálogo de cargos, políticas y funciones. Los perfiles y las credenciales existentes se conservan. Publicar luego el Worker de la misma revisión. Validar la sesión de la propietaria y los dos controles técnicos antes de habilitar invitaciones reales.

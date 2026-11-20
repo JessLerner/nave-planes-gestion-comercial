@@ -5,6 +5,7 @@
 
 import React, { useState } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
+import { LegajosDirectory } from './components/hr/LegajosDirectory';
 import { Header } from './components/layout/Header';
 import { Sidebar } from './components/layout/Sidebar';
 import { PacingDashboard } from './components/pacing/PacingDashboard';
@@ -22,7 +23,7 @@ import { PasswordSetupScreen } from './auth/PasswordSetupScreen';
 
 function MainLayout() {
   const { currentUser } = useApp();
-  const canManageEtl = currentUser.role === 'admin';
+  const canManageEtl = currentUser.isPlatformOwner === true;
   const [activeTab, setActiveTab] = useState<string>('pacing');
   // Keep every visited workspace mounted. Switching sections must never erase
   // an unfinished form, filters, preview or import selection.
@@ -93,7 +94,7 @@ function MainLayout() {
 }
 
 function AuthenticatedApp() {
-  const { user, session, loading, mustSetPassword } = useAuth();
+  const { user, session, loading, mustSetPassword, signOut } = useAuth();
   if (loading) {
     return <div className="min-h-screen bg-[#18191b] text-white flex items-center justify-center text-sm">Validando acceso seguro…</div>;
   }
@@ -101,8 +102,12 @@ function AuthenticatedApp() {
   // enter the application, even while the operational profile is hydrating.
   if (session && mustSetPassword) return <PasswordSetupScreen mode={window.location.hash.includes('type=invite') ? 'invite' : 'recovery'} />;
   if (!user || !session) return <LoginScreen />;
+  if (user.role === 'administrativo' || user.role === 'marketing' || user.role === 'contaduria') {
+    const legajos = user.role === 'administrativo' && user.capabilities?.some(item => item === 'view_legajos' || item === 'manage_legajos');
+    return <main className="p-6">{legajos ? <LegajosDirectory /> : <p>Tu cuenta está activa. Todavía no tenés módulos asignados.</p>}<button onClick={() => void signOut()}>Cerrar sesión</button></main>;
+  }
   return (
-    <AppProvider initialUser={user} accessToken={session.access_token}>
+    <AppProvider key={JSON.stringify([user.id,user.role,user.isPlatformOwner,user.capabilities,user.team_id,user.staff_member_id])} initialUser={user} accessToken={session.access_token}>
       <MainLayout />
     </AppProvider>
   );

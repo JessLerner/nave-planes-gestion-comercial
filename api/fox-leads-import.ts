@@ -116,7 +116,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
   const db = await pool.connect();
   try {
     const profile = await db.query(`select role from public.profiles where id = $1 limit 1`, [userId]);
-    if (profile.rows[0]?.role !== 'admin') return res.status(403).json({ success: false, message: 'Sólo Administración puede importar reportes de Fox.' });
+    if ((profile.rows[0]?.role !== 'admin' && profile.rows[0]?.role !== 'direccion')) return res.status(403).json({ success: false, message: 'Sólo Administración puede importar reportes de Fox.' });
 
     await db.query('begin');
     const run = await db.query(`

@@ -21,7 +21,7 @@ export default async function handler(req: Req, res: Res) {
   // Working in the Administración area, or holding a title such as Director,
   // is not an authorization. Only the global profiles and an explicit grant
   // can read the complete personnel directory.
-  const globalAccess = viewer?.role === 'admin' || viewer?.role === 'rrhh' || viewer?.can_view_legajos === true;
+  const globalAccess = (viewer?.role === 'admin' || viewer?.role === 'direccion') || viewer?.role === 'rrhh' || viewer?.can_view_legajos === true;
   if (!viewer || (!globalAccess && !['gerente', 'supervisor'].includes(viewer.role || '')) || (!globalAccess && !viewer.staff_member_id)) return res.status(403).json({ success: false, message: 'No tenés acceso a Legajos.' });
   const view = text(req.query?.view);
   if (view === 'turnover') {

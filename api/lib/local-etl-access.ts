@@ -5,7 +5,7 @@ export type LocalEtlAuthorization = {
 };
 
 type ResolveUser = (token: string) => Promise<string | null>;
-type ResolveRole = (userId: string) => Promise<string | null>;
+type ResolveOwner = (userId: string) => Promise<boolean | null>;
 
 const bearerToken = (authorization: string | undefined) => {
   if (!authorization?.startsWith('Bearer ')) return null;
@@ -18,7 +18,7 @@ const bearerToken = (authorization: string | undefined) => {
 export async function authorizeLocalEtlAdmin(
   authorization: string | undefined,
   resolveUser: ResolveUser,
-  resolveRole: ResolveRole,
+  resolveOwner: ResolveOwner,
 ): Promise<LocalEtlAuthorization> {
   const token = bearerToken(authorization);
   if (!token) return { status: 401, message: 'Sesión requerida para administrar ETL.' };
@@ -26,9 +26,9 @@ export async function authorizeLocalEtlAdmin(
   const userId = await resolveUser(token);
   if (!userId) return { status: 401, message: 'Sesión no válida o vencida.' };
 
-  const role = await resolveRole(userId);
-  if (role === null) return { status: 503, message: 'La autorización local de ETL no está configurada.' };
-  if (role !== 'admin') return { status: 403, message: 'Sólo Administración General puede administrar ETL.' };
+  const owner = await resolveOwner(userId);
+  if (owner === null) return { status: 503, message: 'La autorización local de ETL no está configurada.' };
+  if (owner !== true) return { status: 403, message: 'Sólo Administración General puede administrar ETL.' };
 
   return { status: 200, userId };
 }

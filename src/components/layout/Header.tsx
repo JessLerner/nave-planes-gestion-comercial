@@ -1,3 +1,4 @@
+import { ACCOUNT_ROLE_LABELS } from '../../security/accountRoles';
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import {
@@ -150,7 +151,7 @@ export const Header: React.FC<HeaderProps> = ({
         </a>
 
         {/* Configuration is intentionally restricted to the platform administrator. */}
-        {currentUser.role === 'admin' && (
+        {(currentUser.role === 'admin' || currentUser.role === 'direccion') && (
           <button
             onClick={onOpenCalendarConfig}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-slate-800/80 hover:bg-slate-700 text-xs font-medium text-slate-300 border border-slate-700/80 transition-colors"
@@ -212,7 +213,7 @@ export const Header: React.FC<HeaderProps> = ({
         )}
 
         {/* Data-Extractor Sync Button */}
-        {currentUser.role === 'admin' && <button
+        {currentUser.isPlatformOwner === true && <button
           onClick={syncDataExtractor}
           disabled={isSyncingDataExtractor}
           className="flex items-center gap-2 px-3 py-1.5 rounded bg-slate-800 hover:bg-slate-700/80 text-xs font-medium text-slate-200 border border-slate-700 transition-colors"
@@ -241,13 +242,7 @@ export const Header: React.FC<HeaderProps> = ({
             <div className="hidden md:block leading-tight text-left">
               <div className="text-xs font-semibold text-slate-200">{currentUser.name}</div>
               <div className="text-[10px] text-blue-400 uppercase tracking-wider font-semibold">
-                {currentUser.role === 'admin'
-                  ? 'Administrador General'
-                  : currentUser.role === 'gerente'
-                  ? 'Gerente General'
-                  : currentUser.role === 'supervisor'
-                  ? 'Supervisor'
-                  : 'RRHH & Calidad'}
+                {currentUser.role === 'admin' && !currentUser.isPlatformOwner ? 'Acceso global histórico' : ACCOUNT_ROLE_LABELS[currentUser.role]}
               </div>
             </div>
             <ChevronDown className="w-3.5 h-3.5 text-slate-400 ml-1" />

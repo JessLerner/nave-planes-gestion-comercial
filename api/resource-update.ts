@@ -38,18 +38,7 @@ export default async function handler(request: Request, response: Response) {
       await database.query('commit');
       return response.status(200).json({ success: true });
     }
-    if (viewer.role === 'gerente') {
-      if (!viewer.staff_member_id) return response.status(403).json({ success: false, message: 'Tu cuenta de gerente no está vinculada a un recurso.' });
-      const inScope = await database.query(`
-        with recursive hierarchy as (
-          select id from public.staff_members where id = $1
-          union
-          select child.id from public.staff_members child join hierarchy parent on child.responsible_staff_id = parent.id
-        )
-        select 1 from public.staff_members where id = $2 and (id in (select id from hierarchy) or effective_manager_staff_id = $1)
-      `, [viewer.staff_member_id, id]);
-      if (!inScope.rowCount) return response.status(403).json({ success: false, message: 'Sólo podés editar recursos de tu estructura.' });
-    }
+    if (viewer.role === 'gerente' && !viewer.staff_member_id) return response.status(403).json({ success: false, message: 'Tu cuenta de gerente no está vinculada a un recurso.' });
     const roleId = text(request.body?.role_id); const responsibleId = text(request.body?.responsible_staff_id) || null;
     const managerId = text(request.body?.manager_staff_id) || null;
     const active = Boolean(request.body?.active);
@@ -62,19 +51,30 @@ export default async function handler(request: Request, response: Response) {
     const specialWithoutLegajo = /COACHING|FREE\s*LANCE|FREELANCE/i.test(employmentType);
     if (dni.length < 7 || dni.length > 8) return response.status(400).json({ success: false, message: 'El DNI es obligatorio y debe contener entre 7 y 8 dígitos.' });
     if (!legajo && !specialWithoutLegajo) return response.status(400).json({ success: false, message: 'El legajo es obligatorio salvo para Coaching o Freelance.' });
-    const existing = await database.query<{ active: boolean; responsible_staff_id: string | null; effective_manager_staff_id: string | null }>('select active,responsible_staff_id,effective_manager_staff_id from public.staff_members where id=$1', [id]);
-    if (!existing.rows[0]) return response.status(404).json({ success: false, message: 'No existe el recurso.' });
+    await database.query('begin');
+    if (viewer.role === 'gerente') {
+      const inScope = await database.query(
+        'select id from public.staff_members where id=$2 and (id=$1 or effective_manager_staff_id=$1) for update',
+        [viewer.staff_member_id, id],
+      );
+      if (!inScope.rowCount) {
+        await database.query('rollback');
+        return response.status(403).json({ success: false, message: 'Sólo podés editar recursos de tu estructura.' });
+      }
+    }
+    const existing = await database.query<{ active: boolean; responsible_staff_id: string | null; effective_manager_staff_id: string | null }>('select active,responsible_staff_id,effective_manager_staff_id from public.staff_members where id=$1 for update', [id]);
+    if (!existing.rows[0]) { await database.query('rollback'); return response.status(404).json({ success: false, message: 'No existe el recurso.' }); }
     const isNewDeactivation = existing.rows[0].active && !active;
-    if (isNewDeactivation && !['termination', 'administrative_correction'].includes(deactivationType || '')) return response.status(400).json({ success: false, message: 'Indicá si la baja es real o una corrección administrativa.' });
+    if (isNewDeactivation && !['termination', 'administrative_correction'].includes(deactivationType || '')) { await database.query('rollback'); return response.status(400).json({ success: false, message: 'Indicá si la baja es real o una corrección administrativa.' }); }
     const role = await database.query<{ area_id: string; creates_seller_record: boolean; app_role_mapping: 'admin' | 'gerente' | 'supervisor' | 'rrhh' | null }>('select area_id,creates_seller_record,app_role_mapping from public.hr_roles where id=$1 and active=true', [roleId]);
-    if (!role.rows[0]) return response.status(400).json({ success: false, message: 'Cargo inválido.' });
+    if (!role.rows[0]) { await database.query('rollback'); return response.status(400).json({ success: false, message: 'Cargo inválido.' }); }
     const linkedProfile = await database.query<{ id: string }>('select id from public.profiles where staff_member_id=$1 limit 1', [id]);
     if (linkedProfile.rowCount && (!active || !role.rows[0].app_role_mapping)) {
+      await database.query('rollback');
       return response.status(400).json({ success: false, message: 'Este recurso tiene una cuenta de acceso. Primero revocá o reasigná su acceso antes de dejarlo inactivo o asignarle un cargo sin permisos.' });
     }
-    if (responsibleId === id) return response.status(400).json({ success: false, message: 'Una persona no puede ser su propio responsable.' });
-    if (managerId === id) return response.status(400).json({ success: false, message: 'Una persona no puede ser su propio gerente.' });
-    await database.query('begin');
+    if (responsibleId === id) { await database.query('rollback'); return response.status(400).json({ success: false, message: 'Una persona no puede ser su propio responsable.' }); }
+    if (managerId === id) { await database.query('rollback'); return response.status(400).json({ success: false, message: 'Una persona no puede ser su propio gerente.' }); }
     const descendant = responsibleId ? await database.query(`
       with recursive hierarchy as (
         select id from public.staff_members where id = $1
@@ -89,12 +89,7 @@ export default async function handler(request: Request, response: Response) {
     if (role.rows[0].creates_seller_record && responsibleId && parent.rows[0]?.app_role_mapping !== 'supervisor') throw new Error('El responsable de un vendedor debe ser un supervisor activo.');
     if (viewer.role === 'gerente' && responsibleId) {
       const destinationInScope = await database.query(`
-        with recursive hierarchy as (
-          select id from public.staff_members where id=$1
-          union
-          select child.id from public.staff_members child join hierarchy parent on child.responsible_staff_id=parent.id
-        )
-        select 1 from public.staff_members where id=$2 and (id in (select id from hierarchy) or effective_manager_staff_id=$1)
+        select id from public.staff_members where id=$2 and (id=$1 or effective_manager_staff_id=$1) for share
       `, [viewer.staff_member_id, responsibleId]);
       if (!destinationInScope.rowCount) {
         await database.query('rollback');

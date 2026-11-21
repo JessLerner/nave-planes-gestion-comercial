@@ -13,18 +13,32 @@ type ApiResult = { status: number; body: { success?: boolean; message?: string; 
 
 test('integración aislada: resource-update autoriza el traslado y conserva las proyecciones de Legajos', {
   skip: integrationEnabled ? undefined : 'Requiere credenciales de Supabase local y NAVE_TEST_DATABASE_ACKNOWLEDGE_ISOLATED=1.',
-}, async () => {
+}, async (context) => {
   const databaseTarget = new URL(databaseUrl!);
   const supabaseTarget = new URL(supabaseUrl!);
   assert.ok(['127.0.0.1', 'localhost'].includes(databaseTarget.hostname) && databaseTarget.port === '54322');
   assert.ok(['127.0.0.1', 'localhost'].includes(supabaseTarget.hostname) && supabaseTarget.port === '54321');
 
-  const { Client } = await import('pg');
+  const { Client, Pool } = await import('pg');
   const database = new Client({ connectionString: databaseUrl });
   const admin = createClient(supabaseUrl!, serviceRoleKey!, { auth: { autoRefreshToken: false, persistSession: false } });
   const marker = `BLK04_${Date.now()}_${Math.floor(Math.random() * 1_000_000)}`;
   const authUserIds: string[] = [];
   await database.connect();
+
+  // Run the real handler SQL and triggers on one connection. Each PATCH gets
+  // a savepoint so its commit cannot persist synthetic roster changes.
+  await database.query('begin');
+  const query = (sql: string, values?: unknown[]) => {
+    const statements: Record<string, string> = {
+      begin: 'savepoint handler_update',
+      commit: 'release savepoint handler_update',
+      rollback: 'rollback to savepoint handler_update',
+    };
+    return database.query(statements[sql] ?? sql, values);
+  };
+  context.mock.method(Pool.prototype, 'connect', async () => ({ query, release() {} }));
+  context.mock.method(Pool.prototype, 'query', query);
 
   const createIdentity = async (name: string, role: 'rrhh' | 'gerente' | 'supervisor', staffMemberId: string | null) => {
     const email = `${marker.toLowerCase()}_${name.toLowerCase()}@local.test`;
@@ -74,6 +88,7 @@ test('integración aislada: resource-update autoriza el traslado y conserva las 
 
     const rrhhToken = await createIdentity('RRHH', 'rrhh', rrhhStaff);
     const managerToken = await createIdentity('GERENTE', 'gerente', managerOne);
+    const newManagerToken = await createIdentity('GERENTE2', 'gerente', managerTwo);
     const supervisorToken = await createIdentity('SUPERVISOR', 'supervisor', supervisorOne);
     const { default: handler } = await import('../../api/resource-update.ts');
     const { default: directoryHandler } = await import('../../api/resources-directory.ts');
@@ -91,18 +106,19 @@ test('integración aislada: resource-update autoriza el traslado y conserva las 
       await handler({ method: 'PATCH', headers: token ? { authorization: `Bearer ${token}` } : {}, body }, response);
       return { status, body: result };
     };
-    const destinationsFor = async (token: string) => {
-      let status = 0; let result: { success?: boolean; data?: { responsibles?: { id: string }[] } } = {};
+    const directoryFor = async (token: string) => {
+      let status = 0; let result: { success?: boolean; data?: { responsibles: { id: string }[]; rows: { id: string }[] } } = {};
       const response = { status: (code: number) => { status = code; return response; }, json: (payload: unknown) => { result = payload as typeof result; return response; } };
-      await directoryHandler({ method: 'GET', headers: { authorization: `Bearer ${token}` }, query: { status: 'active', page: '1', size: '50' } }, response);
+      await directoryHandler({ method: 'GET', headers: { authorization: `Bearer ${token}` }, query: { q: marker, status: 'active', page: '1', size: '50' } }, response);
       assert.equal(status, 200);
-      return result.data?.responsibles || [];
+      assert.ok(result.data);
+      return result.data;
     };
 
-    const managerDestinations = await destinationsFor(managerToken);
+    const managerDestinations = (await directoryFor(managerToken)).responsibles;
     assert.ok(managerDestinations.some((item) => item.id === supervisorOneB), 'Gerencia debe recibir supervisores de su estructura.');
     assert.ok(!managerDestinations.some((item) => item.id === supervisorTwo), 'Gerencia no debe recibir supervisores de otra gerencia.');
-    const rrhhDestinations = await destinationsFor(rrhhToken);
+    const rrhhDestinations = (await directoryFor(rrhhToken)).responsibles;
     assert.ok(rrhhDestinations.some((item) => item.id === supervisorTwo), 'RRHH conserva el alcance global ya autorizado.');
 
     assert.equal((await call(null, sellerRequest(supervisorTwo))).status, 401, 'Sin sesión se rechaza antes de modificar Legajos.');
@@ -118,19 +134,35 @@ test('integración aislada: resource-update autoriza el traslado y conserva las 
     assert.equal(afterManagerTransfer.rows[0].responsible_staff_id, supervisorOneB);
     assert.equal(afterManagerTransfer.rows[0].team_id, afterManagerTransfer.rows[0].destination_team_id, 'La proyección debe pasar al equipo de destino.');
     const sellerId = afterManagerTransfer.rows[0].seller_id;
+    // S2 keeps its reporting line to G1 but belongs to G2 by explicit
+    // override. Recursive ancestry alone would incorrectly authorize G1.
+    await database.query(`update public.staff_members set responsible_staff_id=$1,
+      effective_manager_staff_id=$2, effective_manager_source='manual' where id=$3`,
+      [managerOne, managerTwo, supervisorTwo]);
+    assert.equal((await call(managerToken, sellerRequest(supervisorTwo))).status, 403);
     const rrhhTransfer = await call(rrhhToken, sellerRequest(supervisorTwo));
     assert.equal(rrhhTransfer.status, 200, rrhhTransfer.body.message);
-    const afterRrhhTransfer = await database.query<{ id: string; responsible_staff_id: string; team_id: string; destination_team_id: string }>(`
-      select seller.id,staff.responsible_staff_id,seller.team_id,destination.id as destination_team_id
+    const afterRrhhTransfer = await database.query<{ id: string; effective_manager_staff_id: string; responsible_staff_id: string; team_id: string; destination_team_id: string }>(`
+      select seller.id,staff.effective_manager_staff_id,staff.responsible_staff_id,seller.team_id,destination.id as destination_team_id
       from public.staff_members staff join public.sellers seller on seller.staff_member_id=staff.id
       join public.teams destination on destination.supervisor_staff_id=$2 and destination.active and destination.is_sales_team
       where staff.id=$1`, [seller, supervisorTwo]);
     assert.equal(afterRrhhTransfer.rows[0].id, sellerId, 'El traslado conserva la identidad proyectada del vendedor.');
     assert.equal(afterRrhhTransfer.rows[0].responsible_staff_id, supervisorTwo);
     assert.equal(afterRrhhTransfer.rows[0].team_id, afterRrhhTransfer.rows[0].destination_team_id);
+    assert.equal(afterRrhhTransfer.rows[0].effective_manager_staff_id, managerTwo);
+    const oldView = await directoryFor(managerToken);
+    const newView = await directoryFor(newManagerToken);
+    assert.ok(!oldView.rows.some(item => item.id === seller));
+    assert.ok(!oldView.responsibles.some(item => item.id === supervisorTwo));
+    assert.ok(newView.rows.some(item => item.id === seller));
+    assert.ok(!newView.rows.some(item => item.id === supervisorOne));
+    assert.equal((await call(managerToken, sellerRequest(supervisorTwo))).status, 403);
+    assert.equal((await call(newManagerToken, sellerRequest(supervisorTwo))).status, 200);
+    assert.equal((await call(newManagerToken, sellerRequest(supervisorOne))).status, 403);
     const audit = await database.query<{ changed_by: string; before_value: { supervisor_staff_id?: string }; after_value: { supervisor_staff_id?: string; reason?: string } }>(
       `select changed_by,before_value,after_value from public.roster_change_log
-       where entity_type='staff_member' and entity_id=$1 and before_value->>'event'='seller_transfer' order by created_at desc limit 1`, [seller],
+       where entity_type='staff_member' and entity_id=$1 and before_value->>'event'='seller_transfer' and after_value->>'supervisor_staff_id'=$2`, [seller, supervisorTwo],
     );
     assert.equal(audit.rowCount, 1, 'El traslado debe dejar trazabilidad persistente.');
     assert.equal(audit.rows[0].before_value.supervisor_staff_id, supervisorOneB);
@@ -138,6 +170,7 @@ test('integración aislada: resource-update autoriza el traslado y conserva las 
     assert.equal(audit.rows[0].after_value.reason, 'prueba de traslado aislada');
     assert.ok(audit.rows[0].changed_by, 'El actor autenticado debe quedar registrado.');
   } finally {
+    await database.query('rollback');
     for (const userId of authUserIds) await admin.auth.admin.deleteUser(userId).catch(() => undefined);
     await database.end();
   }

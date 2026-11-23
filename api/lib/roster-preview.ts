@@ -3,18 +3,18 @@ export type SheetRow = {
   category: string; supervisor: string; manager: string;
 };
 export type Member = {
-  area?: string;
+  area?: string; revision?: string;
   id: string; name: string; dni: string; legajo: string; nomina: string; active: boolean;
   role: string; supervisor: string; manager: string; manual: boolean;
 };
-export type Role = { id: string; name: string; alias: string; mapping: string; seller: boolean };
+export type Role = { id: string; name: string; area?: string; areaId?: string; alias: string; mapping: string; seller: boolean };
 export type Team = { id: string; name: string; supervisor: string };
 export const scopeLabels = {
   all: 'Toda la nómina', administration: 'Administración', sales: 'Ventas · Todos los equipos',
   team: 'Ventas · Equipo', management: 'Dirección · Gerencia', directors: 'Dirección · Dirección',
   general: 'Dirección · Administración General',
 };
-export type Selection = { scope: keyof typeof scopeLabels; coverage: 'complete' | 'partial'; teamId?: string };
+export type Selection = { fileHash?: string; scope: keyof typeof scopeLabels; coverage: 'complete' | 'partial'; teamId?: string };
 export function validSelection(value: unknown): value is Selection {
   if (!value || typeof value !== 'object') return false;
   const selection = value as Selection;
@@ -23,7 +23,8 @@ export function validSelection(value: unknown): value is Selection {
     && (selection.scope === 'team' ? typeof selection.teamId === 'string' && /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(selection.teamId) : selection.teamId === undefined);
 }
 type Difference = { field: string; current: string; proposed: string; reason: string };
-export type PreviewItem = { id?: string; line?: number; name: string; differences: Difference[]; reasons: string[] };
+export type Proposal = { role: string; area: string; supervisor: string | null; manager: string | null; manual: boolean };
+export type PreviewItem = { token?: string; proposal?: Proposal; id?: string; line?: number; name: string; differences: Difference[]; reasons: string[] };
 export const groups = ['Sin cambios', 'Actualizaciones propuestas', 'Altas propuestas', 'Ausencias para revisión', 'Conflictos o errores', 'Excluidos'] as const;
 export type Preview = { total: number; emptyRoster: boolean; scopeLabel: string; coverage: Selection['coverage']; items: Record<typeof groups[number], PreviewItem[]> };
 const key = (value?: string) => (value || '').trim().normalize('NFC').toLocaleUpperCase('es').replace(/\s+/g, ' ');
@@ -79,7 +80,7 @@ export function compareRoster(rows: SheetRow[], staff: Member[], roles: Role[], 
     if (row.category) {
       const candidates = new Map(roles.filter(r => [r.name,r.alias].some(label => key(label) === key(row.category))).map(r => [r.id,r]));
       if (candidates.size !== 1) reasons.push('Cargo inexistente o ambiguo.');
-      else { role = [...candidates.values()][0]; diff('Cargo', oldRole?.name, role.name); }
+      else { role = [...candidates.values()][0]; diff('Cargo', oldRole?.name, role.name); diff('Sector',person?.area,role.area); }
     } else if (!person) reasons.push('Falta cargo para el alta.');
     if (!person && !row.legajo && !/COACHING/.test(key(row.category)) && !/FREE\s*LANCE/.test(key(row.nomina))) reasons.push('Falta legajo para el alta.');
     const reference = (name: string, mapping: string, field: string) => {
@@ -95,6 +96,9 @@ export function compareRoster(rows: SheetRow[], staff: Member[], roles: Role[], 
       if (person) proposedParents.set(person.id, supervisor.id);
     }
     const parent = supervisor || byId.get(person?.supervisor ?? '');
+    const parentRole = roleById.get(parent?.role ?? '')?.mapping;
+    if (role?.seller && (!parent?.active || parentRole !== 'supervisor')) reasons.push('Un vendedor activo requiere un supervisor activo.');
+    else if (supervisor && !['supervisor','gerente','admin','direccion'].includes(parentRole || '')) reasons.push('El cargo del responsable no permite recibir dependientes.');
     if (parent && (row.supervisor || row.manager || row.category)) {
       const parentRow = rows.find(other => identity(other.dni) === identity(parent.dni));
       if (parentRow && ((parentRow.manager && key(parentRow.manager) !== key(byId.get(parent.manager)?.name)) ||
@@ -116,6 +120,13 @@ export function compareRoster(rows: SheetRow[], staff: Member[], roles: Role[], 
     if (oldRole?.seller && role && !role.seller) {
       const previousTeam = teams.find(team => team.supervisor === person?.supervisor);
       if (previousTeam) diff('Equipo', previousTeam.name, 'Sin equipo de vendedor', 'El cargo propuesto no proyecta vendedor.');
+    }
+    if (role && (!person || inScope(person))) {
+      const destination = { ...(person || { id:'', name:row.name, dni:row.dni, legajo:row.legajo, nomina:row.nomina, active:true }),
+        role:role.id, area:role.area || person?.area, supervisor:parent?.id || '', manager:nextManager?.id || person?.manager || '', manual:!!person?.manual };
+      // New hires must enter the declared scope. An existing person is authorized by current membership.
+      if (person || inScope(destination)) item.proposal = { role:role.id, area:role.areaId || '', supervisor:parent?.id || null,
+        manager:nextManager?.id || person?.manager || null, manual:!!person?.manual || (!!manager && !role.seller && manager.id !== inherited?.id) };
     }
     evaluated.push({ item, person });
   }

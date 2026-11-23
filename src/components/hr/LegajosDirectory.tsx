@@ -1,3 +1,4 @@
+import { RosterDecision, type Choice } from './RosterDecision';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import * as XLSX from 'xlsx';
 import { FileUp, Pencil, RefreshCw, Search, X } from 'lucide-react';
@@ -22,6 +23,7 @@ type ImportRow = {
   category: string; supervisor: string; manager: string; decision: Decision; note: string;
 };
 
+const hashFile = async (contents: ArrayBuffer) => Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',contents)), x=>x.toString(16).padStart(2,'0')).join('');
 const upper = (value: unknown) => String(value ?? '').trim().toUpperCase();
 const comparable = (value: string) => upper(value).normalize('NFD').replace(/[\u0300-\u036f]/g, '')
   .replace(/[^A-Z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
@@ -45,6 +47,7 @@ export const LegajosDirectory: React.FC = () => {
   const [form, setForm] = useState({ full_name: '', dni: '', legajo: '', employment_type: '', role_id: '', responsible_staff_id: '', manager_staff_id: '', active: true, deactivation_type: 'administrative_correction', deactivation_reason: '', transfer_reason: '' });
   const latestLoad = useRef(0);
   const uploadId = useRef(0);
+  const reviewSource = useRef<{ rows: ImportRow[]; selection: Selection; fileHash: string; file: File } | null>(null);
   const [comparison, setComparison] = useState<Preview>();
   const canLoadInitial = user?.role === 'admin' || user?.role === 'direccion';
   const canImport = canLoadInitial || user?.role === 'rrhh';
@@ -81,6 +84,18 @@ export const LegajosDirectory: React.FC = () => {
   }, [session, q, area, team, status, administrativeStatus, page]);
   useEffect(() => { setPage(1); }, [q, area, team, status, administrativeStatus]);
 
+  const confirmDecision = async (choice: Choice) => {
+    if (!reviewSource.current || !session) throw new Error('Volvé a comparar el archivo.');
+    const {file, ...source} = reviewSource.current;
+    const revision = uploadId.current;
+    const hash = await hashFile(await file.arrayBuffer());
+    if (hash !== source.fileHash || revision !== uploadId.current) throw new Error('Cambió el archivo. Volvé a compararlo.');
+    const result = await fetch('/api/hr-import', {method:'POST', headers:{ Authorization:`Bearer ${session.access_token}`, 'Content-Type':'application/json' },
+      body:JSON.stringify({action:'confirm', ...source, choice})});
+    const payload = await result.json();
+    if (!result.ok || !payload.success) throw new Error(payload.message || 'No se pudo confirmar.');
+    void load();
+  };
   const inspect = async (file?: File, initialLoad = false) => {
     if (!file || !session || !canImport || !scope || !coverage) return;
     const selection: Selection = scope.startsWith('team:')
@@ -89,7 +104,9 @@ export const LegajosDirectory: React.FC = () => {
     const current = ++uploadId.current;
     setPreview([]); setComparison(undefined); setPreviewMessage('Comparando con Legajos…');
     try {
-      const workbook = XLSX.read(await file.arrayBuffer(), { type: 'array' });
+      const contents = await file.arrayBuffer();
+      const fileHash = await hashFile(contents);
+      const workbook = XLSX.read(contents, { type: 'array' });
       const sheet = workbook.Sheets['ESTRUCTURA RRHH ACTIVA OK'];
       if (!sheet) throw new Error('No se encontró la pestaña ESTRUCTURA RRHH ACTIVA OK.');
       const source = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: '' });
@@ -110,14 +127,16 @@ export const LegajosDirectory: React.FC = () => {
           decision: alerts.length ? 'revisar' : (isFreelance ? 'freelance' : 'listo'), note: alerts.join(' · ') || (isFreelance ? 'Freelance: equipo y supervisor no obligatorios.' : 'Datos listos para aplicar.') };
       });
 
+      const sourceRows = parsed.map((row,i) => ({ ...row, line: Number(source[i].__rowNum__) + 1 || row.line }));
       const result = await fetch('/api/hr-import', {
         method: 'POST', headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'preview', selection, rows: parsed.map((row,i) => ({ ...row, line: Number(source[i].__rowNum__) + 1 || row.line })) }),
+        body: JSON.stringify({ action: 'preview', selection, fileHash, rows: sourceRows }),
       });
       const payload = await result.json();
       if (current !== uploadId.current) return;
       if (!result.ok || !payload.success) throw new Error(payload.message || 'No se pudo comparar la nómina.');
       if (!initialLoad || !payload.data.emptyRoster) {
+        reviewSource.current = {rows:sourceRows, selection, fileHash, file};
         setComparison(payload.data); setPreviewMessage('Comparación de sólo lectura.');
         return;
       }
@@ -243,10 +262,11 @@ export const LegajosDirectory: React.FC = () => {
       {canLoadInitial && scope === 'all' && coverage === 'complete' && comparison.emptyRoster && <label className="block">Nómina vacía · Iniciar el circuito de carga inicial<input type="file" accept=".xlsx,.xls" onChange={event => { void inspect(event.target.files?.[0], true); event.target.value = ''; }} /></label>}
       {Object.entries(comparison.items).map(([label, entries]) => <details key={label} className="rounded border border-slate-700 p-3">
         <summary className="cursor-pointer">{label === 'Ausencias para revisión' ? 'Empleados ausentes de la nueva nómina' : label} ({entries.length})</summary>
-        <ul className="max-h-80 overflow-auto">{entries.map((item,index) => <li key={index} className="border-t border-slate-800 py-2 text-sm">
+        <ul className="max-h-80 overflow-auto">{entries.map((item,index) => <li key={item.token || item.id || index} className="border-t border-slate-800 py-2 text-sm">
           <strong>{item.name}</strong>{item.line && ` · Fila ${item.line}`}
           {item.reasons.map(reason => <p key={reason}>{reason}</p>)}
           {item.differences.map(change => <p key={change.field}>{change.field}: {change.current} → {change.proposed} · {change.reason}</p>)}
+          {(user?.role === 'rrhh' || user?.isPlatformOwner) && <RosterDecision item={item} group={label} confirm={confirmDecision} />}
         </li>)}</ul>
       </details>)}
     </section>}

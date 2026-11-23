@@ -1,11 +1,12 @@
 import { databasePool } from './lib/database';
-import { readRosterPreview } from './lib/read-roster-preview';
+import { InvalidRosterTeam, readRosterPreview } from './lib/read-roster-preview';
+import { validSelection } from './lib/roster-preview';
 
 type ImportRow = {
   line?: number; name?: string; dni?: string; legajo?: string; nomina?: string;
   category?: string; supervisor?: string; manager?: string; decision?: string;
 };
-type Request = { method?: string; headers?: Record<string, string | string[] | undefined>; body?: { action?: string; rows?: ImportRow[] } };
+type Request = { method?: string; headers?: Record<string, string | string[] | undefined>; body?: { action?: string; rows?: ImportRow[]; selection?: unknown } };
 type Response = { status: (code: number) => Response; json: (body: unknown) => Response };
 type Role = { id: string; name: string; area_id: string; can_supervise_sales_team: boolean; creates_seller_record: boolean; app_role_mapping?: string | null; source_label?: string | null };
 type Created = { id: string; full_name: string; role: Role; row: Required<ImportRow> };
@@ -67,6 +68,8 @@ export default async function handler(request: Request, response: Response) {
   const userId = await authenticatedUserId(request);
   if (!userId) return response.status(401).json({ success: false, message: 'Sesión no válida.' });
   if (request.body?.action === 'preview') {
+    const selection = request.body.selection;
+    if (!validSelection(selection)) return response.status(400).json({ success: false, message: 'Seleccioná el alcance y la cobertura del archivo.' });
     const rows = request.body.rows;
     if (!Array.isArray(rows) || !rows.length || rows.length > 1000 || rows.some(row =>
       !row || typeof row !== 'object' || (['name','dni','legajo','nomina','category','supervisor','manager'] as const).some(
@@ -78,10 +81,11 @@ export default async function handler(request: Request, response: Response) {
       const data = await readRosterPreview(db, userId, rows.map((row, i) => ({
         ...normalizeRow(row), name: (row.name ?? '').trim(), category: (row.category ?? '').trim(), supervisor: (row.supervisor ?? '').trim(), manager: (row.manager ?? '').trim(),
         line: typeof row.line === 'number' && Number.isSafeInteger(row.line) && row.line > 0 ? row.line : i + 2,
-      })));
+      })), selection);
       if (!data) return response.status(403).json({ success: false, message: 'Sin permiso para comparar la nómina completa.' });
       return response.status(200).json({ success: true, data });
-    } catch {
+    } catch (error) {
+      if (error instanceof InvalidRosterTeam) return response.status(400).json({ success: false, message: 'El equipo seleccionado ya no está disponible.' });
       return response.status(500).json({ success: false, message: 'No se pudo comparar la nómina.' });
     } finally { db.release(); }
   }

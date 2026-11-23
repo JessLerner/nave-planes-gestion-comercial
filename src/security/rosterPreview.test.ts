@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { compareRoster, type Member, type SheetRow } from '../../api/lib/roster-preview';
+import { compareRoster, validSelection, type Member, type SheetRow } from '../../api/lib/roster-preview';
 import { readRosterPreview } from '../../api/lib/read-roster-preview';
 
 const base: Member = { id: 'existing', dni: '10000001', name: 'Persona A', legajo: 'A', active: true, nomina: 'Plantilla', role: 'sales', supervisor: 'first', manager: 'm', manual: false };
@@ -39,14 +39,41 @@ test('transacción de sólo lectura, permiso antes de acceso a datos y rollback 
       statements.push(sql);
       if (sql.includes('public.profiles')) return {rows:[{role:role==='error'?'admin':role}]};
       if (role==='error' && sql.includes('staff_members')) throw new Error('synthetic');
-      return {rows:sql.includes('staff_members')?staff:sql.includes('hr_roles')?roles:sql.includes('public.teams')?teams:[]};
+      return {rows:sql.includes('from public.teams')?teams:sql.includes('from public.staff_members')?staff:sql.includes('from public.hr_roles')?roles:[]};
     }};
     const result=readRosterPreview(db as Parameters<typeof readRosterPreview>[0],'synthetic',[row]);
     if(role==='error') await assert.rejects(result);
-    else if(['admin','direccion'].includes(role)) assert.equal((await result)?.items['Sin cambios'].length,1);
+    else if(['admin','direccion','rrhh'].includes(role)) assert.equal((await result)?.items['Sin cambios'].length,1);
     else {assert.equal(await result,null); assert.equal(statements.length,3);}
     assert.match(statements[0],/read only$/);
     assert.equal(statements.at(-1),'rollback');
     assert.ok(statements.slice(1,-1).every(sql=>/^select /.test(sql) && !/\b(insert|update|delete|call)\b/i.test(sql)));
   }
+});
+
+test('cobertura por equipo: identidad global, traslado con UUID y ausencias sólo del destino completo', () => {
+  const members = staff.map(p => ({...p, area:'Ventas'}));
+  const rows = [{...row,supervisor:'second'}];
+  const complete = compareRoster(rows,members,roles,teams,{scope:'team',teamId:'second',coverage:'complete'});
+  assert.equal(complete.items['Altas propuestas'].length,0);
+  assert.equal(complete.items['Actualizaciones propuestas'][0].id,base.id);
+  assert.ok(complete.items['Actualizaciones propuestas'][0].differences.some(d => d.field === 'Alcance'));
+  assert.deepEqual(complete.items['Ausencias para revisión'].map(p => p.id),['second']);
+  const partial = compareRoster(rows,members,roles,teams,{scope:'team',teamId:'second',coverage:'partial'});
+  assert.deepEqual(partial.items['Ausencias para revisión'],[]);
+  assert.equal(partial.scopeLabel,'Ventas · Equipo second');
+});
+
+test('alcance por sector y cargo, cobertura explícita y traslado de sector', () => {
+  const members = staff.map((p,i) => ({...p, area:i===0?'Administración':'Ventas'}));
+  const general = {...base,id:'general',role:'owner',area:'Gerencia / Dirección'};
+  const director = {...general,id:'director',role:'director'};
+  const catalog = [...roles,{...roles[0],id:'owner',name:'Administrador General',mapping:'admin'}, {...roles[0],id:'director',name:'Director',mapping:'admin'}];
+  const directory = [...members,general,director];
+  for (const [scope,expected] of [['administration',[base.id]],['general',['general']],['directors',['director']],['management',['m']]] as const) {
+    assert.deepEqual(compareRoster([],directory,catalog,teams,{scope,coverage:'complete'}).items['Ausencias para revisión'].map(p=>p.id),expected);
+  }
+  assert.equal(compareRoster([row],members,roles,teams,{scope:'sales',coverage:'complete'}).items['Actualizaciones propuestas'][0].id,base.id);
+  assert.equal(validSelection({scope:'all'}),false);
+  assert.equal(validSelection({scope:'team',teamId:'inventado',coverage:'complete'}),false);
 });

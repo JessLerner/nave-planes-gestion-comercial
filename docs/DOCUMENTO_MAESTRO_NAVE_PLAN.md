@@ -6,6 +6,12 @@
 
 ## Orientación y fuentes vigentes
 
+### Regla de cobertura de nómina aprobada · 23/11/2026
+
+Antes de comparar se declaran el alcance organizativo y si el archivo está completo para ese alcance. Los equipos provienen del directorio activo. El DNI se coteja con todos los Legajos para conservar el UUID ante traslados. Sólo un archivo completo permite listar empleados activos ausentes dentro del alcance declarado. El parcial permite comparar las filas recibidas. La cobertura es una declaración del revisor que el sistema no puede certificar a partir del archivo.
+
+La previsualización admite Administración General, RRHH y el acceso de lectura existente de Dirección. Para la futura confirmación están aprobados Administración General y RRHH, sujetos a permisos específicos. Podrán revisar cargo, sector, responsable, gerente y campos administrativos autorizados. Cada ausencia tendrá una decisión individual auditada: baja laboral con fecha efectiva y motivo por el circuito existente, error administrativo con continuidad activa o pendiente. Las dos últimas decisiones permiten aplicar cambios independientes. Antes de confirmar habrá que verificar la vigencia del archivo y de cada Legajo afectado y solicitar nueva revisión de diferencias obsoletas. La confirmación y cualquier cambio de estado quedan para otra fase.
+
 - **Arquitectura principal:** React/Vite (`src/`) consume APIs TypeScript (`api/`) adaptadas por `cloudflare/worker.ts`; Supabase (`supabase/`) concentra persistencia, autenticación, políticas, migraciones y Edge Functions. `server.ts` es un prototipo local heredado, no el backend desplegable actual.
 - **Documentación vigente:** este Documento Maestro describe el producto y su arquitectura; [Estado del Proyecto](ESTADO_PROYECTO.md) resume continuidad y evidencia local; [AGENTS.md](../AGENTS.md) define la operación del repositorio.
 - **Evidencia histórica:** los informes fechados no sustituyen el estado vigente ni crean tareas operativas independientes. El repositorio conserva sólo documentación técnica necesaria; el seguimiento operativo se registra en el Panel.

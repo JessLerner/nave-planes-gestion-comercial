@@ -3,23 +3,50 @@ export type SheetRow = {
   category: string; supervisor: string; manager: string;
 };
 export type Member = {
+  area?: string;
   id: string; name: string; dni: string; legajo: string; nomina: string; active: boolean;
   role: string; supervisor: string; manager: string; manual: boolean;
 };
 export type Role = { id: string; name: string; alias: string; mapping: string; seller: boolean };
 export type Team = { id: string; name: string; supervisor: string };
+export const scopeLabels = {
+  all: 'Toda la nómina', administration: 'Administración', sales: 'Ventas · Todos los equipos',
+  team: 'Ventas · Equipo', management: 'Dirección · Gerencia', directors: 'Dirección · Dirección',
+  general: 'Dirección · Administración General',
+};
+export type Selection = { scope: keyof typeof scopeLabels; coverage: 'complete' | 'partial'; teamId?: string };
+export function validSelection(value: unknown): value is Selection {
+  if (!value || typeof value !== 'object') return false;
+  const selection = value as Selection;
+  return typeof selection.scope === 'string' && Object.hasOwn(scopeLabels, selection.scope)
+    && ['complete','partial'].includes(selection.coverage)
+    && (selection.scope === 'team' ? typeof selection.teamId === 'string' && /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(selection.teamId) : selection.teamId === undefined);
+}
 type Difference = { field: string; current: string; proposed: string; reason: string };
 export type PreviewItem = { id?: string; line?: number; name: string; differences: Difference[]; reasons: string[] };
 export const groups = ['Sin cambios', 'Actualizaciones propuestas', 'Altas propuestas', 'Ausencias para revisión', 'Conflictos o errores', 'Excluidos'] as const;
-export type Preview = { total: number; emptyRoster: boolean; items: Record<typeof groups[number], PreviewItem[]> };
+export type Preview = { total: number; emptyRoster: boolean; scopeLabel: string; coverage: Selection['coverage']; items: Record<typeof groups[number], PreviewItem[]> };
 const key = (value?: string) => (value || '').trim().normalize('NFC').toLocaleUpperCase('es').replace(/\s+/g, ' ');
 const identity = (value: string) => (value || '').replace(/[.\s]/g, '');
 
-export function compareRoster(rows: SheetRow[], staff: Member[], roles: Role[], teams: Team[]): Preview {
+export function compareRoster(rows: SheetRow[], staff: Member[], roles: Role[], teams: Team[], selection: Selection = {scope:'all',coverage:'complete'}): Preview {
   const items: Preview['items'] = { 'Sin cambios': [], 'Actualizaciones propuestas': [], 'Altas propuestas': [], 'Ausencias para revisión': [], 'Conflictos o errores': [], Excluidos: [] };
   const present = new Set<string>();
   const byId = new Map(staff.map(person => [person.id, person]));
   const roleById = new Map(roles.map(role => [role.id, role]));
+  const team = teams.find(t => t.id === selection.teamId);
+  const inScope = (person: Member) => {
+    const role = roleById.get(person.role);
+    switch (selection.scope) {
+      case 'all': return true;
+      case 'administration': return key(person.area) === 'ADMINISTRACIÓN';
+      case 'sales': return key(person.area) === 'VENTAS';
+      case 'team': return !!team && (person.id === team.supervisor || (role?.seller && person.supervisor === team.supervisor));
+      case 'management': return role?.mapping === 'gerente';
+      case 'directors': return key(role?.name) === 'DIRECTOR' || role?.mapping === 'direccion';
+      case 'general': return key(role?.name) === 'ADMINISTRADOR GENERAL';
+    }
+  };
   const proposedParents = new Map<string,string>();
   const evaluated: { item: PreviewItem; person?: Member }[] = [];
   for (const row of rows) {
@@ -99,11 +126,15 @@ export function compareRoster(rows: SheetRow[], staff: Member[], roles: Role[], 
       while (id && !visited.has(id)) { visited.add(id); id = proposedParents.get(id) || byId.get(id)?.supervisor || ''; }
       if (id) item.reasons.push('Ciclo en la jerarquía propuesta.');
     }
+    if (person && !inScope(person)) {
+      item.differences.push({ field: 'Alcance', current: [person.area, roleById.get(person.role)?.name, teams.find(t => t.supervisor === person.supervisor)?.name].filter(Boolean).join(' · ') || 'Fuera del alcance elegido',
+        proposed: team?.name || scopeLabels[selection.scope], reason: 'Discrepancia con el alcance declarado. Revisar posible traslado.' });
+    }
     const group = item.reasons.length ? 'Conflictos o errores' : !person ? 'Altas propuestas' : item.differences.length ? 'Actualizaciones propuestas' : 'Sin cambios';
     items[group].push(item);
   }
-  for (const person of staff.filter(p => p.active && !present.has(p.id) && key(p.nomina) !== 'CONVENCIONAL')) {
+  for (const person of staff.filter(p => selection.coverage === 'complete' && inScope(p) && p.active && !present.has(p.id) && key(p.nomina) !== 'CONVENCIONAL')) {
     items['Ausencias para revisión'].push({ id: person.id, name: person.name, differences: [], reasons: ['Ausente en la planilla. Conserva su estado laboral.'] });
   }
-  return { total: rows.length, emptyRoster: !staff.length, items };
+  return { total: rows.length, emptyRoster: !staff.length, items, scopeLabel: team ? 'Ventas · ' + team.name : scopeLabels[selection.scope], coverage: selection.coverage };
 }

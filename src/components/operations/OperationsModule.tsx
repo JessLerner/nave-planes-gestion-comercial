@@ -1,3 +1,4 @@
+import { PresentationSaleSelector } from './PresentationSaleSelector';
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import {
@@ -238,12 +239,7 @@ export const OperationsModule: React.FC<OperationsModuleProps> = ({ view = 'cant
       </div>
 
       {view === 'presentations' ? (
-        <div className="rounded-xl border border-slate-800 bg-slate-900 p-5">
-          <h3 className="text-sm font-semibold text-white">Circuito de Presentaciones pendiente</h3>
-          <p className="mt-1 text-xs text-slate-400">
-            Esta vista no habilita formularios ni acciones hasta que se implemente el circuito aprobado de expedientes, documentos y devoluciones administrativas.
-          </p>
-        </div>
+        currentUser.role === 'supervisor' ? <PresentationSaleSelector key={currentUser.team_id} /> : <p>El selector está disponible para Supervisión.</p>
       ) : <>
       {/* 2. Search & Filter Bar */}
       <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">

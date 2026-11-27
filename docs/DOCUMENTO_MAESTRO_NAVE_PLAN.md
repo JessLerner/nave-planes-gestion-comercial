@@ -6,6 +6,16 @@
 
 ## Orientación y fuentes vigentes
 
+### Regla de cobertura de nómina aprobada · 23/11/2026
+
+Antes de comparar se declaran el alcance organizativo y si el archivo está completo para ese alcance. Los equipos provienen del directorio activo. El DNI se coteja con todos los Legajos para conservar el UUID ante traslados. Sólo un archivo completo permite listar empleados activos ausentes dentro del alcance declarado. El parcial permite comparar las filas recibidas. La cobertura es una declaración del revisor que el sistema no puede certificar a partir del archivo.
+
+Administración General y RRHH pueden revisar y confirmar individualmente; Dirección mantiene acceso de lectura. El servidor requiere RRHH o perfil admin con titularidad verificada. La confirmación recalcula la comparación, coteja la huella del archivo y la revisión del registro y autoriza únicamente decisiones dentro del alcance. Cada decisión se revisa antes de enviarla y se registra en una transacción serializable con actor, fecha, origen y valores anteriores/posteriores. Los reintentos idénticos reutilizan la decisión.
+
+El empleado existente admite actualizar o conservar sus datos. Una ausencia admite baja con fecha efectiva y motivo mediante el circuito de baja directa, o error administrativo conservando el estado activo. Todas las categorías admiten dejar pendiente. El alta requiere un expediente de incorporación directa del revisor con DNI, cargo y supervisor coincidentes y los cinco documentos obligatorios. Si falta el expediente o cambia la comparación, el registro requiere atención y los demás pueden avanzar.
+
+**Evidencia del 23/11/2026.** Implementación local sobre 03a948e. Pruebas focalizadas de decisiones y auditoría en PostgreSQL local con datos sintéticos y rollback, incluidos la migración 051 y el fixture de titularidad. La aceptación integrada desde el XLSX, la aplicación remota de 051 y la publicación siguen pendientes.
+
 - **Arquitectura principal:** React/Vite (`src/`) consume APIs TypeScript (`api/`) adaptadas por `cloudflare/worker.ts`; Supabase (`supabase/`) concentra persistencia, autenticación, políticas, migraciones y Edge Functions. `server.ts` es un prototipo local heredado, no el backend desplegable actual.
 - **Documentación vigente:** este Documento Maestro describe el producto y su arquitectura; [Estado del Proyecto](ESTADO_PROYECTO.md) resume continuidad y evidencia local; [AGENTS.md](../AGENTS.md) define la operación del repositorio.
 - **Evidencia histórica:** los informes fechados no sustituyen el estado vigente ni crean tareas operativas independientes. El repositorio conserva sólo documentación técnica necesaria; el seguimiento operativo se registra en el Panel.

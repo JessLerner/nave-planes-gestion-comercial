@@ -1,8 +1,10 @@
+import { RosterDecision, type Choice } from './RosterDecision';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import * as XLSX from 'xlsx';
 import { FileUp, Pencil, RefreshCw, Search, X } from 'lucide-react';
 import { useAuth } from '../../auth/AuthProvider';
 import { AdministrativeStatusBadge } from './AdministrativeStatusBadge';
+import { scopeLabels, type Preview, type Selection } from '../../../api/lib/roster-preview';
 
 type DirectoryRow = {
   id: string; full_name: string; dni?: string; legajo?: string; is_coaching: boolean;
@@ -21,6 +23,7 @@ type ImportRow = {
   category: string; supervisor: string; manager: string; decision: Decision; note: string;
 };
 
+const hashFile = async (contents: ArrayBuffer) => Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',contents)), x=>x.toString(16).padStart(2,'0')).join('');
 const upper = (value: unknown) => String(value ?? '').trim().toUpperCase();
 const comparable = (value: string) => upper(value).normalize('NFD').replace(/[\u0300-\u036f]/g, '')
   .replace(/[^A-Z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
@@ -43,6 +46,21 @@ export const LegajosDirectory: React.FC = () => {
   const [editing, setEditing] = useState<DirectoryRow>(); const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ full_name: '', dni: '', legajo: '', employment_type: '', role_id: '', responsible_staff_id: '', manager_staff_id: '', active: true, deactivation_type: 'administrative_correction', deactivation_reason: '', transfer_reason: '' });
   const latestLoad = useRef(0);
+  const uploadId = useRef(0);
+  const reviewSource = useRef<{ rows: ImportRow[]; selection: Selection; fileHash: string; file: File } | null>(null);
+  const [comparison, setComparison] = useState<Preview>();
+  const canLoadInitial = user?.role === 'admin' || user?.role === 'direccion';
+  const canImport = canLoadInitial || user?.role === 'rrhh';
+  const [scope, setScope] = useState('');
+  const [coverage, setCoverage] = useState<Selection['coverage'] | ''>('');
+  const clearComparison = () => {
+    uploadId.current++;
+    setComparison(undefined); setPreview([]); setPreviewMessage('');
+  };
+  useEffect(() => {
+    setComparison(undefined); setPreview([]); setPreviewMessage('');
+    return () => { uploadId.current++; };
+  }, [session?.access_token, canImport]);
 
   const load = async () => {
     if (!session) return;
@@ -66,14 +84,33 @@ export const LegajosDirectory: React.FC = () => {
   }, [session, q, area, team, status, administrativeStatus, page]);
   useEffect(() => { setPage(1); }, [q, area, team, status, administrativeStatus]);
 
-  const inspect = async (file?: File) => {
-    if (!file) return;
+  const confirmDecision = async (choice: Choice) => {
+    if (!reviewSource.current || !session) throw new Error('Volvé a comparar el archivo.');
+    const {file, ...source} = reviewSource.current;
+    const revision = uploadId.current;
+    const hash = await hashFile(await file.arrayBuffer());
+    if (hash !== source.fileHash || revision !== uploadId.current) throw new Error('Cambió el archivo. Volvé a compararlo.');
+    const result = await fetch('/api/hr-import', {method:'POST', headers:{ Authorization:`Bearer ${session.access_token}`, 'Content-Type':'application/json' },
+      body:JSON.stringify({action:'confirm', ...source, choice})});
+    const payload = await result.json();
+    if (!result.ok || !payload.success) throw new Error(payload.message || 'No se pudo confirmar.');
+    void load();
+  };
+  const inspect = async (file?: File, initialLoad = false) => {
+    if (!file || !session || !canImport || !scope || !coverage) return;
+    const selection: Selection = scope.startsWith('team:')
+      ? { scope: 'team', teamId: scope.slice(5), coverage }
+      : { scope: scope as Selection['scope'], coverage };
+    const current = ++uploadId.current;
+    setPreview([]); setComparison(undefined); setPreviewMessage('Comparando con Legajos…');
     try {
-      const workbook = XLSX.read(await file.arrayBuffer(), { type: 'array' });
+      const contents = await file.arrayBuffer();
+      const fileHash = await hashFile(contents);
+      const workbook = XLSX.read(contents, { type: 'array' });
       const sheet = workbook.Sheets['ESTRUCTURA RRHH ACTIVA OK'];
       if (!sheet) throw new Error('No se encontró la pestaña ESTRUCTURA RRHH ACTIVA OK.');
-      const source = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: '' })
-        .filter((row) => upper(row['NOMBRE DEL RECURSO']));
+      const source = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: '' });
+      if (!source.length || !Object.hasOwn(source[0], 'NUMERO DE DNI') || !Object.hasOwn(source[0], 'NOMBRE DEL RECURSO')) throw new Error('Faltan filas o encabezados de nombre y DNI.');
       const parsed = source.map((row, index): ImportRow => {
         const nomina = upper(row.NOMINA); const name = upper(row['NOMBRE DEL RECURSO']);
         const dni = String(row['NUMERO DE DNI'] ?? '').trim(); const legajo = String(row.LEGAJO ?? '').trim();
@@ -86,10 +123,25 @@ export const LegajosDirectory: React.FC = () => {
         if (!legajo && !category.includes('COACHING') && !isFreelance) alerts.push('Falta legajo');
         if (!category) alerts.push('Falta cargo/categoría');
         if (!manager && category.includes('SUPERVISOR') && !isFreelance) alerts.push('Falta responsable superior');
-        return { line: index + 2, name, dni, legajo, nomina, category, supervisor: isFreelance ? '' : supervisor, manager,
+        return { line: index + 2, name, dni, legajo, nomina, category, supervisor, manager,
           decision: alerts.length ? 'revisar' : (isFreelance ? 'freelance' : 'listo'), note: alerts.join(' · ') || (isFreelance ? 'Freelance: equipo y supervisor no obligatorios.' : 'Datos listos para aplicar.') };
       });
 
+      const sourceRows = parsed.map((row,i) => ({ ...row, line: Number(source[i].__rowNum__) + 1 || row.line }));
+      const result = await fetch('/api/hr-import', {
+        method: 'POST', headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'preview', selection, fileHash, rows: sourceRows }),
+      });
+      const payload = await result.json();
+      if (current !== uploadId.current) return;
+      if (!result.ok || !payload.success) throw new Error(payload.message || 'No se pudo comparar la nómina.');
+      if (!initialLoad || !payload.data.emptyRoster) {
+        reviewSource.current = {rows:sourceRows, selection, fileHash, file};
+        setComparison(payload.data); setPreviewMessage('Comparación de sólo lectura.');
+        return;
+      }
+      // Only the legacy initial load uses inferred hierarchy.
+      for (const row of parsed) if (row.decision === 'freelance') row.supervisor = '';
       // The manager of every subordinate is resolved recursively from the
       // matched supervisor. It is generic fuzzy matching, without exceptions
       // for individual people or organisations.
@@ -112,6 +164,7 @@ export const LegajosDirectory: React.FC = () => {
       setPreview(hierarchy);
       setPreviewMessage(`${hierarchy.length} filas analizadas. No se cargó ningún recurso.`);
     } catch (error) {
+      if (current !== uploadId.current) return;
       setPreview([]); setPreviewMessage(error instanceof Error ? error.message : 'No se pudo leer el archivo.');
     }
   };
@@ -190,7 +243,33 @@ export const LegajosDirectory: React.FC = () => {
   return <section className="space-y-4">
     <div className="flex flex-wrap items-center gap-2 rounded-lg border border-slate-800 bg-slate-900 p-3 text-xs"><span className="text-slate-400">Estado administrativo</span><select value={administrativeStatus} onChange={(event) => setAdministrativeStatus(event.target.value)} className="rounded border border-slate-700 bg-slate-950 px-2 py-1"><option value="">Todos</option><option value="coaching">Coaching</option><option value="alta_definitiva">Alta definitiva</option><option value="pending_classification">Pendiente de clasificación</option></select><AdministrativeStatusBadge status={administrativeStatus === 'coaching' || administrativeStatus === 'alta_definitiva' ? administrativeStatus : null} /></div>
     <div className="flex items-center justify-between"><div><h3 className="text-lg font-bold text-white">Legajos</h3><p className="text-xs text-slate-400">Nómina maestra con acceso según jerarquía.</p></div><button onClick={() => void load()} className="rounded border border-slate-700 p-2"><RefreshCw className={loading ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} /></button></div>
-    {canManageLegajos && <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-dashed border-slate-700 bg-slate-900 p-3 text-xs text-slate-300"><FileUp className="h-4 w-4" />Previsualizar archivo RRHH<input className="hidden" type="file" accept=".xlsx,.xls" onChange={(event) => void inspect(event.target.files?.[0])} /></label>}
+    {canImport && <fieldset className="flex flex-wrap items-center gap-3 rounded border border-slate-700 p-3 text-sm">
+      <legend>Comparar archivo de nómina</legend>
+      <label>Alcance <select className="bg-slate-900" value={scope} onChange={e => { clearComparison(); setScope(e.target.value); setCoverage(''); }}>
+        <option value="">Elegir alcance</option>
+        <option value="all">{scopeLabels.all}</option><option value="administration">{scopeLabels.administration}</option>
+        <optgroup label="Ventas"><option value="sales">Todos los equipos</option>{data?.teams.map(t => <option key={t.id} value={'team:'+t.id}>{t.name}</option>)}</optgroup>
+        <optgroup label="Dirección"><option value="management">Gerencia</option><option value="directors">Dirección</option><option value="general">Administración General</option></optgroup>
+      </select></label>
+      <label>Cobertura <select className="bg-slate-900" value={coverage} disabled={!scope} onChange={e => { clearComparison(); setCoverage(e.target.value as typeof coverage); }}>
+        <option value="">Elegir cobertura</option><option value="complete">Archivo completo del alcance</option><option value="partial">Archivo parcial</option>
+      </select></label>
+      <label><FileUp className="inline h-4 w-4" /> Archivo <input type="file" disabled={!coverage} accept=".xlsx,.xls" onChange={event => { void inspect(event.target.files?.[0]); event.target.value = ''; }} /></label>
+    </fieldset>}
+    {canImport && comparison && <section className="space-y-2" aria-label="Comparación de nómina">
+      <h4 className="font-semibold">Registros recibidos: {comparison.total}</h4>
+      <p>{comparison.scopeLabel} · {comparison.coverage === 'complete' ? 'Archivo completo del alcance' : 'Archivo parcial. Las ausencias no se evalúan.'}</p>
+      {canLoadInitial && scope === 'all' && coverage === 'complete' && comparison.emptyRoster && <label className="block">Nómina vacía · Iniciar el circuito de carga inicial<input type="file" accept=".xlsx,.xls" onChange={event => { void inspect(event.target.files?.[0], true); event.target.value = ''; }} /></label>}
+      {Object.entries(comparison.items).map(([label, entries]) => <details key={label} className="rounded border border-slate-700 p-3">
+        <summary className="cursor-pointer">{label === 'Ausencias para revisión' ? 'Empleados ausentes de la nueva nómina' : label} ({entries.length})</summary>
+        <ul className="max-h-80 overflow-auto">{entries.map((item,index) => <li key={item.token || item.id || index} className="border-t border-slate-800 py-2 text-sm">
+          <strong>{item.name}</strong>{item.line && ` · Fila ${item.line}`}
+          {item.reasons.map(reason => <p key={reason}>{reason}</p>)}
+          {item.differences.map(change => <p key={change.field}>{change.field}: {change.current} → {change.proposed} · {change.reason}</p>)}
+          {(user?.role === 'rrhh' || user?.isPlatformOwner) && <RosterDecision item={item} group={label} confirm={confirmDecision} />}
+        </li>)}</ul>
+      </details>)}
+    </section>}
     {previewMessage && <p className="rounded-lg border border-slate-800 bg-slate-900 p-3 text-xs text-slate-300">{previewMessage}</p>}
     {preview.length > 0 && <>
       <div className="grid grid-cols-2 gap-2 text-xs md:grid-cols-4"><p className="rounded bg-emerald-500/10 p-2 text-emerald-300">{summary.ready} listos</p><p className="rounded bg-violet-500/10 p-2 text-violet-300">{summary.freelance} Freelance</p><p className="rounded bg-slate-800 p-2 text-slate-400">{summary.excluded} excluidos</p><p className="rounded bg-amber-500/10 p-2 text-amber-300">{summary.review} a revisar</p></div>

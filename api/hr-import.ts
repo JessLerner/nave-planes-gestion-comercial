@@ -1,10 +1,13 @@
+import { confirmRoster, ReviewError } from './lib/confirm-roster';
 import { databasePool } from './lib/database';
+import { InvalidRosterTeam, readRosterPreview } from './lib/read-roster-preview';
+import { validSelection } from './lib/roster-preview';
 
 type ImportRow = {
   line?: number; name?: string; dni?: string; legajo?: string; nomina?: string;
   category?: string; supervisor?: string; manager?: string; decision?: string;
 };
-type Request = { method?: string; headers?: Record<string, string | string[] | undefined>; body?: { rows?: ImportRow[] } };
+type Request = { method?: string; headers?: Record<string, string | string[] | undefined>; body?: { action?: string; rows?: ImportRow[]; selection?: unknown; choice?: unknown; fileHash?: string } };
 type Response = { status: (code: number) => Response; json: (body: unknown) => Response };
 type Role = { id: string; name: string; area_id: string; can_supervise_sales_team: boolean; creates_seller_record: boolean; app_role_mapping?: string | null; source_label?: string | null };
 type Created = { id: string; full_name: string; role: Role; row: Required<ImportRow> };
@@ -65,6 +68,39 @@ export default async function handler(request: Request, response: Response) {
   if (request.method !== 'POST') return response.status(405).json({ success: false, message: 'Método no permitido.' });
   const userId = await authenticatedUserId(request);
   if (!userId) return response.status(401).json({ success: false, message: 'Sesión no válida.' });
+  if (request.body?.action === 'preview' || request.body?.action === 'confirm') {
+    const selection = request.body.selection;
+    if (!validSelection(selection)) return response.status(400).json({ success: false, message: 'Seleccioná el alcance y la cobertura del archivo.' });
+    const rows = request.body.rows;
+    if (!Array.isArray(rows) || !rows.length || rows.length > 1000 || rows.some(row =>
+      !row || typeof row !== 'object' || (['name','dni','legajo','nomina','category','supervisor','manager'] as const).some(
+        field => typeof row[field] !== 'string' || (row[field]?.length ?? 0) > 300
+      )
+    )) return response.status(400).json({ success: false, message: 'Se requieren entre 1 y 1000 filas válidas del archivo.' });
+    const db = await pool.connect();
+    try {
+      const parsed = rows.map((row, i) => ({
+        ...normalizeRow(row), name: (row.name ?? '').trim(), category: (row.category ?? '').trim(), supervisor: (row.supervisor ?? '').trim(), manager: (row.manager ?? '').trim(),
+        line: typeof row.line === 'number' && Number.isSafeInteger(row.line) && row.line > 0 ? row.line : i + 2,
+      }));
+      if (new Set(parsed.map(r=>r.line)).size !== parsed.length) return response.status(400).json({success:false,message:'Filas repetidas en el archivo.'});
+      const fileHash = request.body.fileHash;
+      if (fileHash !== undefined && (typeof fileHash !== 'string' || !/^[0-9a-f]{64}$/.test(fileHash))) return response.status(400).json({success:false,message:'Archivo inválido.'});
+      const reviewed = { scope:selection.scope, coverage:selection.coverage, teamId:selection.teamId, fileHash };
+      if (request.body.action === 'confirm') {
+        await confirmRoster(db,userId,parsed,reviewed,request.body.choice);
+        return response.status(200).json({success:true});
+      }
+      const data = await readRosterPreview(db,userId,parsed,reviewed);
+      if (!data) return response.status(403).json({ success: false, message: 'Sin permiso para comparar la nómina completa.' });
+      return response.status(200).json({ success: true, data });
+    } catch (error) {
+      if (error instanceof ReviewError) return response.status(error.status).json({success:false,message:error.message});
+      if (error instanceof InvalidRosterTeam) return response.status(400).json({ success: false, message: 'El equipo seleccionado ya no está disponible.' });
+      return response.status(500).json({ success: false, message: request.body.action === 'confirm' ? 'No se pudo confirmar. Revisá las dependencias de la cuenta o el expediente y volvé a comparar.' : 'No se pudo comparar la nómina.' });
+    } finally { db.release(); }
+  }
+  if (request.body?.action !== undefined) return response.status(400).json({ success: false, message: 'Acción desconocida.' });
 
   const submitted = (request.body?.rows || []).map(normalizeRow);
   const approvedRows = submitted.filter((row) => !['excluido', 'excluded'].includes(row.decision));

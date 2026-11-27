@@ -101,13 +101,14 @@ Los comandos de Supabase local y su secuencia documentada están en `docs/LOCAL_
 
 ## Panel de seguimiento de NAVE.Plan — fuente única
 
-- El **Panel NAVE.Plan de ChatGPT (Sites/MCP)** es la única fuente operativa de tareas, estados, decisiones, bloqueos y evidencias. Acceder mediante el conector SeguimientoNavePlan y la conexión del proyecto. El escritorio se conserva como archivo histórico de consulta hasta verificar el traslado de sus antecedentes.
-- Al iniciar o retomar una tarea, consultar `project_instructions`, ejecutar `list_tasks` y localizar la tarea existente por ID y alcance. Usar `get_task` para leer su contenido completo y su revisión. Registrar rama, HEAD, worktree y cambios ajenos relevantes.
-- Antes de escribir, releer la tarea en Sites y enviar a `update_task` su revisión vigente y un cambio mínimo. Anexar evidencia fechada con su procedencia, conservando los antecedentes. Ante un conflicto de revisión (409), releer, conciliar el cambio concurrente y preparar una nueva actualización.
-- Confirmar el resultado con `get_task`. Al trasladar antecedentes, verificar su contenido en la tarea existente de destino. Cada panel tiene su propia secuencia de revisiones. Si Sites no está accesible, informar el bloqueo y mantener pendiente el registro hasta recuperar el acceso.
+- El Panel operativo oficial es **PaginaSeguimientoNave**: https://nave-plan-seguimiento.dotingsloth1.chatgpt.site/. Usar `project_instructions`, `list_tasks`, `get_task` y `update_task`.
+- Antes de comenzar y antes de modificar, consultar el Panel; al comenzar o retomar, consultar `project_instructions` y `list_tasks`, leer la tarea con `get_task` y registrar rama, HEAD, worktree y cambios ajenos relevantes. Al cambiar de cuenta, sesión o entorno, reconstruir el contexto desde `AGENTS.md`, Git y el Panel.
+- Usar `create_task` sólo cuando no exista una tarea correspondiente y se haya justificado su creación.
+- Antes de actualizar, releer con `get_task` y enviar a `update_task` el cambio mínimo con `expectedRevision` obtenido de esa lectura vigente. Ante un conflicto, releer, conciliar y reintentar sin sobrescribir cambios ajenos; confirmar con `get_task`.
+- Si falla el acceso al Panel, registrar el bloqueo en la documentación disponible y detener sólo las acciones que dependan de esa trazabilidad.
 - Al cerrar cada fase verificable, actualizar la tarea existente con hechos y próximo paso único. Mantener cuatro señales independientes: `code`, `test`, `external` y `publication`, con fecha y evidencia concreta. Código, commits, migraciones y pruebas locales no acreditan aplicación, despliegue ni validación externa.
 - Sólo usar `Completada` cuando todos los criterios de aceptación estén satisfechos con evidencia. Si falta validación, usar `Para probar`; si depende de una autorización, ambiente o decisión real, usar `Bloqueada` con causa y acción siguiente.
-- El panel organiza seguimiento: no autoriza cambios de código, secretos, migraciones remotas, servicios externos ni producción. Registrar sólo commits reales. Mantener Scoring aislado, Parte Diario externo hasta migración validada, hojas privadas sólo desde backend y Mora/cobranza fuera de alcance salvo decisión explícita de Jesica.
+- La disponibilidad del Panel no concede autorización productiva ni autoriza cambios de código, secretos, migraciones remotas o servicios externos. Registrar commits, migraciones, pruebas y despliegues únicamente cuando estén acreditados. Mantener Scoring aislado, Parte Diario externo hasta migración validada, hojas privadas sólo desde backend y Mora/cobranza fuera de alcance salvo decisión explícita de Jesica.
 
 ## Prioridad de entrega y política de resguardos — decisión 27/11/2026
 

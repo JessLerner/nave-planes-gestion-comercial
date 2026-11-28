@@ -1,7 +1,7 @@
 # Plan de implementación: listas de precios y circulares
 
 **Estado:** en implementación  
-**Última actualización:** 31/10/2026
+**Última actualización:** 27/11/2026
 
 ## Objetivo
 
@@ -107,8 +107,8 @@ Adaptadores iniciales:
 - [x] Crear APIs/repositorios específicos de listas de precios; dejar de usar el estado genérico de `AppContext` para este módulo.
 - [x] Definir tipos TypeScript y DTOs de lectura por rol.
 - [x] Implementar funciones puras: sellado BA, conversión MG, validación de sobrepautas y agrupamiento de tramos.
-- [ ] Implementar carga de documentos y asociación de múltiples fuentes a una lista.
-- [ ] Implementar editor/revisión para Administración y Dirección.
+- [x] Implementar carga de documentos y asociación de múltiples fuentes a una lista.
+- [x] Implementar editor/revisión para Administración y Dirección.
 - [x] Implementar publicación a Gerencia.
 - [x] Implementar revisión de sobrepautas, copia del período anterior, aplicación masiva y edición por modelo para Gerencia.
 - [x] Implementar confirmación por estructura.
@@ -117,7 +117,7 @@ Adaptadores iniciales:
 - [x] Permitir edición posterior de importes oficiales por Administración/Dirección y aumentos posteriores de sobrepauta por Gerencia.
 - [x] Permitir retirar del circuito comercial listas erróneas o anteriores, preservando su historial administrativo.
 - [x] Separar las listas retiradas de la vista activa y permitir consultarlas en Historial de listas por mes/año.
-- [ ] Implementar carga asistida universal.
+- [x] Implementar carga asistida universal: circular(es) adjuntas y planilla de transcripción explícita, sin inferir importes.
 - [ ] Implementar adaptadores PDF iniciales.
 - [x] Incorporar OCR mecánico local para las circulares visuales de Stellantis.
 - [ ] Mapear y validar la plantilla Peugeot/Citroën sobre el texto OCR extraído.
@@ -128,7 +128,9 @@ Adaptadores iniciales:
 - [ ] Agregar pruebas de autorización, visibilidad y regresión por rol.
 - [ ] Validar con circulares reales y usuarios de prueba antes de despliegue.
 
-En curso: el parser Renault ya fue contrastado contra la planilla de septiembre de 2026 y recupera 10 planes con sus tramos. Falta conectarlo a la carga de archivos, revisión y creación del borrador.
+El parser Renault fue contrastado contra la planilla de septiembre de 2026 y recupera 10 planes con sus tramos. Su circuito crea borradores revisables; falta la validación funcional con una fuente vigente y usuarios de prueba.
+
+Actualización 27/11/2026: la carga asistida ya crea borradores para Peugeot, Citroën, Fiat, Jeep/RAM y Leapmotor con sus fuentes oficiales asociadas. La planilla exige valores y tramos completos, que siguen sujetos a revisión administrativa antes de publicar. No había circulares reales versionadas en el worktree para validar una plantilla específica o publicar una lista.
 
 ## Pendiente de validación con Administración
 

@@ -39,6 +39,7 @@ const handlers: Record<string, () => Promise<{ default: unknown }>> = {
   '/api/staff-departure-documents': () => import('../api/staff-departure-documents'),
   '/api/staff-departure-decisions': () => import('../api/staff-departure-decisions'),
   '/api/operational-data': () => import('../api/operational-data'),
+  '/api/presentation-sales': () => import('../api/presentation-sales'),
   '/api/operations': () => import('../api/operations'),
   '/api/price-lists': () => import('../api/price-lists'),
   '/api/public-config': () => import('../api/public-config'),

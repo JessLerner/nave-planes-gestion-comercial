@@ -17,12 +17,13 @@ const rows = ({ brand, items, segments, includeCuota1 }: ExportOptions) => {
   const isRenault = brand.toLowerCase() === 'renault';
   const displayRows = items.map(item => ({ item, segments: segments.filter(segment => segment.price_list_item_id === item.id).map(segment => ({ from: segment.installment_from, to: segment.installment_to, quotaValue: Number(segment.total_value) })) }));
   const columns = installmentColumns(displayRows.map(row => ({ totalInstallments: row.item.total_installments, segments: row.segments })));
-  const headers = ['Modelo', 'Tipo plan', 'Cuotas', 'Valor básico', 'Cuota pura', ...(isRenault ? ['Cuota 0 · Sellado'] : []), ...(includeCuota1 ? ['Cuota 1', 'Sobrepauta'] : []), 'Suscripción', ...columns.map(column => column.label), 'Entregas pactadas'];
+  const headers = ['Modelo', 'Tipo plan', 'Cuotas', 'Valor básico', 'Cuota pura', ...(isRenault ? ['Cuota 0 · Sellado'] : []), ...(includeCuota1 ? ['Cuota 1'] : []), 'Suscripción Normal 1', 'Suscripción Normal 3', 'Suscripción Ultra', ...columns.map(column => column.label), 'Entregas pactadas'];
   const values = items.map(item => {
     const valuesByColumn = installmentBucketValues(displayRows.find(row => row.item.id === item.id)?.segments || [], item.total_installments);
-    const surcharge = Number(item.surcharge_amount ?? item.base_surcharge ?? 0);
-    const subscription = Number(item.subscription_value) || Number(item.cuota_1_value || 0) + surcharge;
-    return [item.model, item.plan_type, item.total_installments, Number(item.basic_value), Number(item.pure_installment), ...(isRenault ? [Number(item.upfront_stamp_value || 0)] : []), ...(includeCuota1 ? [Number(item.cuota_1_value || 0), surcharge] : []), subscription, ...columns.map(column => valuesByColumn.get(column.key) ?? null), item.delivery_terms || '—'];
+    const normal1 = Number(item.normal_1 ?? item.subscription_normal_1 ?? 0);
+    const normal3 = Number(item.normal_3 ?? item.subscription_normal_3 ?? 0);
+    const ultra = Number(item.ultra ?? item.subscription_ultra ?? 0);
+    return [item.model, item.plan_type, item.total_installments, Number(item.basic_value), Number(item.pure_installment), ...(isRenault ? [Number(item.upfront_stamp_value || 0)] : []), ...(includeCuota1 ? [Number(item.cuota_1_value || 0)] : []), normal1, normal3, ultra, ...columns.map(column => valuesByColumn.get(column.key) ?? null), item.delivery_terms || '—'];
   });
   return { headers, values };
 };

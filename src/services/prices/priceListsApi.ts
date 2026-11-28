@@ -27,6 +27,12 @@ export type PriceListItemView = {
   upfront_stamp_value?: number;
   delivery_terms: string | null;
   cuota_1_value?: number;
+  subscription_normal_1?: number;
+  subscription_normal_3?: number;
+  subscription_ultra?: number;
+  normal_1?: number;
+  normal_3?: number;
+  ultra?: number;
   base_surcharge?: number;
   surcharge_amount?: number;
   subscription_value: number;
@@ -64,9 +70,11 @@ async function request<T>(token: string, init?: RequestInit): Promise<T> {
 export const getPriceLists = (token: string) => request<PriceListsResponse>(token);
 export const publishPriceList = (token: string, versionId: string) => request<PriceListsResponse>(token, { method: 'POST', body: JSON.stringify({ action: 'publish', version_id: versionId }) });
 export const saveSurcharges = (token: string, versionId: string, surcharges: Array<{ item_id: string; surcharge_amount: number }>) => request<PriceListsResponse>(token, { method: 'POST', body: JSON.stringify({ action: 'save_surcharges', version_id: versionId, surcharges }) });
+export const saveSubscriptions = (token: string, versionId: string, subscriptions: Array<{ item_id: string; normal_1: number; normal_3: number; ultra: number }>) => request<PriceListsResponse>(token, { method: 'POST', body: JSON.stringify({ action: 'save_subscriptions', version_id: versionId, subscriptions }) });
 export const confirmPriceList = (token: string, versionId: string) => request<PriceListsResponse>(token, { method: 'POST', body: JSON.stringify({ action: 'confirm', version_id: versionId }) });
 export const createRenaultDraft = (token: string, draft: Record<string, unknown>) => request<PriceListsResponse>(token, { method: 'POST', body: JSON.stringify({ action: 'create_renault_draft', ...draft }) });
 export const createMgDraft = (token: string, draft: Record<string, unknown>) => request<PriceListsResponse>(token, { method: 'POST', body: JSON.stringify({ action: 'create_mg_draft', ...draft }) });
+export const createAssistedDraft = (token: string, draft: Record<string, unknown>) => request<PriceListsResponse>(token, { method: 'POST', body: JSON.stringify({ action: 'create_assisted_draft', ...draft }) });
 export const getBnaRate = (token: string) => request<{ success: boolean; exchange_rate: number; exchange_rate_source: string }>(token, { method: 'POST', body: JSON.stringify({ action: 'get_bna_rate' }) });
 export const archivePriceList = (token: string, versionId: string) => request<PriceListsResponse>(token, { method: 'POST', body: JSON.stringify({ action: 'archive', version_id: versionId }) });
 export const saveOfficialValues = (token: string, versionId: string, items: unknown[]) => request<PriceListsResponse>(token, { method: 'POST', body: JSON.stringify({ action: 'save_official_values', version_id: versionId, items }) });
